@@ -1,1 +1,78 @@
-test
+------------------------------------------------------------------------------------------------
+###########################
+# Step 1 : Trim Raw Reads #
+###########################
+# Tool: Trimmomatic
+#
+module load python
+conda activate java
+java -version
+
+for i in *1.fastq
+do
+base=$(echo $i | cut -d '_' -f1-1)
+sbatch -p shared  -t 0-00:30 --mem=5000 --wrap="java -jar /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/Trimmomatic-0.39/trimmomatic-0.39.jar PE -phred33 -trimlog $base\_1.log $base\_1.fastq $base\_2.fastq $base\_trimmed_1.fq.gz $base\_unpaired_1.fq.gz $base\_trimmed_2.fq.gz $base\_unpaired_2.fq.gz ILLUMINACLIP:TruSeq3-PE.fa:2:30:10:2:True LEADING:3 TRAILING:3 MINLEN:36 > $base\_trim.out;
+rm $base\_trim.out $base\_1.log $base\_unpaired_1.fq.gz $base\_unpaired_2.fq.gz"
+done
+
+
+------------------------------------------------------------------------------------------------
+################################
+# Step 2 : Check Contamination #
+################################
+# Tool: kraken2
+# https://github.com/DerrickWood/kraken2
+
+for i in *trimmed_1.fq.gz;
+do
+  base=$(echo $i | cut -d '_' -f1-1) ;
+sbatch -p shared  -t 0-01:00 --mem=100000 --wrap="kraken2 --db /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/kraken2/standard_db --report $base\_report.txt --paired $base\_trimmed_1.fq.gz $base\_trimmed_2.fq.gz > $base\_kraken.out";
+done
+
+
+------------------------------------------------------------------------------------------------
+################################
+# Step 3: Remove Contamination #
+################################
+# Tool: Kraken tools
+
+conda activate biopython
+
+for i in *trimmed_1.fq.gz;
+do
+  base=$(echo $i | cut -d '_' -f1-1) ;
+sbatch -p shared  -t 0-00:10 --mem=5000 --wrap="extract_kraken_reads.py -k $base\_kraken.out -s1 $base\_trimmed_1.fq.gz -s2 $base\_trimmed_2.fq.gz -o $base\_filtered_1.fq -o2 $base\_filtered_2.fq --fastq-output --taxid 1301
+gzip $base\_filtered_1.fq
+gzip $base\_filtered_2.fq"
+done
+
+
+------------------------------------------------------------------------------------------------
+#####################
+# Step 4 : ASSEMBLY #
+#####################
+# Tool: unicycler
+
+source activate unicycler
+
+for i in *_filtered_1.fq.gz;
+do
+base=$(echo $i | cut -d '_' -f1-1)
+sbatch -p shared  -t 0-01:00 --mem=40000 --wrap="unicycler -1 $base\_filtered_1.fq.gz  -2 $base\_filtered_2.fq.gz -o $base\.unicycler.out
+mv $base\.unicycler.out/assembly.fasta $base.fasta"
+done
+
+
+
+------------------------------------------------------------------------------------------------
+#######################
+# Step 5 : Annotation #
+#######################
+# Tool: bakta
+source activate prokka
+
+for i in *fasta
+do
+  base=$(echo $i | cut -d '/' -f2-2 | cut -d '.' -f1-1)
+  sbatch -p shared  -t 0-01:00 --mem=100000 --wrap="prokka $i"
+done
