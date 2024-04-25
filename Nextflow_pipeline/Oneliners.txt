@@ -1,3 +1,21 @@
+All steps:
+- Trim, Trimmomatic                       DONE
+- Check contamination, Kraken             DONE
+- Remove contamination, KrakenTools       DONE
+- Assembly, unicycler                     DONE
+- Gene annotation, prokka                 DONE
+- Pangenome analysis, Panaroo
+- Pan-GWAS: pyseer
+- Serotype call - GBS-SBG
+- Sequence cluster - Poppunk
+- MLST - SRST2
+- Mapping+ variant calling: SNIPPY
+- Whole genome SNP alignment: SNP-sites
+- Phylogeny: FastTree
+- GWAS: pyseer
+- unitig calling: unitig-caller
+- DBGWAS: pyseer
+
 ------------------------------------------------------------------------------------------------
 ###########################
 # Step 1 : Trim Raw Reads #
