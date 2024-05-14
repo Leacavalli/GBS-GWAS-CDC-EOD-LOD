@@ -1,16 +1,17 @@
 All steps:
-- Trim, Trimmomatic                       DONE
-- Check contamination, Kraken             DONE
-- Remove contamination, KrakenTools       DONE
-- Assembly, unicycler                     DONE
-- Gene annotation, prokka                 DONE
+1. Trim, Trimmomatic                       DONE
+2. Check contamination, Kraken             DONE
+3. Remove contamination, KrakenTools       DONE
+4. Assembly, unicycler                     DONE
+5. Gene annotation, prokka                 DONE
+6. Serotype call - GBS-SBG                 DONE
+7. MLST - SRST2         		   DONE
+8. Mapping+ variant calling: SNIPPY
+9. Whole genome SNP alignment: SNP-sites
+
 - Pangenome analysis, Panaroo
 - Pan-GWAS: pyseer
-- Serotype call - GBS-SBG
 - Sequence cluster - Poppunk
-- MLST - SRST2
-- Mapping+ variant calling: SNIPPY
-- Whole genome SNP alignment: SNP-sites
 - Phylogeny: FastTree
 - GWAS: pyseer
 - unitig calling: unitig-caller
@@ -77,7 +78,8 @@ for i in *_filtered_1.fq.gz;
 do
 base=$(echo $i | cut -d '_' -f1-1)
 sbatch -p shared  -t 0-01:00 --mem=40000 --wrap="unicycler -1 $base\_filtered_1.fq.gz  -2 $base\_filtered_2.fq.gz -o $base\.unicycler.out
-mv $base\.unicycler.out/assembly.fasta $base.fasta"
+mv $base\.unicycler.out/assembly.fasta $base.fasta
+rm $base\.unicycler.out"
 done
 
 
@@ -86,11 +88,47 @@ done
 #######################
 # Step 5 : Annotation #
 #######################
-# Tool: bakta
+# Tool: prokka
 source activate prokka
 
 for i in *fasta
 do
   base=$(echo $i | cut -d '/' -f2-2 | cut -d '.' -f1-1)
-  sbatch -p shared  -t 0-01:00 --mem=100000 --wrap="prokka $i"
+  sbatch -p shared  -t 0-01:00 --mem=100000 --wrap="prokka $i --outdir $base\_prokka --prefix $base
+mv $base\_prokka/$base\.gff .
+rm -r $base\_prokka"
 done
+
+
+------------------------------------------------------------------------------------------------
+#######################
+# Step 6 : Serotyping #
+#######################
+# Tool: GBS-SBG.pl
+source activate perl
+source activate blast
+
+
+for i in *fasta
+do
+  base=$(echo $i | cut -d '/' -f2-2 | cut -d '.' -f1-1)
+  sbatch -p shared  -t 0-01:00 --mem=100000 --wrap="perl /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/GBS-SBG/GBS-SBG.pl $base.fasta | tail -1 > $base\_sero.tab"
+done
+
+
+------------------------------------------------------------------------------------------------
+#######################
+# Step 7 : MLST       #
+#######################
+# Tool: mlst
+source activate mlst
+
+for i in *fasta
+do
+  base=$(echo $i | cut -d '/' -f2-2 | cut -d '.' -f1-1)
+  sbatch -p shared  -t 0-01:00 --mem=100000 --wrap="mlst --scheme sagalactiae $base.fasta > $base\_mlst.tab"
+done
+  
+  
+
+
