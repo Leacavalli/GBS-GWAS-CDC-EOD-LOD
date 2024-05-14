@@ -7,13 +7,11 @@ All steps:
 6. Serotype call - GBS-SBG                 DONE
 7. MLST - SRST2         		               DONE
 8. Pangenome analysis, Panaroo
-9. Sequence cluster - Poppunk 
 9. Mapping+ variant calling: SNIPPY
 10. Whole genome SNP alignment: SNP-sites
 
 
 - Pan-GWAS: pyseer
-- Sequence cluster - Poppunk
 - Phylogeny: FastTree
 - GWAS: pyseer
 - unitig calling: unitig-caller
