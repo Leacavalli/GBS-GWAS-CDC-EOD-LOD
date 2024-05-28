@@ -5,14 +5,13 @@ All steps:
 4. Assembly, unicycler                     DONE
 5. Gene annotation, prokka                 DONE
 6. Serotype call - GBS-SBG                 DONE
-7. MLST - SRST2         		               DONE
-8. Pangenome analysis, Panaroo
-9. Mapping+ variant calling: SNIPPY
-10. Whole genome SNP alignment: SNP-sites
+7. MLST - SRST2         		   DONE
+8. Mapping+ variant calling: SNIPPY
+9. Whole genome SNP alignment: SNP-sites
 
-
-- Pan-GWAS: pyseer
-- Phylogeny: FastTree
+- Pangenome analysis, Panaroo 		   In Progress
+- Pan-GWAS: pyseer 	  	 
+- Phylogeny: FastTree 
 - GWAS: pyseer
 - unitig calling: unitig-caller
 - DBGWAS: pyseer
@@ -128,31 +127,7 @@ do
   base=$(echo $i | cut -d '/' -f2-2 | cut -d '.' -f1-1)
   sbatch -p shared  -t 0-01:00 --mem=100000 --wrap="mlst --scheme sagalactiae $base.fasta > $base\_mlst.tab"
 done
-
-___________________________________________________________________________________________________
-
-###############################
-# Step 8 : Pangenome analysis #
-###############################
-# Tool: Panaroo
-# Input: gff files from Prokka
-# Output: Results folder 
-
-conda create -n panaroo python=3.9
-conda activate panaroo
-conda install -c conda-forge -c bioconda -c defaults 'panaroo>=1.3'
-
-mkdir results
-for i in *.gff 
-do 
-    base=$(echo $i | cut -d '/' -f2-2 | cut -d '.' -f1-1)
-    sbatch -p shared  -t 0-01:00 --mem=100000 --wrap="panaroo -i $base.gff -o results --clean-mode strict"
-done
-
-
-
-
-
-
+  
+  
 
 

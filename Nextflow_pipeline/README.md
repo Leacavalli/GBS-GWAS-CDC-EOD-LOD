@@ -64,9 +64,9 @@ done
 # 3. Install Java 11
  # Installation
  module load python
- conda create -n java  # Only run once to set up; All following times, skip this
+ # conda create -n java  # Only run once to set up; All following times, skip this
  conda activate java
- conda install openjdk=11  # Only run once to set up; All following times, skip this
+ # conda install openjdk=11  # Only run once to set up; All following times, skip this
  java -version
 
 
@@ -87,7 +87,7 @@ source ~/.bashrc
 
 
 # 5. Run Nextflow
-cd /n/holyscratch01/hanage_lab/lcavalli/Intrahost_Sars_VoCs/NEXTFLOW_PIPELINE/scripts/
+cd NEXTFLOW_PIPELINE/scripts/
 
 for i in ../0.RAW_READS/*_1.fastq
 do
