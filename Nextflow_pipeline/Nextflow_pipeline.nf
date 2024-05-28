@@ -86,7 +86,7 @@ process ASSEMBLY {
   """
   unicycler -1 ${filtered_read1}  -2 ${filtered_read2} -o ${base}.unicycler.out
   mv ${base}.unicycler.out/assembly.fasta ${base}.fasta
-  rm ${base}.unicycler.out
+  rm -r ${base}.unicycler.out
   """
 }
 
@@ -108,7 +108,7 @@ process ANNOTATION {
   script:
   """
   prokka ${fasta_file} --outdir ${base}_prokka ${base}
-  mv ${base}_prokka/${base}.gff .
+  mv ${base}_prokka/*.gff .
   rm -r ${base}_prokka
   """
 }
