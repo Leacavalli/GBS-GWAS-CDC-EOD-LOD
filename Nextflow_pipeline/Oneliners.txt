@@ -6,10 +6,11 @@ All steps:
 5. Gene annotation, prokka                 DONE
 6. Serotype call - GBS-SBG                 DONE
 7. MLST - SRST2         		   DONE
-8. Mapping+ variant calling: SNIPPY
-9. Whole genome SNP alignment: SNP-sites
+8. Pangenome analysis: Panaroo 
+9. Mapping+ variant calling: SNIPPY
+10. Whole genome SNP alignment: SNP-sites
 
-- Pangenome analysis, Panaroo 		   In Progress
+
 - Pan-GWAS: pyseer 	  	 
 - Phylogeny: FastTree 
 - GWAS: pyseer
@@ -127,7 +128,17 @@ do
   base=$(echo $i | cut -d '/' -f2-2 | cut -d '.' -f1-1)
   sbatch -p shared  -t 0-01:00 --mem=100000 --wrap="mlst --scheme sagalactiae $base.fasta > $base\_mlst.tab"
 done
-  
+
+###############################
+# Step 8 : Pangenome Analysis #
+###############################
+# Tool: panaroo
+
+conda create -n Panaroo python=3.9
+source activate Panaroo
+mkdir panaroo_results
+
+panaroo -i *.gff3 -o panaroo_results --clean-mode strict --alignment pan --aligner mafft
   
 
 
