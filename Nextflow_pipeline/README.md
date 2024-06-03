@@ -1,14 +1,10 @@
 This Nextflow pipeline was built to intregate the following steps:
-```{r table1, tidy=FALSE}
-library(tidyverse)
-data1 <- tribble(
-  ~"Column 1",                                ~"Column 2",
-  "lorem ipsum dolor",                        "sit amet, consectetur",
-  "adipisci elit, sed eiusmod tempor",        "incidunt ut labore et dolore magna aliqua"
-)
-knitr::kable((data1), booktabs = TRUE,
-caption = 'A test table.')
-```
+
+| First Header  | Second Header |
+| ------------- | ------------- |
+| Content Cell  | Content Cell  |
+| Content Cell  | Content Cell  |
+
 # Pipeline Architecture
 
 NEXTFLOW_PIPELINE\
