@@ -3,29 +3,29 @@
 # Pipeline Architecture
 
 NEXTFLOW_PIPELINE\
-&nbsp;| scripts\
-______|--- nextflow.config\
-      |--- Nextflow_pipeline.nf\
-  | 0.RAW_READS\
-      |--- *r1.fq.gz\
-      |--- *r2.fq.gz\
-  | 1.TRIMMED_READS\
-      | *_trimmed_1.fq.gz\
-      | *_trimmed_2.fq.gz\
-  | 2.KRAKEN\
-      | *_kraken.out\
-      | *_report.txt\
-  | 3.FILTERED_READS\
-      | *_filtered_1.fq.gz\
-      | *_filtered_2.fq.gz\
-  | 4.ASSEMBLIES\
-      | *.fasta\
-  | 5.ANNOTATION\
-      | *.gff3\
-  | 6.SEROTYPES\
-      | *_sero.tab\
-  | 7.MLST\
-      | *_mlst.tab\
+&nbsp;&nbsp;| scripts\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|--- nextflow.config\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|--- Nextflow_pipeline.nf\
+&nbsp;&nbsp;| 0.RAW_READS\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|--- *r1.fq.gz\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|--- *r2.fq.gz\
+&nbsp;&nbsp;| 1.TRIMMED_READS\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_trimmed_1.fq.gz\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_trimmed_2.fq.gz\
+&nbsp;&nbsp;| 2.KRAKEN\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_kraken.out\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_report.txt\
+&nbsp;&nbsp;| 3.FILTERED_READS\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_filtered_1.fq.gz\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_filtered_2.fq.gz\
+&nbsp;&nbsp;| 4.ASSEMBLIES\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *.fasta\
+&nbsp;&nbsp;| 5.ANNOTATION\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *.gff3\
+&nbsp;&nbsp;| 6.SEROTYPES\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_sero.tab\
+&nbsp;&nbsp;| 7.MLST\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_mlst.tab\
 
 # Running the Pipeline
 
