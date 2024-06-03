@@ -7,20 +7,20 @@ This Nextflow pipeline was built to intregate the following steps:
 | Steps  | Description  | Tool |
 | ------------- | ------------- | ------------- |
 | 1 | Trim sequencing primers  | [Trimmomatic](https://github.com/timflutre/trimmomatic)  |
-| 2 | Identify contaminating reads  | Kraken2  |
-| 3 | Remove contaminating reads  | KrakenTools  |
-| 4 | Assemble reads  | Unicycler  |
-| 5 | Determine the serotype of isolates | GBS-SG  |
-| 6 | Determine the ST of isolates | SRT2  |
-| 7 | Genome Annotation | Prokka  |
-| 8 | Pangenome Analysis | Panaroo  |
-| 9 | Mapping and variant calling | Snippy  |
-| 10 | Produce a whole genome SNP alignment | SNP-sites  |
-| 11 | Call unitigs | Unitig-caller |
-| 12 | Conduct a GWAS using SNPs | pyseer |
-| 13 | Conduct a GWAS using unitigs (i.e. DBGWAS) | pyseer |
-| 14 | Conduct a GWAS using gene presence/absence (i.e. PanGWAS)| pyseer |
-| 15 | Produce a phylogeney | FastTree |
+| 2 | Identify contaminating reads  | [Kraken2](https://github.com/DerrickWood/kraken2) |
+| 3 | Remove contaminating reads  | [KrakenTools](https://github.com/jenniferlu717/KrakenTools) |
+| 4 | Assemble reads  | [Unicycler](https://github.com/rrwick/Unicycler)  |
+| 5 | Determine the serotype of isolates | [GBS-SG](https://github.com/swainechen/GBS-SBG)  |
+| 6 | Determine the ST of isolates | [SRST2]()  |
+| 7 | Genome Annotation | [Prokka](https://github.com/tseemann/prokka)  |
+| 8 | Pangenome Analysis | [Panaroo](https://github.com/gtonkinhill/panaroo)  |
+| 9 | Mapping and variant calling | [Snippy](https://github.com/tseemann/snippy)  |
+| 10 | Produce a whole genome SNP alignment | [SNP-sites](https://github.com/sanger-pathogens/snp-sites)  |
+| 11 | Call unitigs | [Unitig-caller](https://github.com/bacpop/unitig-caller) |
+| 12 | Conduct a GWAS using SNPs | [pyseer](https://github.com/mgalardini/pyseer) |
+| 13 | Conduct a GWAS using unitigs (i.e. DBGWAS) | [pyseer](https://github.com/mgalardini/pyseer) |
+| 14 | Conduct a GWAS using gene presence/absence (i.e. PanGWAS)| [pyseer](https://github.com/mgalardini/pyseer) |
+| 15 | Produce a phylogeney | [FastTree](http://www.microbesonline.org/fasttree/) |
 
 
 
