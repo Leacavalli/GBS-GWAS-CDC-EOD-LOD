@@ -5,54 +5,51 @@
 NEXTFLOW_PIPELINE\
   | scripts\
       |--- nextflow.config\
-      |--- Nextflow_pipeline.nf
-  | 0.RAW_READS
-      |--- *r1.fq.gz
-      |--- *r2.fq.gz
-  | 1.TRIMMED_READS
-      | *_trimmed_1.fq.gz
-      | *_trimmed_2.fq.gz
-  | 2.KRAKEN
-      | *_kraken.out
-      | *_report.txt
-  | 3.FILTERED_READS
-      | *_filtered_1.fq.gz
-      | *_filtered_2.fq.gz
-  | 4.ASSEMBLIES
-      | *.fasta
-  | 5.ANNOTATION
-      | *.gff3
-  | 6.SEROTYPES
-      | *_sero.tab
-  | 7.MLST
-      | *_mlst.tab
+      |--- Nextflow_pipeline.nf\
+  | 0.RAW_READS\
+      |--- *r1.fq.gz\
+      |--- *r2.fq.gz\
+  | 1.TRIMMED_READS\
+      | *_trimmed_1.fq.gz\
+      | *_trimmed_2.fq.gz\
+  | 2.KRAKEN\
+      | *_kraken.out\
+      | *_report.txt\
+  | 3.FILTERED_READS\
+      | *_filtered_1.fq.gz\
+      | *_filtered_2.fq.gz\
+  | 4.ASSEMBLIES\
+      | *.fasta\
+  | 5.ANNOTATION\
+      | *.gff3\
+  | 6.SEROTYPES\
+      | *_sero.tab\
+  | 7.MLST\
+      | *_mlst.tab\
 
-# Steps to run the Pipeline:
+# Running the Pipeline:
 
 ## 1. Create ARCHITECTURE
-mkdir NEXTFLOW_PIPELINE
-cd NEXTFLOW_PIPELINE
-  mkdir 0.RAW_READS
-  mkdir 1.TRIMMED_READS
-  mkdir 2.KRAKEN
-  mkdir 3.FILTERED_READS
-  mkdir 4.ASSEMBLIES
-  mkdir 5.ANNOTATION
-  mkdir 6.SEROTYPES
-  mkdir 7.MLST
-  mkdir scripts
+mkdir NEXTFLOW_PIPELINE\
+cd NEXTFLOW_PIPELINE\
+  mkdir 0.RAW_READS\
+  mkdir 1.TRIMMED_READS\
+  mkdir 2.KRAKEN\
+  mkdir 3.FILTERED_READS\
+  mkdir 4.ASSEMBLIES\
+  mkdir 5.ANNOTATION\
+  mkdir 6.SEROTYPES\
+  mkdir 7.MLST\
+  mkdir scripts\
 
 ## 2. Download Raw reads from NCBI
-# SraAccList.txt contains the list of accessions you want
-cd 0.RAW_READS
-sbatch -p shared -t 1-00:00 --mem=100000 --wrap="prefetch --option-file SraAccList.txt"
-for i in *RR*
-do
- sbatch -p shared  -t 0-00:10 --mem=10000 --wrap="fasterq-dump --split-files $i/*sra"
-done
+* SraAccList.txt contains the list of accessions you want
+cd 0.RAW_READS\
+sbatch -p shared -t 1-00:00 --mem=100000 --wrap="prefetch --option-file SraAccList.txt"\
+for i in *RR*; do sbatch -p shared  -t 0-00:10 --mem=10000 --wrap="fasterq-dump --split-files $i/*sra"; done\
 
 
-# 3. Install Java 11
+## 3. Install Java 11
  # Installation
  module load python
  # conda create -n java  # Only run once to set up; All following times, skip this
@@ -61,7 +58,7 @@ done
  java -version
 
 
-# 4. Install Nextflow
+## 4. Install Nextflow
 # Download the executable package
 wget -qO- https://get.nextflow.io | bash
 # Make the binary executable on your system by running
