@@ -3,8 +3,8 @@
 # Pipeline Architecture:
 
 NEXTFLOW_PIPELINE\
-  | scripts\
-      |--- nextflow.config\
+__| scripts\
+______|--- nextflow.config\
       |--- Nextflow_pipeline.nf\
   | 0.RAW_READS\
       |--- *r1.fq.gz\
