@@ -1,16 +1,14 @@
 This Nextflow pipeline was built to intregate the following steps:
-<br>      
-
-<table>
-<caption><span id="tab:table2">Table 1.2: </span>Test table 2.</caption>
-
-Column 1       Column 2
--------------  ---------
-lorem          ipsum
-dolor          sit
-
-</table>
-
+```{r table1, tidy=FALSE}
+library(tidyverse)
+data1 <- tribble(
+  ~"Column 1",                                ~"Column 2",
+  "lorem ipsum dolor",                        "sit amet, consectetur",
+  "adipisci elit, sed eiusmod tempor",        "incidunt ut labore et dolore magna aliqua"
+)
+knitr::kable((data1), booktabs = TRUE,
+caption = 'A test table.')
+```
 # Pipeline Architecture
 
 NEXTFLOW_PIPELINE\
