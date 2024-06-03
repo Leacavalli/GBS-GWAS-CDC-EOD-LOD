@@ -1,45 +1,37 @@
-################################
-#          NEXTFLOW            #
-################################
+# Pipeline Description:
 
-PIPELINE ARCHITECTURE
+# Pipeline Architecture:
 
-#   | scripts
-#       |--- nextflow.config
-#       |--- Nextflow_pipeline.nf
-#   |
-#   | 0.RAW_READS
-#       |--- *r1.fq.gz
-#       |--- *r2.fq.gz
-#   |
-#   | 1.TRIMMED_READS
-#       | *_trimmed_1.fq.gz
-#       | *_trimmed_2.fq.gz
-#   |
-#   | 2.KRAKEN
-#       | *_kraken.out
-#       | *_report.txt
-#   |
-#   | 3.FILTERED_READS
-#       | *_filtered_1.fq.gz
-#       | *_filtered_2.fq.gz
-#   |
-#   | 4.ASSEMBLIES
-#       | *.fasta
-#   |
-#   | 5.ANNOTATION
-#       | *.gff3
-#   |
-#   | 6.SEROTYPES
-#       | *_sero.tab
-#   |
-#   | 7.MLST
-#       | *_mlst.tab
+NEXTFLOW_PIPELINE
+  | scripts
+      |--- nextflow.config
+      |--- Nextflow_pipeline.nf
+  | 0.RAW_READS
+      |--- *r1.fq.gz
+      |--- *r2.fq.gz
+  | 1.TRIMMED_READS
+      | *_trimmed_1.fq.gz
+      | *_trimmed_2.fq.gz
+  | 2.KRAKEN
+      | *_kraken.out
+      | *_report.txt
+  | 3.FILTERED_READS
+      | *_filtered_1.fq.gz
+      | *_filtered_2.fq.gz
+  | 4.ASSEMBLIES
+      | *.fasta
+  | 5.ANNOTATION
+      | *.gff3
+  | 6.SEROTYPES
+      | *_sero.tab
+  | 7.MLST
+      | *_mlst.tab
 
-# 1. Create ARCHITECTURE
+# Steps to run the Pipeline:
+
+## 1. Create ARCHITECTURE
 mkdir NEXTFLOW_PIPELINE
 cd NEXTFLOW_PIPELINE
-
   mkdir 0.RAW_READS
   mkdir 1.TRIMMED_READS
   mkdir 2.KRAKEN
@@ -50,8 +42,7 @@ cd NEXTFLOW_PIPELINE
   mkdir 7.MLST
   mkdir scripts
 
-
-# 2. Download Raw reads from NCBI
+## 2. Download Raw reads from NCBI
 # SraAccList.txt contains the list of accessions you want
 cd 0.RAW_READS
 sbatch -p shared -t 1-00:00 --mem=100000 --wrap="prefetch --option-file SraAccList.txt"
@@ -93,4 +84,11 @@ for i in ../0.RAW_READS/*_1.fastq
 do
  base=$(echo $i | cut -d '/' -f3-3 | cut -d '_' -f1-1)
  sbatch -p shared -t 0-03:00 --mem=100000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline.nf --base $base"
+done
+
+
+for i in ../0.RAW_READS/*_1.fastq
+do
+ base=$(echo $i | cut -d '/' -f3-3 | cut -d '_' -f1-1)
+ sbatch -p shared -t 0-03:00 --mem=100000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline_V1.nf --base $base"
 done

@@ -1,5 +1,3 @@
-params.baselist = params.base?.split(',') as List
-
 process Trimmomatic {
   conda 'openjdk=11'
 
