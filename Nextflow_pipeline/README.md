@@ -1,4 +1,14 @@
-# Pipeline Description:
+This Nextflow pipeline was built to intregate the following steps:
+<br>      
+
+<table>
+<caption><span id="tab:table2">Table 1.2: </span>Test table 2.</caption>
+Column 1       Column 2
+-------------  ---------
+Trim sequencing primers         Trimmomatic
+Identify contaminating reads          Kraken
+
+</table>
 
 # Pipeline Architecture
 
@@ -25,31 +35,34 @@ NEXTFLOW_PIPELINE\
 &nbsp;&nbsp;| 6.SEROTYPES\
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_sero.tab\
 &nbsp;&nbsp;| 7.MLST\
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_mlst.tab\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_mlst.tab
 
 # Running the Pipeline
 
 ## 1. Create ARCHITECTURE
 ```
-mkdir NEXTFLOW_PIPELINE\
-cd NEXTFLOW_PIPELINE\
-  mkdir 0.RAW_READS\
-  mkdir 1.TRIMMED_READS\
-  mkdir 2.KRAKEN\
-  mkdir 3.FILTERED_READS\
-  mkdir 4.ASSEMBLIES\
-  mkdir 5.ANNOTATION\
-  mkdir 6.SEROTYPES\
-  mkdir 7.MLST\
-  mkdir scripts\
+mkdir NEXTFLOW_PIPELINE
+cd NEXTFLOW_PIPELINE
+  mkdir 0.RAW_READS
+  mkdir 1.TRIMMED_READS
+  mkdir 2.KRAKEN
+  mkdir 3.FILTERED_READS
+  mkdir 4.ASSEMBLIES
+  mkdir 5.ANNOTATION
+  mkdir 6.SEROTYPES
+  mkdir 7.MLST
+  mkdir scripts
 ```
 
 ## 2. Download Raw reads from NCBI
 Note: SraAccList.txt contains the list of accessions you want
 ```
-cd 0.RAW_READS\
-sbatch -p shared -t 1-00:00 --mem=100000 --wrap="prefetch --option-file SraAccList.txt"\
-for i in *RR*; do sbatch -p shared  -t 0-00:10 --mem=10000 --wrap="fasterq-dump --split-files $i/*sra"; done\
+cd 0.RAW_READS
+sbatch -p shared -t 1-00:00 --mem=100000 --wrap="prefetch --option-file SraAccList.txt"
+for i in *RR*
+do
+  sbatch -p shared  -t 0-00:10 --mem=10000 --wrap="fasterq-dump --split-files $i/*sra"
+done
 ```
 
 ## 3. Install Java 11
