@@ -1,9 +1,9 @@
 # Pipeline Description:
 
-# Pipeline Architecture:
+# Pipeline Architecture
 
 NEXTFLOW_PIPELINE\
-__| scripts\
+&nbsp;| scripts\
 ______|--- nextflow.config\
       |--- Nextflow_pipeline.nf\
   | 0.RAW_READS\
@@ -27,7 +27,7 @@ ______|--- nextflow.config\
   | 7.MLST\
       | *_mlst.tab\
 
-# Running the Pipeline:
+# Running the Pipeline
 
 ## 1. Create ARCHITECTURE
 ```
@@ -45,7 +45,7 @@ cd NEXTFLOW_PIPELINE\
 ```
 
 ## 2. Download Raw reads from NCBI
-* SraAccList.txt contains the list of accessions you want *
+Note: SraAccList.txt contains the list of accessions you want
 ```
 cd 0.RAW_READS\
 sbatch -p shared -t 1-00:00 --mem=100000 --wrap="prefetch --option-file SraAccList.txt"\
@@ -53,7 +53,6 @@ for i in *RR*; do sbatch -p shared  -t 0-00:10 --mem=10000 --wrap="fasterq-dump 
 ```
 
 ## 3. Install Java 11
- # Installation
 ```
 module load python
 conda create -n java      # Only run once to set up; All following times, skip this
@@ -65,12 +64,16 @@ java -version             # Check java version
 
 ## 4. Install Nextflow
 ```
- wget -qO- https://get.nextflow.io | bash     # Download the executable package
-chmod +x nextflow                             # Make the binary executable on your system by running
-cd /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software # Remember the full path to nextflow
-nano  ~/.bashrc       # Add executable to $PATH
-# add line at the end of file: export PATH="/n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software:$PATH"
-source ~/.bashrc      # exist file with ctlX and Y
+# Download the executable package:
+wget -qO- https://get.nextflow.io | bash   
+# Make the binary executable on your system by running:  
+chmod +x nextflow  
+# Add executable to $PATH                           
+nano  ~/.bashrc      
+# add line at the end of file:
+export PATH="<path_to_nextflow>:$PATH"
+# exist file with ctlX and Y
+source ~/.bashrc      
 ```
 
 
