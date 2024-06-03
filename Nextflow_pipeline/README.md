@@ -1,9 +1,27 @@
 This Nextflow pipeline was built to intregate the following steps:
+<br>   
 
-| First Header  | Second Header |
-| ------------- | ------------- |
-| Content Cell  | Content Cell  |
-| Content Cell  | Content Cell  |
+| Steps  | Description  | Tool |
+| ------------- | ------------- | ------------- |
+| 1 | Trim sequencing primers  | Trimmomatic  |
+| 2 | Identify contaminating reads  | Kraken2  |
+| 3 | Remove contaminating reads  | KrakenTools  |
+| 4 | Assemble reads  | Unicycler  |
+| 5 | Determine the serotype of isolates | GBS-SG  |
+| 6 | Determine the ST of isolates | SRT2  |
+| 7 | Genome Annotation | Prokka  |
+| 8 | Pangenome Analysis | Panaroo  |
+| 9 | Mapping and variant calling | Snippy  |
+| 10 | Produce a whole genome SNP alignment | SNP-sites  |
+| 11 | Call unitigs | Unitig-caller |
+| 12 | Conduct a GWAS using SNPs | pyseer |
+| 13 | Conduct a GWAS using unitigs (i.e. DBGWAS) | pyseer |
+| 14 | Conduct a GWAS using gene presence/absence (i.e. PanGWAS)| pyseer |
+| 15 | Produce a phylogeney | FastTree |
+
+
+
+
 
 # Pipeline Architecture
 
