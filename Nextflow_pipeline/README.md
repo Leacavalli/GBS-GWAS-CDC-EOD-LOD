@@ -1,9 +1,12 @@
+
+# Pipeline Description
+
 This Nextflow pipeline was built to intregate the following steps:
 <br>   
 
 | Steps  | Description  | Tool |
 | ------------- | ------------- | ------------- |
-| 1 | Trim sequencing primers  | Trimmomatic  |
+| 1 | Trim sequencing primers  | [Trimmomatic](https://github.com/timflutre/trimmomatic)  |
 | 2 | Identify contaminating reads  | Kraken2  |
 | 3 | Remove contaminating reads  | KrakenTools  |
 | 4 | Assemble reads  | Unicycler  |
