@@ -3,10 +3,11 @@ This Nextflow pipeline was built to intregate the following steps:
 
 <table>
 <caption><span id="tab:table2">Table 1.2: </span>Test table 2.</caption>
+
 Column 1       Column 2
 -------------  ---------
-Trim sequencing primers         Trimmomatic
-Identify contaminating reads          Kraken
+lorem          ipsum
+dolor          sit
 
 </table>
 
