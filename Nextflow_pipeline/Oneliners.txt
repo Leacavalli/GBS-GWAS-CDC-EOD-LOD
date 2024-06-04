@@ -3,10 +3,10 @@ Pipeline steps:
 2. Check contamination, Kraken             DONE
 3. Remove contamination, KrakenTools       DONE
 4. FASTQC                                 
-5. Serotyping + MLST - SRST2               DONE
-6. Assembly, unicycler                     DONE
-7. Gene annotation, prokka                 DONE
-11. Mapping+ variant calling: SNIPPY
+5. Mapping+ variant calling: SNIPPY
+6. Serotyping + MLST - SRST2               DONE
+7. Assembly, unicycler                     DONE
+8. Gene annotation, prokka                 DONE
 12. Whole genome SNP alignment: SNP-sites
 
 Post-pipeline steps: 
@@ -79,6 +79,31 @@ sbatch -p shared  -t 0-01:00 --mem=100000 --wrap="srst2 --input_pe ../0.RAW_READ
 
 
 ------------------------------------------------------------------------------------------------
+######################################
+# Step 5: Mapping+ variant calling   #
+######################################
+# Tool: snippy
+
+#install snippy
+conda create -n snippy
+source activate snippy
+conda install -c conda-forge -c bioconda -c defaults snippy
+
+
+#download reference
+
+pip install ncbi-acc-download
+ncbi-acc-download --format fasta AP018935.1 #switch reference as needed
+
+mkdir mysnps
+
+for i in *filtered_1.fq.gz;
+do
+  base=$(echo $i | cut -d '_' -f1-1) ;
+sbatch -p shared  -t 0-00:10 --mem=5000 --wrap="snippy --cpus 16 --outdir mysnps --ref AP018935.1 --R1 $base_filtered_1.fastq.gz --R2 $base_filtered_2.fastq.gz"
+done
+
+
 #####################
 # Step 5 : ASSEMBLY #
 #####################
