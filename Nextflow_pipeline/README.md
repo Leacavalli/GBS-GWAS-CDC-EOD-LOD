@@ -63,10 +63,11 @@ cd NEXTFLOW_PIPELINE
   mkdir 1.TRIMMED_READS
   mkdir 2.KRAKEN
   mkdir 3.FILTERED_READS
-  mkdir 4.ASSEMBLIES
-  mkdir 5.ANNOTATION
-  mkdir 6.SEROTYPES
-  mkdir 7.MLST
+  mkdir 4.FASTQC
+  mkdir 5.SRST2
+  mkdir 6.SNIPPY
+  mkdir 7.ASSEMBLIES
+  mkdir 8.ANNOTATION
   mkdir scripts
 ```
 
@@ -116,10 +117,9 @@ do
  sbatch -p shared -t 0-03:00 --mem=100000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline.nf --base $base"
 done
 
-
 for i in ../0.RAW_READS/SRR5063686*_1.fastq.gz
 do
  base=$(echo $i | cut -d '/' -f3-3 | cut -d '_' -f1-1)
- sbatch -p shared -t 0-03:00 --mem=100000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline_V2.nf --base $base"
+ sbatch -p shared -t 0-03:00 --mem=100000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline_V2.nf --path_to_reads /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_NEW --base $base"
 done
 ```

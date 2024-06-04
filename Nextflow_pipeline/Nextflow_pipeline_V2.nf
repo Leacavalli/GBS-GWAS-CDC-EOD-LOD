@@ -1,7 +1,7 @@
 process Trimmomatic {
   conda 'openjdk=11'
 
-  publishDir '/n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/1.TRIMMED_READS' , overwrite: true
+  publishDir "${params.path_to_reads}/1.TRIMMED_READS" , overwrite: true
 
   input:
   val base
@@ -12,14 +12,14 @@ process Trimmomatic {
   path "${base}_trimmed_2.fq.gz"
 
   """
-  java -jar /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/Trimmomatic-0.39/trimmomatic-0.39.jar PE -phred33 -trimlog ${base}_1.log /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/0.RAW_READS/${base}_1.fastq.gz /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/0.RAW_READS/${base}_2.fastq.gz ${base}_trimmed_1.fq.gz ${base}_unpaired_1.fq.gz ${base}_trimmed_2.fq.gz ${base}_unpaired_2.fq.gz LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36 > ${base}_trim.out
+  java -jar /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/Trimmomatic-0.39/trimmomatic-0.39.jar PE -phred33 -trimlog ${base}_1.log ${params.path_to_reads}/0.RAW_READS/${base}_1.fastq.gz ${params.path_to_reads}/0.RAW_READS/${base}_2.fastq.gz ${base}_trimmed_1.fq.gz ${base}_unpaired_1.fq.gz ${base}_trimmed_2.fq.gz ${base}_unpaired_2.fq.gz LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36 > ${base}_trim.out
   rm ${base}_1.log ${base}_unpaired_1.fq.gz ${base}_unpaired_2.fq.gz ${base}_trim.out
   """
 }
 
 
 process Kraken {
-  publishDir '/n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/2.KRAKEN' , overwrite: true
+  publishDir "${params.path_to_reads}/2.KRAKEN" , overwrite: true
 
   input:
   val base
@@ -43,7 +43,7 @@ process Kraken {
 process Kraken_tools {
   conda 'biopython'
 
-  publishDir '/n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/3.FILTERED_READS', overwrite: true
+  publishDir "${params.path_to_reads}/3.FILTERED_READS", overwrite: true
 
   input:
   val base
@@ -65,10 +65,29 @@ process Kraken_tools {
   """
 }
 
+process FastQC {
+  conda 'fastqc'
+
+  input:
+  val base
+  val filtered_read1
+  val filtered_read2
+
+  output:
+  val base
+  val filtered_read1
+  val filtered_read2
+
+  script:
+  """
+  fastqc ${filtered_read1} -o ${params.path_to_reads}/4.FASTQC
+  """
+}
+
 process Serotype_MLST {
   conda 'srst2'
 
-  publishDir '/n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/6.SRST2', overwrite: true
+  publishDir "${params.path_to_reads}/5.SRST2", overwrite: true
 
   input:
   val base
@@ -84,9 +103,78 @@ process Serotype_MLST {
 
   script:
   """
-  srst2 --input_pe /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/0.RAW_READS/${base}_{1,2}.fastq.gz --output ${base} --log --gene_db /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/GBS-SBG/GBS-SBG.fasta --mlst_db /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/srst2/Streptococcus_agalactiae.fasta --mlst_definitions /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/srst2/profiles_csv --mlst_delimiter '_'
+  srst2 --input_pe ${params.path_to_reads}/0.RAW_READS/${base}_{1,2}.fastq.gz --output ${base} --log --gene_db ${params.path_to_reads}/Files/GBS-SBG.fasta --mlst_db ${params.path_to_reads}/Files/Streptococcus_agalactiae.fasta --mlst_definitions ${params.path_to_reads}/Files/profiles_csv --mlst_delimiter '_'
   """
 }
+
+process SNIPPY {
+  conda 'snippy'
+
+  input:
+  val base
+  val filtered_read1
+  val filtered_read2
+  val serotypes_out
+  val mlst_out
+
+  output:
+  val base
+  val filtered_read1
+  val filtered_read2
+
+  script:
+  """
+  snippy --outdir ${params.path_to_reads}/6.SNIPPY/${base} --R1 ${filtered_read1} --R2 ${filtered_read2} --ref ${params.path_to_reads}/Files/AP018935.1.fa --cpus 16
+  """
+}
+
+process ASSEMBLY {
+  conda '/n/home02/lcavalli/.conda/envs/unicycler'
+
+  publishDir "${params.path_to_reads}/7.ASSEMBLIES", overwrite: true
+
+  input:
+  val base
+  val filtered_read1
+  val filtered_read2
+
+
+  output:
+  val base
+  path "${base}.fasta"
+
+  script:
+  """
+  unicycler -1 ${filtered_read1}  -2 ${filtered_read2} -o ${base}.unicycler.out
+  mv ${base}.unicycler.out/assembly.fasta ${base}.fasta
+  rm -r ${base}.unicycler.out
+  """
+}
+
+
+process ANNOTATION {
+  conda 'prokka'
+
+  publishDir "${params.path_to_reads}/8.ANNOTATION", overwrite: true
+
+  input:
+  val base
+  val fasta_file
+
+  output:
+  val base
+  val fasta_file
+  path "${base}.gff"
+
+  script:
+  """
+  prokka ${fasta_file} --outdir ${base}_prokka  --prefix ${base}
+  mv ${base}_prokka/*.gff .
+  rm -r ${base}_prokka
+  """
+}
+
+
 
 
 workflow {
@@ -94,5 +182,9 @@ workflow {
     | Trimmomatic
     | Kraken
     | Kraken_tools
+    | FastQC
     | Serotype_MLST
+    | SNIPPY
+    | ASSEMBLY
+    | ANNOTATION
 }

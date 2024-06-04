@@ -3,13 +3,13 @@ Pipeline steps:
 2. Check contamination, Kraken             DONE
 3. Remove contamination, KrakenTools       DONE
 4. FASTQC                                 
-5. Mapping+ variant calling: SNIPPY
-6. Serotyping + MLST - SRST2               DONE
-7. Assembly, unicycler                     DONE
-8. Gene annotation, prokka                 DONE
+5. Serotyping + MLST - SRST2               DONE
+6. Assembly, unicycler                     DONE
+7. Gene annotation, prokka                 DONE
 
 Post-pipeline steps: 
-- MULTIQC
+1. MULTIQC                                 DONE
+- Mapping+ variant calling: SNIPPY
 - Genome quality control 
 - Pangenome analysis: Panaroo 
 - Pan-GWAS: pyseer 	  	 
@@ -80,10 +80,10 @@ conda install bioconda::fastqc
 
 for i in *.fq.gz;
 do
-  sbatch -p shared -t 0-01:00 --mem=4000 --wrap="fastqc $i"
+  sbatch -p shared -t 0-01:00 --mem=4000 --wrap="fastqc $i –o /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_NEW/4.FASTQC"
 done
 
-
+sbatch -p shared -t 0-01:00 --mem=4000 --wrap="fastqc SRR5063682_filtered_1.fq.gz -o /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_NEW/4.FASTQC"
 ------------------------------------------------------------------------------------------------
 ######################################
 #     Step 4: Serotyping + MLST      #
@@ -112,15 +112,14 @@ conda install -c conda-forge -c bioconda -c defaults snippy
 pip install ncbi-acc-download
 ncbi-acc-download --format fasta AP018935.1 #switch reference as needed
 
-mkdir mysnps
-
-for i in *filtered_1.fq.gz;
+# Run Snippy 
+for i in SRR5063686*1.fq.gz
 do
-  base=$(echo $i | cut -d '_' -f1-1) ;
-sbatch -p shared  -t 0-00:10 --mem=5000 --wrap="snippy --cpus 16 --outdir mysnps --ref AP018935.1 --R1 $base_filtered_1.fastq.gz --R2 $base_filtered_2.fastq.gz"
+  base=$(echo $i | cut -d '/' -f2-2 | cut -d '_' -f1-1)
+  sbatch -p shared -t 0-05:00 --mem=100000 --wrap="snippy --outdir $base --R1 $base\_filtered_1.fq.gz --R2 $base\_filtered_2.fq.gz --ref AP018935.1.fa --cpus 16"
 done
 
-
+------------------------------------------------------------------------------------------------
 #####################
 # Step 6 : ASSEMBLY #
 #####################
@@ -135,7 +134,6 @@ sbatch -p shared  -t 0-01:00 --mem=40000 --wrap="unicycler -1 $base\_filtered_1.
 mv $base\.unicycler.out/assembly.fasta $base.fasta
 rm $base\.unicycler.out"
 done
-
 
 
 ------------------------------------------------------------------------------------------------
@@ -163,8 +161,7 @@ done
 source activate multiqc
 # conda install multiqc
 
-multiqc --outdir ~/Documents/Harvard/Lab/Fastqc_R1/ ~/Documents/Harvard/Lab/Fastqc_R1/
-multiqc --outdir ~/Documents/Harvard/Lab/Fastqc_R2/ ~/Documents/Harvard/Lab/Fastqc_R2/
+ sbatch -p shared  -t 0-03:00 --mem=100000 --wrap="multiqc ."
 
 
 ------------------------------------------------------------------------------------------------
@@ -173,14 +170,36 @@ multiqc --outdir ~/Documents/Harvard/Lab/Fastqc_R2/ ~/Documents/Harvard/Lab/Fast
 #######################################
 # Tool: snippy-multi
 
+#install snippy
+conda create -n snippy
+source activate snippy
+conda install -c conda-forge -c bioconda -c defaults snippy
+
+
+#download reference
+pip install ncbi-acc-download
+ncbi-acc-download --format fasta AP018935.1 #switch reference as needed
+
+
 #create input.tab of this format for every isolate 
-
 # input.tab = ID R1 [R2]
-Isolate1	/path/to/R1.fq.gz	/path/to/R2.fq.gz
-Isolate2 /path/to/R1.fq.gz	/path/to/R2.fq.gz
+# Isolate1	/path/to/R1.fq.gz	/path/to/R2.fq.gz
+# Isolate2 /path/to/R1.fq.gz	/path/to/R2.fq.gz
 
-snippy-multi input.tab --ref AP018935.1 --cpus 16 > runme.sh
+for i in *1.fq.gz
+do
+  base=$(echo $i | cut -d '/' -f2-2 | cut -d '_' -f1-1)
+  pwd=$(pwd)
+  echo -e "${base}\t$pwd/${base}_filtered_1.fq.gz\t$pwd/${base}_filtered_2.fq.gz"
+done >input.tab
+
+# run tool 
+snippy-multi input.tab --ref AP018935.1.fa --cpus 16 > runme.sh
 sh ./runme.sh 
+
+
+# OR JUST RUN SNP-core
+snippy-core --ref 'SRR5063682/ref.fa' SRR5063682 SRR5063683 SRR5063686 SRR5063689 SRR5063702 SRR5063709 SRR9088851 SRR9088857 SRR9088866
 
 
 ------------------------------------------------------------------------------------------------
@@ -209,6 +228,7 @@ source activate unitig-caller
 ls -d -1 /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_TESTS/4.ASSEMBLIES/* > refs.txt 
 unitig-caller --call --pyseer --refs refs.txt --out out_prefix
 
+sbatch -p shared -t 0-05:00 --mem=100000 --wrap="unitig-caller --call --pyseer --refs refs.txt --out out_prefix"
 
 ------------------------------------------------------------------------------------------------
 ###############################
