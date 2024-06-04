@@ -1,16 +1,17 @@
-All steps:
+Pipeline steps:
 1. Trim, Trimmomatic                       DONE
 2. Check contamination, Kraken             DONE
 3. Remove contamination, KrakenTools       DONE
-4. Assembly, unicycler                     DONE
-5. Gene annotation, prokka                 DONE
-6. Serotype call - GBS-SBG                 DONE
-7. MLST - SRST2         		   DONE
-8. Pangenome analysis: Panaroo 
+4. FASTQC                                 
+4. Serotyping + MLST - SRST2               DONE
+5. Assembly, unicycler                     DONE
+6. Gene annotation, prokka                 DONE
+7. Pangenome analysis: Panaroo 
 9. Mapping+ variant calling: SNIPPY
 10. Whole genome SNP alignment: SNP-sites
 
-
+Post-pipeline steps: 
+- MULTIQC
 - Pan-GWAS: pyseer 	  	 
 - Phylogeny: FastTree 
 - GWAS: pyseer
@@ -65,10 +66,20 @@ gzip $base\_filtered_1.fq
 gzip $base\_filtered_2.fq"
 done
 
+------------------------------------------------------------------------------------------------
+######################################
+#     Step 4: Serotyping + MLST      #
+######################################
+
+source activate srst2
+getmlst.py --species 'Streptococcus agalactiae'
+
+sbatch -p shared  -t 0-01:00 --mem=100000 --wrap="srst2 --input_pe ../0.RAW_READS/*.fastq.gz --output $base --log --gene_db /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/GBS-SBG/GBS-SBG.fasta --mlst_db /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/srst2/Streptococcus_agalactiae.fasta --mlst_definitions /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/srst2/profiles_csv --mlst_delimiter '_'"
+
 
 ------------------------------------------------------------------------------------------------
 #####################
-# Step 4 : ASSEMBLY #
+# Step 5 : ASSEMBLY #
 #####################
 # Tool: unicycler
 
@@ -86,7 +97,7 @@ done
 
 ------------------------------------------------------------------------------------------------
 #######################
-# Step 5 : Annotation #
+# Step 6 : Annotation #
 #######################
 # Tool: prokka
 source activate prokka
@@ -101,36 +112,8 @@ done
 
 
 ------------------------------------------------------------------------------------------------
-#######################
-# Step 6 : Serotyping #
-#######################
-# Tool: GBS-SBG.pl
-source activate perl
-source activate blast
-
-
-for i in *fasta
-do
-  base=$(echo $i | cut -d '/' -f2-2 | cut -d '.' -f1-1)
-  sbatch -p shared  -t 0-01:00 --mem=100000 --wrap="perl /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/GBS-SBG/GBS-SBG.pl $base.fasta | tail -1 > $base\_sero.tab"
-done
-
-
-------------------------------------------------------------------------------------------------
-#######################
-# Step 7 : MLST       #
-#######################
-# Tool: mlst
-source activate mlst
-
-for i in *fasta
-do
-  base=$(echo $i | cut -d '/' -f2-2 | cut -d '.' -f1-1)
-  sbatch -p shared  -t 0-01:00 --mem=100000 --wrap="mlst --scheme sagalactiae $base.fasta > $base\_mlst.tab"
-done
-
 ###############################
-# Step 8 : Pangenome Analysis #
+# Step 7 : Pangenome Analysis #
 ###############################
 # Tool: panaroo
 
@@ -140,5 +123,33 @@ mkdir panaroo_results
 
 panaroo -i *.gff3 -o panaroo_results --clean-mode strict --alignment pan --aligner mafft
   
+
+------------------------------------------------------------------------------------------------
+###############################
+# Step XX : Call Unitigs      #
+###############################
+# Tool: unitig-caller
+# conda create -n unitig-caller
+source activate unitig-caller
+# conda install unitig-caller
+
+ls -d -1 /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_TESTS/4.ASSEMBLIES/* > refs.txt 
+# ls -d -1 /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_RUN/0.RAW_READS/*{1,2}.fastq > input.txt 
+unitig-caller --call --pyseer --refs refs.txt --out out_prefix
+
+
+------------------------------------------------------------------------------------------------
+###############################
+# Step XX : Build phylogeny   #
+###############################
+# Tool: FastTree
+curl -O http://www.microbesonline.org/fasttree/FastTree.c
+gcc -O3 -finline-functions -funroll-loops -Wall -o FastTree FastTree.c -lm
+
+FastTree -gtr -nt alignment_file > tree_file 
+
+
+
+
 
 

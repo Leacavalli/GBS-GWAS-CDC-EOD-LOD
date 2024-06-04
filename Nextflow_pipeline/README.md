@@ -107,12 +107,19 @@ source ~/.bashrc
 
 
 
-# 5. Run Nextflow
+## 5. Run Nextflow
 ```
 cd NEXTFLOW_PIPELINE/scripts/
-for i in ../0.RAW_READS/*_1.fastq
+for i in ../0.RAW_READS/*_1.fastq.gz
 do
  base=$(echo $i | cut -d '/' -f3-3 | cut -d '_' -f1-1)
  sbatch -p shared -t 0-03:00 --mem=100000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline.nf --base $base"
+done
+
+
+for i in ../0.RAW_READS/SRR5063686*_1.fastq.gz
+do
+ base=$(echo $i | cut -d '/' -f3-3 | cut -d '_' -f1-1)
+ sbatch -p shared -t 0-03:00 --mem=100000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline_V2.nf --base $base"
 done
 ```
