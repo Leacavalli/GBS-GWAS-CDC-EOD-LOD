@@ -68,6 +68,24 @@ done
 
 ------------------------------------------------------------------------------------------------
 ######################################
+#           Step 4: FastQC           #
+######################################
+# Tool: fastqc
+
+module load python
+conda create -n fastqc
+source activate fastqc
+conda install bioconda::fastqc
+
+
+for i in *.fq.gz;
+do
+  sbatch -p shared -t 0-01:00 --mem=4000 --wrap="fastqc $i"
+done
+
+
+------------------------------------------------------------------------------------------------
+######################################
 #     Step 4: Serotyping + MLST      #
 ######################################
 
@@ -135,6 +153,19 @@ mv $base\_prokka/$base\.gff .
 rm -r $base\_prokka"
 done
 
+------------------------------------------------------------------------------------------------
+###############################
+#    Step XX : MultiQC        #
+###############################
+# Tool: MultiQC
+
+# conda create -n multiqc
+source activate multiqc
+# conda install multiqc
+
+multiqc --outdir ~/Documents/Harvard/Lab/Fastqc_R1/ ~/Documents/Harvard/Lab/Fastqc_R1/
+multiqc --outdir ~/Documents/Harvard/Lab/Fastqc_R2/ ~/Documents/Harvard/Lab/Fastqc_R2/
+
 
 ------------------------------------------------------------------------------------------------
 #######################################
@@ -152,6 +183,7 @@ snippy-multi input.tab --ref AP018935.1 --cpus 16 > runme.sh
 sh ./runme.sh 
 
 
+------------------------------------------------------------------------------------------------
 
 ###############################
 # Step XX : Pangenome Analysis #
@@ -165,6 +197,7 @@ mkdir panaroo_results
 panaroo -i *.gff3 -o panaroo_results --clean-mode strict --alignment pan --aligner mafft
   
 ------------------------------------------------------------------------------------------------
+
 ###############################
 # Step XX : Call Unitigs      #
 ###############################
@@ -174,7 +207,6 @@ source activate unitig-caller
 # conda install unitig-caller
 
 ls -d -1 /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_TESTS/4.ASSEMBLIES/* > refs.txt 
-# ls -d -1 /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_RUN/0.RAW_READS/*{1,2}.fastq > input.txt 
 unitig-caller --call --pyseer --refs refs.txt --out out_prefix
 
 
