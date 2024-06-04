@@ -3,15 +3,16 @@ Pipeline steps:
 2. Check contamination, Kraken             DONE
 3. Remove contamination, KrakenTools       DONE
 4. FASTQC                                 
-4. Serotyping + MLST - SRST2               DONE
-5. Assembly, unicycler                     DONE
-6. Gene annotation, prokka                 DONE
-7. Pangenome analysis: Panaroo 
-9. Mapping+ variant calling: SNIPPY
-10. Whole genome SNP alignment: SNP-sites
+5. Serotyping + MLST - SRST2               DONE
+6. Assembly, unicycler                     DONE
+7. Gene annotation, prokka                 DONE
+11. Mapping+ variant calling: SNIPPY
+12. Whole genome SNP alignment: SNP-sites
 
 Post-pipeline steps: 
 - MULTIQC
+- Genome quality control 
+- Pangenome analysis: Panaroo 
 - Pan-GWAS: pyseer 	  	 
 - Phylogeny: FastTree 
 - GWAS: pyseer
