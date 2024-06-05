@@ -9,18 +9,19 @@ This Nextflow pipeline was built to intregate the following steps:
 | 1 | Trim sequencing primers  | [Trimmomatic](https://github.com/timflutre/trimmomatic)  |
 | 2 | Identify contaminating reads  | [Kraken2](https://github.com/DerrickWood/kraken2) |
 | 3 | Remove contaminating reads  | [KrakenTools](https://github.com/jenniferlu717/KrakenTools) |
-| 4 | Assemble reads  | [Unicycler](https://github.com/rrwick/Unicycler)  |
-| 5 | Determine the serotype of isolates | [GBS-SG](https://github.com/swainechen/GBS-SBG)  |
-| 6 | Determine the ST of isolates | [SRST2]()  |
-| 7 | Genome Annotation | [Prokka](https://github.com/tseemann/prokka)  |
-| 8 | Pangenome Analysis | [Panaroo](https://github.com/gtonkinhill/panaroo)  |
-| 9 | Mapping and variant calling | [Snippy](https://github.com/tseemann/snippy)  |
-| 10 | Produce a whole genome SNP alignment | [SNP-sites](https://github.com/sanger-pathogens/snp-sites)  |
-| 11 | Call unitigs | [Unitig-caller](https://github.com/bacpop/unitig-caller) |
-| 12 | Conduct a GWAS using SNPs | [pyseer](https://github.com/mgalardini/pyseer) |
-| 13 | Conduct a GWAS using unitigs (i.e. DBGWAS) | [pyseer](https://github.com/mgalardini/pyseer) |
-| 14 | Conduct a GWAS using gene presence/absence (i.e. PanGWAS)| [pyseer](https://github.com/mgalardini/pyseer) |
-| 15 | Produce a phylogeney | [FastTree](http://www.microbesonline.org/fasttree/) |
+| 4 | Reads Quality Control | [FastQC](https://github.com/s-andrews/FastQC)  |
+| 5 | Determine the serotype and ST of isolates | [SRST2](), with [GBS-SG](https://github.com/swainechen/GBS-SBG)  |
+| 6 | Mapping to reference genome and variant calling | [Snippy](https://github.com/tseemann/snippy)  |
+| 7 | Assemble reads  | [Unicycler](https://github.com/rrwick/Unicycler)  |
+| 8 | Genome Annotation | [Prokka](https://github.com/tseemann/prokka)  |
+| X | Combine QC results | [MultiQC](https://github.com/MultiQC/MultiQC)  |
+| X | Pangenome Analysis | [Panaroo](https://github.com/gtonkinhill/panaroo)  |
+| X | Produce a whole genome SNP alignment | [Snippy-core](https://github.com/tseemann/snippy)  |
+| X | Call unitigs | [Unitig-caller](https://github.com/bacpop/unitig-caller) |
+| X | Conduct a GWAS using SNPs | [pyseer](https://github.com/mgalardini/pyseer) |
+| X | Conduct a GWAS using unitigs (i.e. DBGWAS) | [pyseer](https://github.com/mgalardini/pyseer) |
+| X | Conduct a GWAS using gene presence/absence (i.e. PanGWAS)| [pyseer](https://github.com/mgalardini/pyseer) |
+| X | Produce a phylogeney | [FastTree](http://www.microbesonline.org/fasttree/) |
 
 
 
@@ -32,9 +33,14 @@ NEXTFLOW_PIPELINE\
 &nbsp;&nbsp;| scripts\
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|--- nextflow.config\
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|--- Nextflow_pipeline.nf\
+&nbsp;&nbsp;| Files\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|--- AP018935.1.fa\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|--- GBS-SBG.fasta\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|--- Streptococcus_agalactiae.fasta\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|--- profiles_csv\
 &nbsp;&nbsp;| 0.RAW_READS\
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|--- *r1.fq.gz\
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|--- *r2.fq.gz\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|--- *_1.fastq.gz\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|--- *_2.fastq.gz\
 &nbsp;&nbsp;| 1.TRIMMED_READS\
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_trimmed_1.fq.gz\
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_trimmed_2.fq.gz\
@@ -44,14 +50,21 @@ NEXTFLOW_PIPELINE\
 &nbsp;&nbsp;| 3.FILTERED_READS\
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_filtered_1.fq.gz\
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_filtered_2.fq.gz\
-&nbsp;&nbsp;| 4.ASSEMBLIES\
+&nbsp;&nbsp;| 4.FASTQC\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_filtered_1_fastqc.html\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_filtered_1_fastqc.zip\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_filtered_2_fastqc.html\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_filtered_2_fastqc.zip\
+&nbsp;&nbsp;| 5.SRST2\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *__genes__GBS-SBG__results.txt\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *__mlst__Streptococcus_agalactiae__results.txt\
+&nbsp;&nbsp;| 6.SNIPPY\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *\
+&nbsp;&nbsp;| 7.ASSEMBLIES\
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *.fasta\
-&nbsp;&nbsp;| 5.ANNOTATION\
+&nbsp;&nbsp;| 8.ANNOTATION\
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *.gff3\
-&nbsp;&nbsp;| 6.SEROTYPES\
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_sero.tab\
-&nbsp;&nbsp;| 7.MLST\
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_mlst.tab
+
 
 # Running the Pipeline
 
@@ -69,6 +82,7 @@ cd NEXTFLOW_PIPELINE
   mkdir 7.ASSEMBLIES
   mkdir 8.ANNOTATION
   mkdir scripts
+  mkdir Files
 ```
 
 ## 2. Download Raw reads from NCBI
@@ -117,9 +131,9 @@ do
  sbatch -p shared -t 0-03:00 --mem=100000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline.nf --base $base"
 done
 
-for i in ../0.RAW_READS/SRR5063686*_1.fastq.gz
+for i in ../0.RAW_READS/SRR5063683*_1.fastq.gz
 do
  base=$(echo $i | cut -d '/' -f3-3 | cut -d '_' -f1-1)
- sbatch -p shared -t 0-03:00 --mem=100000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline_V2.nf --path_to_reads /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_NEW --base $base"
+ sbatch -p shared -t 0-03:00 --mem=100000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline.nf --path_to_reads /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_NEW --base $base"
 done
 ```

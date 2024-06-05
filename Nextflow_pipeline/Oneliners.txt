@@ -1,22 +1,22 @@
 Pipeline steps:
-1. Trim, Trimmomatic                       DONE
-2. Check contamination, Kraken             DONE
-3. Remove contamination, KrakenTools       DONE
-4. FASTQC                                 
+1. Trim - Trimmomatic                      DONE
+2. Check contamination - Kraken            DONE
+3. Remove contamination - KrakenTools      DONE
+4. Read Quality Check - FASTQC             DONE
 5. Serotyping + MLST - SRST2               DONE
+6. Mapping+ variant calling - SNIPPY       DONE
 6. Assembly, unicycler                     DONE
 7. Gene annotation, prokka                 DONE
 
 Post-pipeline steps: 
-1. MULTIQC                                 DONE
-- Mapping+ variant calling: SNIPPY
-- Genome quality control 
-- Pangenome analysis: Panaroo 
-- Pan-GWAS: pyseer 	  	 
-- Phylogeny: FastTree 
-- GWAS: pyseer
-- unitig calling: unitig-caller
-- DBGWAS: pyseer
+1. Genome quality control - MULTIQC        DONE
+- Merge Snippy results - SNIPPY-core       In progress
+- Pangenome analysis: Panaroo              In progress
+- Phylogeny: FastTree                      Paused (waiting for snippy-core output)
+- unitig calling: unitig-caller            In progress
+- SNP-based GWAS: pyseer                   ?
+- Pan-GWAS: pyseer 	  	           ?
+- DBGWAS: pyseer                           ?
 
 ------------------------------------------------------------------------------------------------
 ###########################
@@ -113,7 +113,7 @@ pip install ncbi-acc-download
 ncbi-acc-download --format fasta AP018935.1 #switch reference as needed
 
 # Run Snippy 
-for i in SRR5063686*1.fq.gz
+for i in *1.fq.gz
 do
   base=$(echo $i | cut -d '/' -f2-2 | cut -d '_' -f1-1)
   sbatch -p shared -t 0-05:00 --mem=100000 --wrap="snippy --outdir $base --R1 $base\_filtered_1.fq.gz --R2 $base\_filtered_2.fq.gz --ref AP018935.1.fa --cpus 16"
@@ -211,7 +211,12 @@ snippy-core --ref 'SRR5063682/ref.fa' SRR5063682 SRR5063683 SRR5063686 SRR506368
 
 conda create -n Panaroo python=3.9
 source activate Panaroo
+# conda install -c conda-forge -c bioconda -c defaults 'panaroo>=1.3'
+
+
 mkdir panaroo_results
+
+sbatch -p shared -t 0-05:00 --mem=100000 --wrap="panaroo -i *.gff3 -o panaroo_results --clean-mode strict --alignment pan --aligner mafft"
 
 panaroo -i *.gff3 -o panaroo_results --clean-mode strict --alignment pan --aligner mafft
   
@@ -228,7 +233,7 @@ source activate unitig-caller
 ls -d -1 /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_TESTS/4.ASSEMBLIES/* > refs.txt 
 unitig-caller --call --pyseer --refs refs.txt --out out_prefix
 
-sbatch -p shared -t 0-05:00 --mem=100000 --wrap="unitig-caller --call --pyseer --refs refs.txt --out out_prefix"
+sbatch -p shared -t 0-05:00 --mem=100000 --wrap="unitig-caller --call --refs refs2.txt --out out_prefix"
 
 ------------------------------------------------------------------------------------------------
 ###############################

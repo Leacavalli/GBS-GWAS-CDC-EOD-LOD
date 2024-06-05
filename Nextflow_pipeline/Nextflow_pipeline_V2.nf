@@ -1,5 +1,5 @@
 process Trimmomatic {
-  conda 'openjdk=11'
+  conda '/n/home02/lcavalli/.conda/envs/openjdk=11'
 
   publishDir "${params.path_to_reads}/1.TRIMMED_READS" , overwrite: true
 
@@ -41,7 +41,7 @@ process Kraken {
 }
 
 process Kraken_tools {
-  conda 'biopython'
+  conda '/n/home02/lcavalli/.conda/envs/biopython'
 
   publishDir "${params.path_to_reads}/3.FILTERED_READS", overwrite: true
 
@@ -66,7 +66,7 @@ process Kraken_tools {
 }
 
 process FastQC {
-  conda 'fastqc'
+  conda '/n/home02/lcavalli/.conda/envs/fastqc'
 
   input:
   val base
@@ -85,7 +85,7 @@ process FastQC {
 }
 
 process Serotype_MLST {
-  conda 'srst2'
+  conda '/n/home02/lcavalli/.conda/envs/srst2'
 
   publishDir "${params.path_to_reads}/5.SRST2", overwrite: true
 
@@ -108,7 +108,7 @@ process Serotype_MLST {
 }
 
 process SNIPPY {
-  conda 'snippy'
+  conda '/n/home02/lcavalli/.conda/envs/snippy'
 
   input:
   val base
