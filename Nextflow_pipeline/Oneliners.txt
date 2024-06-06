@@ -10,13 +10,13 @@ Pipeline steps:
 
 Post-pipeline steps: 
 1. Genome quality control - MULTIQC        DONE
-- Merge Snippy results - SNIPPY-core       In progress
-- Pangenome analysis: Panaroo              In progress
-- Phylogeny: FastTree                      Paused (waiting for snippy-core output)
-- unitig calling: unitig-caller            In progress
-- SNP-based GWAS: pyseer                   
-- Pan-GWAS: pyseer 	  	           
-- DBGWAS: pyseer                           
+- Merge Snippy results - SNIPPY-core       DONE
+- Pangenome analysis: Panaroo              DONE
+- Phylogeny: FastTree                      DONE
+- unitig calling: unitig-caller/-counter   In progress
+- SNP-based GWAS: pyseer                   In progress
+- Pan-GWAS: pyseer 	  	           In progress
+- DBGWAS: pyseer                           In progress
 
 ------------------------------------------------------------------------------------------------
 ###########################
@@ -170,36 +170,9 @@ source activate multiqc
 #######################################
 # Tool: snippy-multi
 
-#install snippy
-conda create -n snippy
 source activate snippy
-conda install -c conda-forge -c bioconda -c defaults snippy
 
-
-#download reference
-pip install ncbi-acc-download
-ncbi-acc-download --format fasta AP018935.1 #switch reference as needed
-
-
-#create input.tab of this format for every isolate 
-# input.tab = ID R1 [R2]
-# Isolate1	/path/to/R1.fq.gz	/path/to/R2.fq.gz
-# Isolate2 /path/to/R1.fq.gz	/path/to/R2.fq.gz
-
-for i in *1.fq.gz
-do
-  base=$(echo $i | cut -d '/' -f2-2 | cut -d '_' -f1-1)
-  pwd=$(pwd)
-  echo -e "${base}\t$pwd/${base}_filtered_1.fq.gz\t$pwd/${base}_filtered_2.fq.gz"
-done >input.tab
-
-# run tool 
-snippy-multi input.tab --ref AP018935.1.fa --cpus 16 > runme.sh
-sh ./runme.sh 
-
-
-# OR JUST RUN SNP-core
-snippy-core --ref 'SRR5063682/ref.fa' SRR5063682 SRR5063683 SRR5063686 SRR5063689 SRR5063702 SRR5063709 SRR9088851 SRR9088857 SRR9088866
+sbatch -p shared -t 0-02:00 --mem=100000 --wrap="snippy-core --ref 'SRR5063682/ref.fa' SRR*"
 
 
 ------------------------------------------------------------------------------------------------
@@ -216,7 +189,7 @@ source activate Panaroo
 
 mkdir panaroo_results
 
-sbatch -p shared -t 0-05:00 --mem=100000 --wrap="panaroo -i *.gff3 -o panaroo_results --clean-mode strict --alignment pan --aligner mafft"
+sbatch -p shared -t 0-05:00 --mem=100000 --wrap="panaroo -i *.gff -o panaroo_results --clean-mode strict --alignment pan --aligner mafft"
 
 panaroo -i *.gff3 -o panaroo_results --clean-mode strict --alignment pan --aligner mafft
   
@@ -234,16 +207,48 @@ ls -d -1 /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/
 unitig-caller --call --pyseer --refs refs.txt --out out_prefix
 
 sbatch -p shared -t 0-05:00 --mem=100000 --wrap="unitig-caller --call --refs refs2.txt --out out_prefix"
+sbatch -p shared -t 0-05:00 --mem=100000 --wrap="unitig-caller --call --refs refs.txt --out out_prefix_v2"
+sbatch -p shared -c 8 -t 0-05:00 --mem=100000 --wrap="unitig-caller --threads 8 --call --refs refs.txt --out out_prefix_v2"
+
+conda create -n bifrost
+source activate bifrost
+conda install -c bioconda bifrost
+sbatch -p shared -c 8 -t 0-05:00 --mem=100000 --wrap="Bifrost build -t 8 -k 31 -c -r refs.txt -o bifrost_test_2"
+sbatch -p shared -c 8 -t 0-05:00 --mem=100000 --wrap="unitig-caller --call --threads 8 --graph bifrost_test_2.gfa.gz --colours bifrost_test_2.color.bfg --out unitigs_bifrost_test_2"
+ls -d -1 $PWD/*.fastq > input.txt
+
+
+# conda create -n unitig-counter
+source activate unitig-counter
+# conda install unitig-counter
+
+echo -e "ID\tPath" > strain_list.txt
+for i in *.fasta
+do
+  base=$(echo "$i" | cut -d '.' -f1)
+  echo -e "$base\t$i"
+done >> strain_list.txt
+
+sbatch -p shared -c 8 -t 0-05:00 --mem=100000 --wrap="unitig-counter -strains strain_list.txt -output output -nb-cores 8"
+sbatch -p shared -c 8 -t 0-05:00 --mem=100000 --wrap="cdbg-ops extend --graph graph --unitigs unitigs.txt > extended.txt"
+
+
+
+
 
 ------------------------------------------------------------------------------------------------
 ###############################
 # Step XX : Build phylogeny   #
 ###############################
 # Tool: FastTree
+
+# install FastTree
 curl -O http://www.microbesonline.org/fasttree/FastTree.c
 gcc -O3 -finline-functions -funroll-loops -Wall -o FastTree FastTree.c -lm
 
-FastTree -gtr -nt alignment_file > tree_file 
+# Run
+sbatch -p shared -t 0-02:00 --mem=100000 --wrap="FastTree -gtr -nt core.full.aln > phylo.aln"
+ 
 
 ------------------------------------------------------------------------------------------------
 ###############################
