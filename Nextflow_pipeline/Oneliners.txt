@@ -14,9 +14,9 @@ Post-pipeline steps:
 - Pangenome analysis: Panaroo              In progress
 - Phylogeny: FastTree                      Paused (waiting for snippy-core output)
 - unitig calling: unitig-caller            In progress
-- SNP-based GWAS: pyseer                   ?
-- Pan-GWAS: pyseer 	  	           ?
-- DBGWAS: pyseer                           ?
+- SNP-based GWAS: pyseer                   
+- Pan-GWAS: pyseer 	  	           
+- DBGWAS: pyseer                           
 
 ------------------------------------------------------------------------------------------------
 ###########################
@@ -244,6 +244,43 @@ curl -O http://www.microbesonline.org/fasttree/FastTree.c
 gcc -O3 -finline-functions -funroll-loops -Wall -o FastTree FastTree.c -lm
 
 FastTree -gtr -nt alignment_file > tree_file 
+
+------------------------------------------------------------------------------------------------
+###############################
+# Step XX : SNP-Based GWAS   #
+###############################
+# Tool: pyseer
+# phenotypes is a file of presence absence (EOD vs LOD) for each isolate
+# snps.vcf.gz is a vcf file of snps mapped to our reference of choice (output of snippy-core) 
+
+
+#installation
+conda -n create pyseer
+source activate pyseer
+conda install pyseer
+
+#create pairwise distance matrix using mash to account for population structure (using all fasta files)
+
+mash sketch -s 10000 -o mash_sketch *.fasta
+mash dist mash_sketch.msh mash_sketch.msh| square_mash > mash.tsv
+
+#snp based pyseer
+pyseer --phenotypes  --vcf snps.vcf.gz --distances mash.tsv --lineage --print-samples > EOD_LOD_SNPs.txt
+
+------------------------------------------------------------------------------------------------
+
+###############################
+# Step XX : Pan GWAS   #
+###############################
+# Tool: pyseer (installation as above)
+# phenotypes is a file of presence absence (EOD vs LOD) for each isolate
+# gene_presence_absence.Rtab from output of panaroo 
+
+#COG based pyseer
+
+pyseer --phenotypes resistances.pheno --pres gene_presence_absence.Rtab --distances mash.tsv --save-m mash_mds --max-dimensions 8 > EOD_LOD_COGs.txt
+------------------------------------------------------------------------------------------------
+
 
 
 
