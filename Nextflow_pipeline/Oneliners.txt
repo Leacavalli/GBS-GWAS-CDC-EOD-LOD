@@ -256,7 +256,7 @@ sbatch -p shared -t 0-02:00 --mem=100000 --wrap="FastTree -gtr -nt core.full.aln
 ###############################
 # Tool: pyseer
 # phenotypes is a file of presence absence (EOD vs LOD) for each isolate
-# snps.vcf.gz is a vcf file of snps mapped to our reference of choice (output of snippy-core) 
+# core.vcf is a vcf file of snps mapped to our reference of choice (output of snippy-core) 
 
 
 #installation
@@ -264,13 +264,11 @@ conda -n create pyseer
 source activate pyseer
 conda install pyseer
 
-#create pairwise distance matrix using mash to account for population structure (using all fasta files)
-
-mash sketch -s 10000 -o mash_sketch *.fasta
-mash dist mash_sketch.msh mash_sketch.msh| square_mash > mash.tsv
+#create phylogeny tsv file
+python scripts/phylogeny_distance.py --lmm core_genome_aln.tree > phylogeny_K.tsv
 
 #snp based pyseer
-pyseer --phenotypes  --vcf snps.vcf.gz --distances mash.tsv --lineage --print-samples > EOD_LOD_SNPs.txt
+pyseer --phenotypes phenotypes --vcf core.vcf --lmm --similarity phylogeny_K.tsv > EOD_LOD_SNPs.txt
 
 ------------------------------------------------------------------------------------------------
 
@@ -279,11 +277,11 @@ pyseer --phenotypes  --vcf snps.vcf.gz --distances mash.tsv --lineage --print-sa
 ###############################
 # Tool: pyseer (installation as above)
 # phenotypes is a file of presence absence (EOD vs LOD) for each isolate
-# gene_presence_absence.Rtab from output of panaroo 
+# gene_presence_absence.Rtab directly from output of panaroo 
 
 #COG based pyseer
 
-pyseer --phenotypes resistances.pheno --pres gene_presence_absence.Rtab --distances mash.tsv --save-m mash_mds --max-dimensions 8 > EOD_LOD_COGs.txt
+pyseer --phenotypes phenotypes --pres gene_presence_absence.Rtab --lmm --similarity phylogeny_K.tsv > EOD_LOD_COGs.txt
 ------------------------------------------------------------------------------------------------
 
 
