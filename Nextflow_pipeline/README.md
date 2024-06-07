@@ -104,7 +104,7 @@ done
 ```
 
 # Post-pipeline steps
-Post-pipeline steps consists of bioinformatic steps that need to be run on a collection of samples. Starting from merge QC reports from all samples and filtering bad quality controls, and ending with the GWAS.
+Post-pipeline steps consists of bioinformatic steps that need to be run on the collection of pipeline outputs from all samples. Starting from merge QC reports from all samples and filtering bad quality controls, and ending with the GWAS.
 
 | Steps  | Description  | Tool |
 | ------------- | ------------- | ------------- |
@@ -119,7 +119,7 @@ Post-pipeline steps consists of bioinformatic steps that need to be run on a col
 
 
 ## 1. Genome quality control
-Tool: MultiQC
+Tool: MultiQC\
 Output: One QC report for all samples in our dataset
 ```
 # Install MultiQC
@@ -132,7 +132,7 @@ cd NEXTFLOW_PIPELINE/4.FASTQC
 sbatch -p shared  -t 0-03:00 --mem=100000 --wrap="multiqc ."
 ```
 ## 2. Merge Snippy results
-Tool: snippy-core
+Tool: snippy-core\
 Output:  Whole genome SNP alignment
 ```
 # Install Snippy
@@ -142,7 +142,7 @@ cd NEXTFLOW_PIPELINE/6.SNIPPY
 sbatch -p shared -t 0-02:00 --mem=100000 --wrap="snippy-core --ref 'SRR5063682/ref.fa' SRR*"
 ```
 ## 3. Pangenome analysis
-Tool: panaroo
+Tool: panaroo\
 Output: Gene Presence/Absence matrix for input into Pyseer
 ```
 # Install Panaroo
@@ -156,7 +156,7 @@ mkdir panaroo_results
 sbatch -p shared -t 0-05:00 --mem=100000 --wrap="panaroo -i *.gff -o panaroo_results --clean-mode strict --alignment pan --aligner mafft"
 ```
 ## 4. Unitig calling
-Tool: unitig-counter
+Tool: unitig-counter\
 Output: Unitig list file for input into Pyseer
 ```
 # Install unitig-counter
@@ -180,7 +180,7 @@ sbatch -p shared -c 8 -t 0-05:00 --mem=100000 --wrap="unitig-counter -strains st
 sbatch -p shared -c 8 -t 0-05:00 --mem=100000 --wrap="cdbg-ops extend --graph graph --unitigs unitigs.txt > extended.txt"
 ```
 ## 5. Phylogeny - FastTree
-Tool: FastTree
+Tool: FastTree\
 ```
 # install FastTree
 curl -O http://www.microbesonline.org/fasttree/FastTree.c
@@ -192,7 +192,7 @@ sbatch -p shared -t 0-02:00 --mem=100000 --wrap="FastTree -gtr -nt core.full.aln
 
 ```
 ## 6. GWAS
-Tool: pyseer
+Tool: pyseer\
 ```
 #installation
 conda -n create pyseer
