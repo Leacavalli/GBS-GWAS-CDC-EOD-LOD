@@ -1,7 +1,7 @@
 process Trimmomatic {
-  conda 'openjdk=11'
+  conda '/n/home02/lcavalli/.conda/envs/java'
 
-  publishDir '${params.path_to_reads}/1.TRIMMED_READS' , overwrite: true
+  publishDir "${params.path_to_reads}/1.TRIMMED_READS" , overwrite: true
 
   input:
   val base
@@ -19,7 +19,7 @@ process Trimmomatic {
 
 
 process Kraken {
-  publishDir '${params.path_to_reads}/2.KRAKEN' , overwrite: true
+  publishDir "${params.path_to_reads}/2.KRAKEN" , overwrite: true
 
   input:
   val base
@@ -41,9 +41,9 @@ process Kraken {
 }
 
 process Kraken_tools {
-  conda 'biopython'
+  conda '/n/home02/lcavalli/.conda/envs/biopython'
 
-  publishDir '${params.path_to_reads}/3.FILTERED_READS', overwrite: true
+  publishDir "${params.path_to_reads}/3.FILTERED_READS", overwrite: true
 
   input:
   val base
@@ -65,16 +65,79 @@ process Kraken_tools {
   """
 }
 
-
-process ASSEMBLY {
-  conda 'unicycler'
-
-  publishDir '${params.path_to_reads}/4.ASSEMBLIES', overwrite: true
+process FastQC {
+  conda '/n/home02/lcavalli/.conda/envs/fastqc'
 
   input:
   val base
   val filtered_read1
   val filtered_read2
+
+  output:
+  val base
+  val filtered_read1
+  val filtered_read2
+
+  script:
+  """
+  fastqc ${filtered_read1} -o ${params.path_to_reads}/4.FASTQC
+  """
+}
+
+process Serotype_MLST {
+  conda '/n/home02/lcavalli/.conda/envs/srst2'
+
+  publishDir "${params.path_to_reads}/5.SRST2", overwrite: true
+
+  input:
+  val base
+  val filtered_read1
+  val filtered_read2
+
+  output:
+  val base
+  val filtered_read1
+  val filtered_read2
+  path "${base}__genes__GBS-SBG__results.txt"
+  path "${base}__mlst__Streptococcus_agalactiae__results.txt"
+
+  script:
+  """
+  srst2 --input_pe ${params.path_to_reads}/0.RAW_READS/${base}_{1,2}.fastq.gz --output ${base} --log --gene_db ${params.path_to_reads}/Files/GBS-SBG.fasta --mlst_db ${params.path_to_reads}/Files/Streptococcus_agalactiae.fasta --mlst_definitions ${params.path_to_reads}/Files/profiles_csv --mlst_delimiter '_'
+  """
+}
+
+process SNIPPY {
+  conda '/n/home02/lcavalli/.conda/envs/snippy'
+
+  input:
+  val base
+  val filtered_read1
+  val filtered_read2
+  val serotypes_out
+  val mlst_out
+
+  output:
+  val base
+  val filtered_read1
+  val filtered_read2
+
+  script:
+  """
+  snippy --outdir ${params.path_to_reads}/6.SNIPPY/${base} --R1 ${filtered_read1} --R2 ${filtered_read2} --ref ${params.path_to_reads}/Files/AP018935.1.fa --cpus 16
+  """
+}
+
+process ASSEMBLY {
+  conda '/n/home02/lcavalli/.conda/envs/unicycler'
+
+  publishDir "${params.path_to_reads}/7.ASSEMBLIES", overwrite: true
+
+  input:
+  val base
+  val filtered_read1
+  val filtered_read2
+
 
   output:
   val base
@@ -92,7 +155,7 @@ process ASSEMBLY {
 process ANNOTATION {
   conda 'prokka'
 
-  publishDir '${params.path_to_reads}/5.ANNOTATION', overwrite: true
+  publishDir "${params.path_to_reads}/8.ANNOTATION", overwrite: true
 
   input:
   val base
@@ -111,56 +174,18 @@ process ANNOTATION {
   """
 }
 
-process Serotyping {
-  conda 'perl blast'
-
-  publishDir '${params.path_to_reads}/6.SEROTYPES', overwrite: true
-
-  input:
-  val base
-  val fasta_file
-  val gff3_file
 
 
-  output:
-  val base
-  val fasta_file
-  path "${base}_sero.tab"
-
-  script:
-  """
-  perl /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/GBS-SBG/GBS-SBG.pl ${fasta_file} | tail -1 > ${base}_sero.tab
-  """
-}
-
-process MLST {
-  conda 'mlst'
-
-  publishDir '${params.path_to_reads}/7.MLST', overwrite: true
-
-  input:
-  val base
-  val fasta_file
-  val sero_tab_file
-
-  output:
-  val base
-  val fasta_file
-  path "${base}_mlst.tab"
-
-  script:
-  """
-  mlst --scheme sagalactiae ${fasta_file} > ${base}_mlst.tab
-  """
-}
 
 workflow {
   Channel.of(params.base)
     | Trimmomatic
     | Kraken
     | Kraken_tools
+    | FastQC
+    | Serotype_MLST
+    | SNIPPY
     | ASSEMBLY
     | ANNOTATION
-    | Serotyping
-    | MLST
 }
+

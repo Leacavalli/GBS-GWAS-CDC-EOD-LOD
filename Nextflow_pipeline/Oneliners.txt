@@ -168,7 +168,7 @@ source activate multiqc
 #######################################
 # Step XX : Whole genome SNP alignment #
 #######################################
-# Tool: snippy-multi
+# Tool: snippy-core
 
 source activate snippy
 
@@ -198,25 +198,7 @@ panaroo -i *.gff3 -o panaroo_results --clean-mode strict --alignment pan --align
 ###############################
 # Step XX : Call Unitigs      #
 ###############################
-# Tool: unitig-caller
-# conda create -n unitig-caller
-source activate unitig-caller
-# conda install unitig-caller
-
-ls -d -1 /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_TESTS/4.ASSEMBLIES/* > refs.txt 
-unitig-caller --call --pyseer --refs refs.txt --out out_prefix
-
-sbatch -p shared -t 0-05:00 --mem=100000 --wrap="unitig-caller --call --refs refs2.txt --out out_prefix"
-sbatch -p shared -t 0-05:00 --mem=100000 --wrap="unitig-caller --call --refs refs.txt --out out_prefix_v2"
-sbatch -p shared -c 8 -t 0-05:00 --mem=100000 --wrap="unitig-caller --threads 8 --call --refs refs.txt --out out_prefix_v2"
-
-conda create -n bifrost
-source activate bifrost
-conda install -c bioconda bifrost
-sbatch -p shared -c 8 -t 0-05:00 --mem=100000 --wrap="Bifrost build -t 8 -k 31 -c -r refs.txt -o bifrost_test_2"
-sbatch -p shared -c 8 -t 0-05:00 --mem=100000 --wrap="unitig-caller --call --threads 8 --graph bifrost_test_2.gfa.gz --colours bifrost_test_2.color.bfg --out unitigs_bifrost_test_2"
-ls -d -1 $PWD/*.fastq > input.txt
-
+# Tool: unitig-counter
 
 # conda create -n unitig-counter
 source activate unitig-counter
@@ -231,9 +213,6 @@ done >> strain_list.txt
 
 sbatch -p shared -c 8 -t 0-05:00 --mem=100000 --wrap="unitig-counter -strains strain_list.txt -output output -nb-cores 8"
 sbatch -p shared -c 8 -t 0-05:00 --mem=100000 --wrap="cdbg-ops extend --graph graph --unitigs unitigs.txt > extended.txt"
-
-
-
 
 
 ------------------------------------------------------------------------------------------------

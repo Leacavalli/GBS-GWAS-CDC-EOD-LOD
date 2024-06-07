@@ -68,6 +68,9 @@ NEXTFLOW_PIPELINE\
 
 # Running the Pipeline
 
+## 0. Dependencies
+
+
 ## 1. Create ARCHITECTURE
 ```
 mkdir NEXTFLOW_PIPELINE
@@ -105,7 +108,6 @@ conda install openjdk=11  # Only run once to set up; All following times, skip t
 java -version             # Check java version
 ```
 
-
 ## 4. Install Nextflow
 ```
 # Download the executable package:
@@ -120,20 +122,110 @@ export PATH="<path_to_nextflow>:$PATH"
 source ~/.bashrc      
 ```
 
-
-
 ## 5. Run Nextflow
 ```
-cd NEXTFLOW_PIPELINE/scripts/
 for i in ../0.RAW_READS/*_1.fastq.gz
 do
  base=$(echo $i | cut -d '/' -f3-3 | cut -d '_' -f1-1)
- sbatch -p shared -t 0-03:00 --mem=100000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline.nf --base $base"
+ sbatch -p shared -t 0-03:00 --mem=100000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline.nf --path_to_reads /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE --base $base"
 done
+```
 
-for i in ../0.RAW_READS/SRR5063683*_1.fastq.gz
+## 6. Post-pipeline steps
+### Genome quality control
+Tool: MultiQC
+Output: One QC report for all samples in our dataset
+```
+# Install MultiQC
+conda create -n multiqc
+source activate multiqc
+conda install multiqc
+
+# Run MultiQC
+cd NEXTFLOW_PIPELINE/4.FASTQC
+sbatch -p shared  -t 0-03:00 --mem=100000 --wrap="multiqc ."
+```
+### Merge Snippy results
+Tool: snippy-core
+Output:  Whole genome SNP alignment
+```
+# Install Snippy
+source activate snippy
+# Run Snippy
+cd NEXTFLOW_PIPELINE/6.SNIPPY
+sbatch -p shared -t 0-02:00 --mem=100000 --wrap="snippy-core --ref 'SRR5063682/ref.fa' SRR*"
+```
+### Pangenome analysis
+Tool: panaroo
+Output: Gene Presence/Absence matrix for input into Pyseer
+```
+# Install Panaroo
+conda create -n Panaroo python=3.9
+source activate Panaroo
+conda install -c conda-forge -c bioconda -c defaults 'panaroo>=1.3'
+
+# Run Panaroo
+cd NEXTFLOW_PIPELINE/8.ANNOTATION
+mkdir panaroo_results
+sbatch -p shared -t 0-05:00 --mem=100000 --wrap="panaroo -i *.gff -o panaroo_results --clean-mode strict --alignment pan --aligner mafft"
+```
+### Unitig calling
+Tool: unitig-counter
+Output: Unitig list file for input into Pyseer
+```
+# Install unitig-counter
+conda create -n unitig-counter
+source activate unitig-counter
+conda install unitig-counter
+
+# Create input file
+cd NEXTFLOW_PIPELINE/7.ASSEMBLIES
+echo -e "ID\tPath" > strain_list.txt
+for i in *.fasta
 do
- base=$(echo $i | cut -d '/' -f3-3 | cut -d '_' -f1-1)
- sbatch -p shared -t 0-03:00 --mem=100000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline.nf --path_to_reads /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_NEW --base $base"
-done
+  base=$(echo "$i" | cut -d '.' -f1)
+  echo -e "$base\t$i"
+done >> strain_list.txt
+
+# Run unitig-counter
+sbatch -p shared -c 8 -t 0-05:00 --mem=100000 --wrap="unitig-counter -strains strain_list.txt -output output -nb-cores 8"
+
+# Extend short unitigs leftwards and rightwards by following the neightbouring nodes in the de Bruijn graph
+sbatch -p shared -c 8 -t 0-05:00 --mem=100000 --wrap="cdbg-ops extend --graph graph --unitigs unitigs.txt > extended.txt"
+```
+### Phylogeny - FastTree
+Tool: FastTree
+```
+# install FastTree
+curl -O http://www.microbesonline.org/fasttree/FastTree.c
+gcc -O3 -finline-functions -funroll-loops -Wall -o FastTree FastTree.c -lm
+
+# Run
+cd NEXTFLOW_PIPELINE/7.ASSEMBLIES
+sbatch -p shared -t 0-02:00 --mem=100000 --wrap="FastTree -gtr -nt core.full.aln > phylo.aln"
+
+```
+### GWAS
+Tool: pyseer
+```
+#installation
+conda -n create pyseer
+source activate pyseer
+conda install pyseer
+
+#create phylogeny tsv file
+python scripts/phylogeny_distance.py --lmm core_genome_aln.tree > phylogeny_K.tsv
+```
+
+#### SNP-based GWAS
+```
+pyseer --phenotypes phenotypes --vcf core.vcf --lmm --similarity phylogeny_K.tsv > EOD_LOD_SNPs.txt
+```
+#### Pan-GWAS
+```
+pyseer --phenotypes phenotypes --pres gene_presence_absence.Rtab --lmm --similarity phylogeny_K.tsv > EOD_LOD_COGs.txt
+```
+#### Unigit-based GWAS (DBGWAS)
+```
+
 ```
