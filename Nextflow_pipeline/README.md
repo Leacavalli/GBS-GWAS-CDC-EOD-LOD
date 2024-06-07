@@ -14,17 +14,6 @@ This Nextflow pipeline was built to intregate the following steps:
 | 6 | Mapping to reference genome and variant calling | [Snippy](https://github.com/tseemann/snippy)  |
 | 7 | Assemble reads  | [Unicycler](https://github.com/rrwick/Unicycler)  |
 | 8 | Genome Annotation | [Prokka](https://github.com/tseemann/prokka)  |
-| X | Combine QC results | [MultiQC](https://github.com/MultiQC/MultiQC)  |
-| X | Pangenome Analysis | [Panaroo](https://github.com/gtonkinhill/panaroo)  |
-| X | Produce a whole genome SNP alignment | [Snippy-core](https://github.com/tseemann/snippy)  |
-| X | Call unitigs | [Unitig-counter](https://github.com/bacpop/unitig-counter) |
-| X | Conduct a GWAS using SNPs | [pyseer](https://github.com/mgalardini/pyseer) |
-| X | Conduct a GWAS using unitigs (i.e. DBGWAS) | [pyseer](https://github.com/mgalardini/pyseer) |
-| X | Conduct a GWAS using gene presence/absence (i.e. PanGWAS)| [pyseer](https://github.com/mgalardini/pyseer) |
-| X | Produce a phylogeney | [FastTree](http://www.microbesonline.org/fasttree/) |
-
-
-
 
 
 # Pipeline Architecture
@@ -46,15 +35,15 @@ NEXTFLOW_PIPELINE\
 &nbsp;&nbsp;| 5.SEROTYPE_MLST\
 &nbsp;&nbsp;| 6.SNIPPY\
 &nbsp;&nbsp;| 7.ASSEMBLIES\
-&nbsp;&nbsp;| 8.ANNOTATION\
+&nbsp;&nbsp;| 8.ANNOTATION
 
 
 # Running the Pipeline
-
+The pipeline contains the steps that can be run for each sample individually. From read trimming and filtering to genome annotation.
 ## 0. Install Dependencies
 
 
-## 1. Create ARCHITECTURE
+## 1. Create Architecture
 ```
 mkdir NEXTFLOW_PIPELINE
 cd NEXTFLOW_PIPELINE
@@ -115,6 +104,20 @@ done
 ```
 
 # Post-pipeline steps
+Post-pipeline steps consists of bioinformatic steps that need to be run on a collection of samples. Starting from merge QC reports from all samples and filtering bad quality controls, and ending with the GWAS.
+
+| Steps  | Description  | Tool |
+| ------------- | ------------- | ------------- |
+| X | Combine QC results | [MultiQC](https://github.com/MultiQC/MultiQC)  |
+| X | Pangenome Analysis | [Panaroo](https://github.com/gtonkinhill/panaroo)  |
+| X | Produce a whole genome SNP alignment | [Snippy-core](https://github.com/tseemann/snippy)  |
+| X | Call unitigs | [Unitig-counter](https://github.com/bacpop/unitig-counter) |
+| X | Conduct a GWAS using SNPs | [pyseer](https://github.com/mgalardini/pyseer) |
+| X | Conduct a GWAS using unitigs (i.e. DBGWAS) | [pyseer](https://github.com/mgalardini/pyseer) |
+| X | Conduct a GWAS using gene presence/absence (i.e. PanGWAS)| [pyseer](https://github.com/mgalardini/pyseer) |
+| X | Produce a phylogeney | [FastTree](http://www.microbesonline.org/fasttree/) |
+
+
 ## 1. Genome quality control
 Tool: MultiQC
 Output: One QC report for all samples in our dataset
