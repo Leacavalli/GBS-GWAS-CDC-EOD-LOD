@@ -19,7 +19,7 @@ process Trimmomatic {
 
 
 process Kraken {
-  publishDir "${params.path_to_reads}/2.KRAKEN" , overwrite: true
+  publishDir "${params.path_to_reads}/2.KRAKEN_REPORTS" , overwrite: true
 
   input:
   val base
@@ -87,7 +87,7 @@ process FastQC {
 process Serotype_MLST {
   conda '/n/home02/lcavalli/.conda/envs/srst2'
 
-  publishDir "${params.path_to_reads}/5.SRST2", overwrite: true
+  publishDir "${params.path_to_reads}/5.SEROTYPE_MLST", overwrite: true
 
   input:
   val base
@@ -188,4 +188,3 @@ workflow {
     | ASSEMBLY
     | ANNOTATION
 }
-

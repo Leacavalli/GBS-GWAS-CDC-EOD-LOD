@@ -17,7 +17,7 @@ This Nextflow pipeline was built to intregate the following steps:
 | X | Combine QC results | [MultiQC](https://github.com/MultiQC/MultiQC)  |
 | X | Pangenome Analysis | [Panaroo](https://github.com/gtonkinhill/panaroo)  |
 | X | Produce a whole genome SNP alignment | [Snippy-core](https://github.com/tseemann/snippy)  |
-| X | Call unitigs | [Unitig-caller](https://github.com/bacpop/unitig-caller) |
+| X | Call unitigs | [Unitig-counter](https://github.com/bacpop/unitig-counter) |
 | X | Conduct a GWAS using SNPs | [pyseer](https://github.com/mgalardini/pyseer) |
 | X | Conduct a GWAS using unitigs (i.e. DBGWAS) | [pyseer](https://github.com/mgalardini/pyseer) |
 | X | Conduct a GWAS using gene presence/absence (i.e. PanGWAS)| [pyseer](https://github.com/mgalardini/pyseer) |
@@ -39,36 +39,19 @@ NEXTFLOW_PIPELINE\
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|--- Streptococcus_agalactiae.fasta\
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|--- profiles_csv\
 &nbsp;&nbsp;| 0.RAW_READS\
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|--- *_1.fastq.gz\
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|--- *_2.fastq.gz\
 &nbsp;&nbsp;| 1.TRIMMED_READS\
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_trimmed_1.fq.gz\
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_trimmed_2.fq.gz\
-&nbsp;&nbsp;| 2.KRAKEN\
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_kraken.out\
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_report.txt\
+&nbsp;&nbsp;| 2.KRAKEN_REPORTS\
 &nbsp;&nbsp;| 3.FILTERED_READS\
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_filtered_1.fq.gz\
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_filtered_2.fq.gz\
 &nbsp;&nbsp;| 4.FASTQC\
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_filtered_1_fastqc.html\
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_filtered_1_fastqc.zip\
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_filtered_2_fastqc.html\
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *_filtered_2_fastqc.zip\
-&nbsp;&nbsp;| 5.SRST2\
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *__genes__GBS-SBG__results.txt\
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *__mlst__Streptococcus_agalactiae__results.txt\
+&nbsp;&nbsp;| 5.SEROTYPE_MLST\
 &nbsp;&nbsp;| 6.SNIPPY\
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *\
 &nbsp;&nbsp;| 7.ASSEMBLIES\
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *.fasta\
 &nbsp;&nbsp;| 8.ANNOTATION\
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| *.gff3\
 
 
 # Running the Pipeline
 
-## 0. Dependencies
+## 0. Install Dependencies
 
 
 ## 1. Create ARCHITECTURE
@@ -77,10 +60,10 @@ mkdir NEXTFLOW_PIPELINE
 cd NEXTFLOW_PIPELINE
   mkdir 0.RAW_READS
   mkdir 1.TRIMMED_READS
-  mkdir 2.KRAKEN
+  mkdir 2.KRAKEN_REPORTS
   mkdir 3.FILTERED_READS
   mkdir 4.FASTQC
-  mkdir 5.SRST2
+  mkdir 5.SEROTYPE_MLST
   mkdir 6.SNIPPY
   mkdir 7.ASSEMBLIES
   mkdir 8.ANNOTATION
@@ -131,8 +114,8 @@ do
 done
 ```
 
-## 6. Post-pipeline steps
-### Genome quality control
+# Post-pipeline steps
+## 1. Genome quality control
 Tool: MultiQC
 Output: One QC report for all samples in our dataset
 ```
@@ -145,7 +128,7 @@ conda install multiqc
 cd NEXTFLOW_PIPELINE/4.FASTQC
 sbatch -p shared  -t 0-03:00 --mem=100000 --wrap="multiqc ."
 ```
-### Merge Snippy results
+## 2. Merge Snippy results
 Tool: snippy-core
 Output:  Whole genome SNP alignment
 ```
@@ -155,7 +138,7 @@ source activate snippy
 cd NEXTFLOW_PIPELINE/6.SNIPPY
 sbatch -p shared -t 0-02:00 --mem=100000 --wrap="snippy-core --ref 'SRR5063682/ref.fa' SRR*"
 ```
-### Pangenome analysis
+## 3. Pangenome analysis
 Tool: panaroo
 Output: Gene Presence/Absence matrix for input into Pyseer
 ```
@@ -169,7 +152,7 @@ cd NEXTFLOW_PIPELINE/8.ANNOTATION
 mkdir panaroo_results
 sbatch -p shared -t 0-05:00 --mem=100000 --wrap="panaroo -i *.gff -o panaroo_results --clean-mode strict --alignment pan --aligner mafft"
 ```
-### Unitig calling
+## 4. Unitig calling
 Tool: unitig-counter
 Output: Unitig list file for input into Pyseer
 ```
@@ -193,7 +176,7 @@ sbatch -p shared -c 8 -t 0-05:00 --mem=100000 --wrap="unitig-counter -strains st
 # Extend short unitigs leftwards and rightwards by following the neightbouring nodes in the de Bruijn graph
 sbatch -p shared -c 8 -t 0-05:00 --mem=100000 --wrap="cdbg-ops extend --graph graph --unitigs unitigs.txt > extended.txt"
 ```
-### Phylogeny - FastTree
+## 5. Phylogeny - FastTree
 Tool: FastTree
 ```
 # install FastTree
@@ -205,7 +188,7 @@ cd NEXTFLOW_PIPELINE/7.ASSEMBLIES
 sbatch -p shared -t 0-02:00 --mem=100000 --wrap="FastTree -gtr -nt core.full.aln > phylo.aln"
 
 ```
-### GWAS
+## 6. GWAS
 Tool: pyseer
 ```
 #installation
@@ -217,15 +200,15 @@ conda install pyseer
 python scripts/phylogeny_distance.py --lmm core_genome_aln.tree > phylogeny_K.tsv
 ```
 
-#### SNP-based GWAS
+### SNP-based GWAS
 ```
 pyseer --phenotypes phenotypes --vcf core.vcf --lmm --similarity phylogeny_K.tsv > EOD_LOD_SNPs.txt
 ```
-#### Pan-GWAS
+### Pan-GWAS
 ```
 pyseer --phenotypes phenotypes --pres gene_presence_absence.Rtab --lmm --similarity phylogeny_K.tsv > EOD_LOD_COGs.txt
 ```
-#### Unigit-based GWAS (DBGWAS)
+### Unigit-based GWAS (DBGWAS)
 ```
 
 ```
