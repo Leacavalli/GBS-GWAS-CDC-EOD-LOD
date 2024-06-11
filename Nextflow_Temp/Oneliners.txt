@@ -247,7 +247,7 @@ conda install pyseer
 python scripts/phylogeny_distance.py --lmm core_genome_aln.tree > phylogeny_K.tsv
 
 #snp based pyseer
-pyseer --phenotypes phenotypes --vcf core.vcf --lmm --similarity phylogeny_K.tsv > EOD_LOD_SNPs.txt
+pyseer --lmm --phenotypes phenotypes --vcf core.vcf --similarity phylogeny_K.tsv > EOD_LOD_SNPs.txt
 
 ------------------------------------------------------------------------------------------------
 
@@ -260,9 +260,21 @@ pyseer --phenotypes phenotypes --vcf core.vcf --lmm --similarity phylogeny_K.tsv
 
 #COG based pyseer
 
-pyseer --phenotypes phenotypes --pres gene_presence_absence.Rtab --lmm --similarity phylogeny_K.tsv > EOD_LOD_COGs.txt
+pyseer --lmm --phenotypes phenotypes --pres gene_presence_absence.Rtab --similarity phylogeny_K.tsv > EOD_LOD_COGs.txt
 ------------------------------------------------------------------------------------------------
 
+------------------------------------------------------------------------------------------------
+
+###############################
+# Step XX : DBGWAS            #
+###############################
+# Tool: pyseer (installation as above)
+# phenotypes is a file of presence absence (EOD vs LOD) for each isolate
+# unitigs.txt directly from output of unitig-counter 
+
+pyseer --lmm --phenotypes phenotypes --kmers /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.4.Unitig_counter/Unitig_counter/unitigs.txt --similarity phylogeny_K.tsv --output-patterns unitig_patterns.txt --cpu 8 > phenotype_unitigs.txt
+
+------------------------------------------------------------------------------------------------
 
 
 

@@ -205,6 +205,7 @@ sbatch -p shared -t 0-02:00 --mem=100000 --wrap="FastTree -gtr -nt /n/holylfs05/
 ```
 ## 6. GWAS
 Tool: pyseer\
+### Build similarity matrix from phylogeny
 ```
 #installation
 conda -n create pyseer
@@ -212,18 +213,17 @@ source activate pyseer
 conda install pyseer
 
 #create phylogeny tsv file
-python scripts/phylogeny_distance.py --lmm core_genome_aln.tree > phylogeny_K.tsv
+sbatch -p shared -t 0-02:00 --mem=100000 --wrap="python /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/Files/phylogeny_distance.py --lmm /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.5.FastTree/phylo.aln > phylogeny_K.tsv"
 ```
-
 ### SNP-based GWAS
 ```
-pyseer --phenotypes phenotypes --vcf core.vcf --lmm --similarity phylogeny_K.tsv > EOD_LOD_SNPs.txt
+pyseer --phenotypes phenotypes --vcf /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.2.Snippy_core/core.vcf --lmm --similarity phylogeny_K.tsv > EOD_LOD_SNPs.txt
 ```
 ### Pan-GWAS
 ```
-pyseer --phenotypes phenotypes --pres gene_presence_absence.Rtab --lmm --similarity phylogeny_K.tsv > EOD_LOD_COGs.txt
+pyseer --phenotypes phenotypes --pres /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.3.Pangenome_analysis/gene_presence_absence.Rtab --lmm --similarity phylogeny_K.tsv > EOD_LOD_COGs.txt
 ```
 ### Unigit-based GWAS (DBGWAS)
 ```
-
+pyseer --lmm --phenotypes phenotypes --kmers /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.4.Unitig_counter/Unitig_counter/unitigs.txt --similarity phylogeny_K.tsv --output-patterns unitig_patterns.txt --cpu 8 > phenotype_unitigs.txt
 ```
