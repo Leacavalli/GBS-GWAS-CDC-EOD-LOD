@@ -101,6 +101,7 @@ do
  base=$(echo $i | cut -d '/' -f3-3 | cut -d '_' -f1-1)
  sbatch -p shared -t 0-03:00 --mem=100000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline.nf --path_to_reads /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE --base $base"
 done
+
 ```
 
 # Post-pipeline steps
@@ -117,6 +118,16 @@ Post-pipeline steps consists of bioinformatic steps that need to be run on the c
 | X | Conduct a GWAS using gene presence/absence (i.e. PanGWAS)| [pyseer](https://github.com/mgalardini/pyseer) |
 | X | Produce a phylogeney | [FastTree](http://www.microbesonline.org/fasttree/) |
 
+## 0. Create de architecture
+cd NEXTFLOW_PIPELINE
+mkdir 9.Post_Pipeline
+cd 9.Post_Pipeline
+mkdir 9.1.MultiQC
+mkdir 9.2.Snippy_core
+mkdir 9.3.Pangenome_analysis
+mkdir 9.4.Unitig_counter
+mkdir 9.5.FastTree
+mkdir 9.6.GWAS
 
 ## 1. Genome quality control
 Tool: MultiQC\
@@ -128,8 +139,8 @@ source activate multiqc
 conda install multiqc
 
 # Run MultiQC
-cd NEXTFLOW_PIPELINE/4.FASTQC
-sbatch -p shared  -t 0-03:00 --mem=100000 --wrap="multiqc ."
+cd 9.1.MultiQC/
+sbatch -p shared  -t 0-03:00 --mem=100000 --wrap="multiqc /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/4.FASTQC"
 ```
 ## 2. Merge Snippy results
 Tool: snippy-core\
@@ -138,8 +149,9 @@ Output:  Whole genome SNP alignment
 # Install Snippy
 source activate snippy
 # Run Snippy
-cd NEXTFLOW_PIPELINE/6.SNIPPY
-sbatch -p shared -t 0-02:00 --mem=100000 --wrap="snippy-core --ref 'SRR5063682/ref.fa' SRR*"
+cd 9.2.Snippy_core
+cp /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/6.SNIPPY/SRR5063682/ref.fa ./
+sbatch -p shared -t 0-02:00 --mem=100000 --wrap="snippy-core --ref 'ref.fa' /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/6.SNIPPY/SRR*"
 ```
 ## 3. Pangenome analysis
 Tool: panaroo\
@@ -151,9 +163,8 @@ source activate Panaroo
 conda install -c conda-forge -c bioconda -c defaults 'panaroo>=1.3'
 
 # Run Panaroo
-cd NEXTFLOW_PIPELINE/8.ANNOTATION
-mkdir panaroo_results
-sbatch -p shared -t 0-05:00 --mem=100000 --wrap="panaroo -i *.gff -o panaroo_results --clean-mode strict --alignment pan --aligner mafft"
+cd 9.3.Pangenome_analysis
+sbatch -p shared -t 0-05:00 --mem=100000 --wrap="panaroo -i /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/8.ANNOTATION/*.gff -o /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.3.Pangenome_analysis --clean-mode strict --alignment pan --aligner mafft"
 ```
 ## 4. Unitig calling
 Tool: unitig-counter\
@@ -165,18 +176,20 @@ source activate unitig-counter
 conda install unitig-counter
 
 # Create input file
-cd NEXTFLOW_PIPELINE/7.ASSEMBLIES
+cd 9.4.Unitig_counter
 echo -e "ID\tPath" > strain_list.txt
-for i in *.fasta
+for i in /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/7.ASSEMBLIES/*.fasta
 do
-  base=$(echo "$i" | cut -d '.' -f1)
+  base=$(echo "$i" | cut -d '/' -f12-12 | cut -d '.' -f1)
   echo -e "$base\t$i"
 done >> strain_list.txt
 
 # Run unitig-counter
-sbatch -p shared -c 8 -t 0-05:00 --mem=100000 --wrap="unitig-counter -strains strain_list.txt -output output -nb-cores 8"
+cd 9.4.Unitig_counter
+sbatch -p shared -c 8 -t 0-05:00 --mem=100000 --wrap="unitig-counter -strains strain_list.txt -output Unitig_counter -nb-cores 8"
 
 # Extend short unitigs leftwards and rightwards by following the neightbouring nodes in the de Bruijn graph
+cd Unitig_counter
 sbatch -p shared -c 8 -t 0-05:00 --mem=100000 --wrap="cdbg-ops extend --graph graph --unitigs unitigs.txt > extended.txt"
 ```
 ## 5. Phylogeny - FastTree
@@ -187,9 +200,8 @@ curl -O http://www.microbesonline.org/fasttree/FastTree.c
 gcc -O3 -finline-functions -funroll-loops -Wall -o FastTree FastTree.c -lm
 
 # Run
-cd NEXTFLOW_PIPELINE/7.ASSEMBLIES
-sbatch -p shared -t 0-02:00 --mem=100000 --wrap="FastTree -gtr -nt core.full.aln > phylo.aln"
-
+cd 9.5.FastTree
+sbatch -p shared -t 0-02:00 --mem=100000 --wrap="FastTree -gtr -nt /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.2.Snippy_core/core.full.aln > phylo.aln"
 ```
 ## 6. GWAS
 Tool: pyseer\
