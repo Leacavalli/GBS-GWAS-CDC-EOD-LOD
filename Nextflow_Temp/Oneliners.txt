@@ -15,7 +15,7 @@ Post-pipeline steps:
 - Phylogeny: FastTree                      DONE
 - unitig calling: unitig-caller/-counter   In progress
 - SNP-based GWAS: pyseer                   In progress
-- Pan-GWAS: pyseer 	  	           In progress
+- Pan-GWAS: pyseer 	  	                   In progress
 - DBGWAS: pyseer                           In progress
 
 ------------------------------------------------------------------------------------------------
@@ -275,6 +275,25 @@ pyseer --lmm --phenotypes phenotypes --pres gene_presence_absence.Rtab --similar
 pyseer --lmm --phenotypes phenotypes --kmers /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.4.Unitig_counter/Unitig_counter/unitigs.txt --similarity phylogeny_K.tsv --output-patterns unitig_patterns.txt --cpu 8 > phenotype_unitigs.txt
 
 ------------------------------------------------------------------------------------------------
+
+##############################
+# QC Steps: N50 Calculation  #
+##############################
+
+#Tool bbmap
+
+wget https://downloads.sourceforge.net/project/bbmap/BBMap_38.91.tar.gz
+tar -xzvf BBMap_38.91.tar.gz
+cd bbmap
+
+#Ensure file is executable
+chmod +x *.sh
+
+#produce tab delimited text file, each line contains a fasta file with corresponding L50, N50 and GC content 
+BBMmap/sh/statswrapper.sh in = *.fasta
+
+
+
 
 
 
