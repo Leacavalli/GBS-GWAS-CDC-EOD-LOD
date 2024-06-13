@@ -1,7 +1,7 @@
 
 # Pipeline Description
 
-This Nextflow pipeline was built to intregate the following steps:
+This Nextflow pipeline was built to integrate the following steps:
 <br>   
 
 | Steps  | Description  | Tool |
@@ -27,6 +27,7 @@ NEXTFLOW_PIPELINE\
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|--- GBS-SBG.fasta\
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|--- Streptococcus_agalactiae.fasta\
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|--- profiles_csv\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|--- phylogeny_distance.py\
 &nbsp;&nbsp;| 0.RAW_READS\
 &nbsp;&nbsp;| 1.TRIMMED_READS\
 &nbsp;&nbsp;| 2.KRAKEN_REPORTS\
@@ -109,14 +110,14 @@ Post-pipeline steps consists of bioinformatic steps that need to be run on the c
 
 | Steps  | Description  | Tool |
 | ------------- | ------------- | ------------- |
-| X | Combine QC results | [MultiQC](https://github.com/MultiQC/MultiQC)  |
-| X | Pangenome Analysis | [Panaroo](https://github.com/gtonkinhill/panaroo)  |
-| X | Produce a whole genome SNP alignment | [Snippy-core](https://github.com/tseemann/snippy)  |
-| X | Call unitigs | [Unitig-counter](https://github.com/bacpop/unitig-counter) |
-| X | Conduct a GWAS using SNPs | [pyseer](https://github.com/mgalardini/pyseer) |
-| X | Conduct a GWAS using unitigs (i.e. DBGWAS) | [pyseer](https://github.com/mgalardini/pyseer) |
-| X | Conduct a GWAS using gene presence/absence (i.e. PanGWAS)| [pyseer](https://github.com/mgalardini/pyseer) |
-| X | Produce a phylogeney | [FastTree](http://www.microbesonline.org/fasttree/) |
+| 1 | Combine QC results | [MultiQC](https://github.com/MultiQC/MultiQC)  |
+| 2 | Produce a whole genome SNP alignment | [Snippy-core](https://github.com/tseemann/snippy)  |
+| 3 | Pangenome Analysis | [Panaroo](https://github.com/gtonkinhill/panaroo)  |
+| 4 | Call unitigs | [Unitig-counter](https://github.com/bacpop/unitig-counter) |
+| 5 | Produce a phylogeney | [FastTree](http://www.microbesonline.org/fasttree/) |
+| 6.1 | Conduct a GWAS using SNPs | [pyseer](https://github.com/mgalardini/pyseer) |
+| 6.2 | Conduct a GWAS using unitigs (i.e. DBGWAS) | [pyseer](https://github.com/mgalardini/pyseer) |
+| 6.3 | Conduct a GWAS using gene presence/absence (i.e. PanGWAS)| [pyseer](https://github.com/mgalardini/pyseer) |
 
 ## 0. Create de architecture
 cd NEXTFLOW_PIPELINE
@@ -205,7 +206,7 @@ sbatch -p shared -t 0-02:00 --mem=100000 --wrap="FastTree -gtr -nt /n/holylfs05/
 ```
 ## 6. GWAS
 Tool: pyseer\
-### Build similarity matrix from phylogeny
+### 6.0.Build similarity matrix from phylogeny
 ```
 #installation
 conda -n create pyseer
@@ -215,15 +216,15 @@ conda install pyseer
 #create phylogeny tsv file
 sbatch -p shared -t 0-02:00 --mem=100000 --wrap="python /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/Files/phylogeny_distance.py --lmm /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.5.FastTree/phylo.aln > phylogeny_K.tsv"
 ```
-### SNP-based GWAS
+### 6.1.SNP-based GWAS
 ```
 pyseer --phenotypes phenotypes --vcf /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.2.Snippy_core/core.vcf --lmm --similarity phylogeny_K.tsv > EOD_LOD_SNPs.txt
 ```
-### Pan-GWAS
+### 6.2.Pan-GWAS
 ```
 pyseer --phenotypes phenotypes --pres /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.3.Pangenome_analysis/gene_presence_absence.Rtab --lmm --similarity phylogeny_K.tsv > EOD_LOD_COGs.txt
 ```
-### Unigit-based GWAS (DBGWAS)
+### 6.3.Unigit-based GWAS (DBGWAS)
 ```
 pyseer --lmm --phenotypes phenotypes --kmers /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.4.Unitig_counter/Unitig_counter/unitigs.txt --similarity phylogeny_K.tsv --output-patterns unitig_patterns.txt --cpu 8 > phenotype_unitigs.txt
 ```

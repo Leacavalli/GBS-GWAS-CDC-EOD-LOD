@@ -81,6 +81,7 @@ process FastQC {
   script:
   """
   fastqc ${filtered_read1} -o ${params.path_to_reads}/4.FASTQC
+  fastqc ${filtered_read2} -o ${params.path_to_reads}/4.FASTQC
   """
 }
 
@@ -153,7 +154,7 @@ process ASSEMBLY {
 
 
 process ANNOTATION {
-  conda 'prokka'
+  conda '/n/home02/lcavalli/.conda/envs/prokka'
 
   publishDir "${params.path_to_reads}/8.ANNOTATION", overwrite: true
 
