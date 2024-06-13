@@ -52,15 +52,15 @@ java -version             # Check java version
 ```
 ### Other dependencies
 [sra-tools](https://github.com/ncbi/sra-tools)
-java
-Trimmomatic
-Kraken2
-KrakenTools
-FastQC
-SRST2
-Snippy
-Unicycler
-Prokka
+java,
+Trimmomatic,
+Kraken2,
+KrakenTools,
+FastQC,
+SRST2, 
+Snippy,
+Unicycler,
+Prokka (See table above)
 
 ## 1. Create Architecture
 ```
