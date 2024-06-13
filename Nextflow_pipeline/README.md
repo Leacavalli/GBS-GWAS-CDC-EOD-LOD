@@ -51,13 +51,13 @@ conda install openjdk=11  # Only run once to set up; All following times, skip t
 java -version             # Check java version
 ```
 ### Other dependencies
-[sra-tools](https://github.com/ncbi/sra-tools)
+[sra-tools](https://github.com/ncbi/sra-tools), 
 java,
 Trimmomatic,
 Kraken2,
 KrakenTools,
 FastQC,
-SRST2, 
+SRST2,
 Snippy,
 Unicycler,
 Prokka (See table above)
