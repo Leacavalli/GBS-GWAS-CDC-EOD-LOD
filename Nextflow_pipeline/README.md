@@ -1,5 +1,5 @@
-
 # Pipeline Description
+![alt text]()
 
 This Nextflow pipeline was built to integrate the following steps:
 <br>   
@@ -51,7 +51,7 @@ conda install openjdk=11  # Only run once to set up; All following times, skip t
 java -version             # Check java version
 ```
 ### Other dependencies
-[sra-tools](https://github.com/ncbi/sra-tools), 
+[sra-tools](https://github.com/ncbi/sra-tools),
 java,
 Trimmomatic,
 Kraken2,
