@@ -10,7 +10,7 @@ This Nextflow pipeline was built to integrate the following steps:
 | 2 | Identify contaminating reads  | [Kraken2](https://github.com/DerrickWood/kraken2) |
 | 3 | Remove contaminating reads  | [KrakenTools](https://github.com/jenniferlu717/KrakenTools) |
 | 4 | Reads Quality Control | [FastQC](https://github.com/s-andrews/FastQC)  |
-| 5 | Determine the serotype and ST of isolates | [SRST2](), with [GBS-SG](https://github.com/swainechen/GBS-SBG)  |
+| 5 | Determine the serotype and ST of isolates | [SRST2](https://github.com/katholt/srst2), with [GBS-SG](https://github.com/swainechen/GBS-SBG)  |
 | 6 | Mapping to reference genome and variant calling | [Snippy](https://github.com/tseemann/snippy)  |
 | 7 | Assemble reads  | [Unicycler](https://github.com/rrwick/Unicycler)  |
 | 8 | Genome Annotation | [Prokka](https://github.com/tseemann/prokka)  |
@@ -42,7 +42,25 @@ NEXTFLOW_PIPELINE\
 # Running the Pipeline
 The pipeline contains the steps that can be run for each sample individually. From read trimming and filtering to genome annotation.
 ## 0. Install Dependencies
-
+### Install Java v.11 for Nextflow
+```
+module load python
+conda create -n java      # Only run once to set up; All following times, skip this
+conda activate java
+conda install openjdk=11  # Only run once to set up; All following times, skip this
+java -version             # Check java version
+```
+### Other dependencies
+[sra-tools](https://github.com/ncbi/sra-tools)
+java
+Trimmomatic
+Kraken2
+KrakenTools
+FastQC
+SRST2
+Snippy
+Unicycler
+Prokka
 
 ## 1. Create Architecture
 ```
@@ -72,16 +90,7 @@ do
 done
 ```
 
-## 3. Install Java 11
-```
-module load python
-conda create -n java      # Only run once to set up; All following times, skip this
-conda activate java
-conda install openjdk=11  # Only run once to set up; All following times, skip this
-java -version             # Check java version
-```
-
-## 4. Install Nextflow
+## 3. Install Nextflow
 ```
 # Download the executable package:
 wget -qO- https://get.nextflow.io | bash   
@@ -95,14 +104,27 @@ export PATH="<path_to_nextflow>:$PATH"
 source ~/.bashrc      
 ```
 
-## 5. Run Nextflow
+## 4. Run Nextflow
+The following options are required to run the pipeline for each isolates:
+```
+Usage: nextflow run <Nextflow_script> [args...]
+Arguments:
+        -C                     <The nextflow configuration file>
+        --path_nextflow_dir    <The path to your Nextflow Directory>
+        --path_conda_env       <The path to a directory containing the required conda environments (See Dependencies). Leave empty if you want Nextflow to install for youo>
+        --sample               <The Sample ID/Name>
+```
+For example, the command to run the pipeline for a single isolate is the following:  
+```
+nextflow run Nextflow_pipeline.nf -C nextflow.config --path_nextflow_dir /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE --path_conda_env /n/home02/lcavalli/.conda/envs/ --sample SRR5063682
+```
+The following loop can be used  to submit jobs for all isolates:
 ```
 for i in ../0.RAW_READS/*_1.fastq.gz
 do
  base=$(echo $i | cut -d '/' -f3-3 | cut -d '_' -f1-1)
- sbatch -p shared -t 0-03:00 --mem=100000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline.nf --path_to_reads /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE --base $base"
+ sbatch -p shared -t 0-03:00 --mem=100000 --wrap="nextflow run Nextflow_pipeline.nf -C nextflow.config --path_nextflow_dir /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE --path_conda_env /n/home02/lcavalli/.conda/envs/ --sample $base"
 done
-
 ```
 
 # Post-pipeline steps

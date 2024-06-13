@@ -1,7 +1,7 @@
 process Trimmomatic {
-  conda '/n/home02/lcavalli/.conda/envs/java'
+  conda '${params.path_conda_env}java'
 
-  publishDir "${params.path_to_reads}/1.TRIMMED_READS" , overwrite: true
+  publishDir "${params.path_nextflow_dir}/1.TRIMMED_READS" , overwrite: true
 
   input:
   val base
@@ -12,14 +12,14 @@ process Trimmomatic {
   path "${base}_trimmed_2.fq.gz"
 
   """
-  java -jar /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/Trimmomatic-0.39/trimmomatic-0.39.jar PE -phred33 -trimlog ${base}_1.log ${params.path_to_reads}/0.RAW_READS/${base}_1.fastq.gz ${params.path_to_reads}/0.RAW_READS/${base}_2.fastq.gz ${base}_trimmed_1.fq.gz ${base}_unpaired_1.fq.gz ${base}_trimmed_2.fq.gz ${base}_unpaired_2.fq.gz LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36 > ${base}_trim.out
+  java -jar /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/Trimmomatic-0.39/trimmomatic-0.39.jar PE -phred33 -trimlog ${base}_1.log ${params.path_nextflow_dir}/0.RAW_READS/${base}_1.fastq.gz ${params.path_nextflow_dir}/0.RAW_READS/${base}_2.fastq.gz ${base}_trimmed_1.fq.gz ${base}_unpaired_1.fq.gz ${base}_trimmed_2.fq.gz ${base}_unpaired_2.fq.gz LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36 > ${base}_trim.out
   rm ${base}_1.log ${base}_unpaired_1.fq.gz ${base}_unpaired_2.fq.gz ${base}_trim.out
   """
 }
 
 
 process Kraken {
-  publishDir "${params.path_to_reads}/2.KRAKEN_REPORTS" , overwrite: true
+  publishDir "${params.path_nextflow_dir}/2.KRAKEN_REPORTS" , overwrite: true
 
   input:
   val base
@@ -41,9 +41,9 @@ process Kraken {
 }
 
 process Kraken_tools {
-  conda '/n/home02/lcavalli/.conda/envs/biopython'
+  conda '${params.path_conda_env}biopython'
 
-  publishDir "${params.path_to_reads}/3.FILTERED_READS", overwrite: true
+  publishDir "${params.path_nextflow_dir}/3.FILTERED_READS", overwrite: true
 
   input:
   val base
@@ -66,7 +66,7 @@ process Kraken_tools {
 }
 
 process FastQC {
-  conda '/n/home02/lcavalli/.conda/envs/fastqc'
+  conda '${params.path_conda_env}fastqc'
 
   input:
   val base
@@ -80,15 +80,15 @@ process FastQC {
 
   script:
   """
-  fastqc ${filtered_read1} -o ${params.path_to_reads}/4.FASTQC
-  fastqc ${filtered_read2} -o ${params.path_to_reads}/4.FASTQC
+  fastqc ${filtered_read1} -o ${params.path_nextflow_dir}/4.FASTQC
+  fastqc ${filtered_read2} -o ${params.path_nextflow_dir}/4.FASTQC
   """
 }
 
 process Serotype_MLST {
-  conda '/n/home02/lcavalli/.conda/envs/srst2'
+  conda '${params.path_conda_env}srst2'
 
-  publishDir "${params.path_to_reads}/5.SEROTYPE_MLST", overwrite: true
+  publishDir "${params.path_nextflow_dir}/5.SEROTYPE_MLST", overwrite: true
 
   input:
   val base
@@ -104,12 +104,12 @@ process Serotype_MLST {
 
   script:
   """
-  srst2 --input_pe ${params.path_to_reads}/0.RAW_READS/${base}_{1,2}.fastq.gz --output ${base} --log --gene_db ${params.path_to_reads}/Files/GBS-SBG.fasta --mlst_db ${params.path_to_reads}/Files/Streptococcus_agalactiae.fasta --mlst_definitions ${params.path_to_reads}/Files/profiles_csv --mlst_delimiter '_'
+  srst2 --input_pe ${params.path_nextflow_dir}/0.RAW_READS/${base}_{1,2}.fastq.gz --output ${base} --log --gene_db ${params.path_nextflow_dir}/Files/GBS-SBG.fasta --mlst_db ${params.path_nextflow_dir}/Files/Streptococcus_agalactiae.fasta --mlst_definitions ${params.path_nextflow_dir}/Files/profiles_csv --mlst_delimiter '_'
   """
 }
 
 process SNIPPY {
-  conda '/n/home02/lcavalli/.conda/envs/snippy'
+  conda '${params.path_conda_env}snippy'
 
   input:
   val base
@@ -125,14 +125,14 @@ process SNIPPY {
 
   script:
   """
-  snippy --outdir ${params.path_to_reads}/6.SNIPPY/${base} --R1 ${filtered_read1} --R2 ${filtered_read2} --ref ${params.path_to_reads}/Files/AP018935.1.fa --cpus 16
+  snippy --outdir ${params.path_nextflow_dir}/6.SNIPPY/${base} --R1 ${filtered_read1} --R2 ${filtered_read2} --ref ${params.path_nextflow_dir}/Files/AP018935.1.fa --cpus 16
   """
 }
 
 process ASSEMBLY {
-  conda '/n/home02/lcavalli/.conda/envs/unicycler'
+  conda '${params.path_conda_env}unicycler'
 
-  publishDir "${params.path_to_reads}/7.ASSEMBLIES", overwrite: true
+  publishDir "${params.path_nextflow_dir}/7.ASSEMBLIES", overwrite: true
 
   input:
   val base
@@ -154,9 +154,9 @@ process ASSEMBLY {
 
 
 process ANNOTATION {
-  conda '/n/home02/lcavalli/.conda/envs/prokka'
+  conda '${params.path_conda_env}prokka'
 
-  publishDir "${params.path_to_reads}/8.ANNOTATION", overwrite: true
+  publishDir "${params.path_nextflow_dir}/8.ANNOTATION", overwrite: true
 
   input:
   val base
@@ -179,7 +179,7 @@ process ANNOTATION {
 
 
 workflow {
-  Channel.of(params.base)
+  Channel.of(params.sample)
     | Trimmomatic
     | Kraken
     | Kraken_tools
