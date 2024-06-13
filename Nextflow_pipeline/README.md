@@ -1,5 +1,5 @@
 # Pipeline Description
-![alt text]()
+![alt text](https://github.com/Leacavalli/GBS-GWAS-CDC-EOD-LOD/blob/main/Nextflow_pipeline/Bioinfo_flowchart.png)
 
 This Nextflow pipeline was built to integrate the following steps:
 <br>   
