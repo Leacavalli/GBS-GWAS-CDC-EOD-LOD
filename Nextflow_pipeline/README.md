@@ -116,14 +116,17 @@ Arguments:
 ```
 For example, the command to run the pipeline for a single isolate is the following:  
 ```
-nextflow run Nextflow_pipeline.nf -C nextflow.config --path_nextflow_dir /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE --path_conda_env /n/home02/lcavalli/.conda/envs/ --sample SRR5063682
+nextflow run Nextflow_pipeline.nf -C nextflow.config --path_nextflow_dir /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE --path_conda_env /n/home02/lcavalli/.conda/envs --sample SRR5063682
 ```
+sbatch -p shared -t 0-03:00 --mem=100000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline.nf --path_nextflow_dir /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_new --path_conda_env /n/home02/lcavalli/.conda/envs --sample SRR5063682"
+sbatch -p shared -t 0-03:00 --mem=100000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline.nf --path_nextflow_dir /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_new --path_conda_env "" --sample SRR5063686"
+
 The following loop can be used  to submit jobs for all isolates:
 ```
 for i in ../0.RAW_READS/*_1.fastq.gz
 do
  base=$(echo $i | cut -d '/' -f3-3 | cut -d '_' -f1-1)
- sbatch -p shared -t 0-03:00 --mem=100000 --wrap="nextflow run Nextflow_pipeline.nf -C nextflow.config --path_nextflow_dir /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE --path_conda_env /n/home02/lcavalli/.conda/envs/ --sample $base"
+ sbatch -p shared -t 0-03:00 --mem=100000 --wrap="nextflow  -C nextflow.config run Nextflow_pipeline.nf--path_nextflow_dir /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE --path_conda_env /n/home02/lcavalli/.conda/envs --sample $base"
 done
 ```
 

@@ -1,5 +1,5 @@
 process Trimmomatic {
-  conda '${params.path_conda_env}java'
+  conda "${params.path_conda_env}/java"
 
   publishDir "${params.path_nextflow_dir}/1.TRIMMED_READS" , overwrite: true
 
@@ -41,7 +41,7 @@ process Kraken {
 }
 
 process Kraken_tools {
-  conda '${params.path_conda_env}biopython'
+  conda "${params.path_conda_env}/biopython"
 
   publishDir "${params.path_nextflow_dir}/3.FILTERED_READS", overwrite: true
 
@@ -66,7 +66,7 @@ process Kraken_tools {
 }
 
 process FastQC {
-  conda '${params.path_conda_env}fastqc'
+  conda "${params.path_conda_env}/fastqc"
 
   input:
   val base
@@ -86,7 +86,7 @@ process FastQC {
 }
 
 process Serotype_MLST {
-  conda '${params.path_conda_env}srst2'
+  conda "${params.path_conda_env}/srst2"
 
   publishDir "${params.path_nextflow_dir}/5.SEROTYPE_MLST", overwrite: true
 
@@ -109,7 +109,7 @@ process Serotype_MLST {
 }
 
 process SNIPPY {
-  conda '${params.path_conda_env}snippy'
+  conda "${params.path_conda_env}/snippy"
 
   input:
   val base
@@ -130,7 +130,7 @@ process SNIPPY {
 }
 
 process ASSEMBLY {
-  conda '${params.path_conda_env}unicycler'
+  conda "${params.path_conda_env}/unicycler"
 
   publishDir "${params.path_nextflow_dir}/7.ASSEMBLIES", overwrite: true
 
@@ -154,7 +154,7 @@ process ASSEMBLY {
 
 
 process ANNOTATION {
-  conda '${params.path_conda_env}prokka'
+  conda "${params.path_conda_env}/prokka"
 
   publishDir "${params.path_nextflow_dir}/8.ANNOTATION", overwrite: true
 
