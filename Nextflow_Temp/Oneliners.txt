@@ -17,6 +17,7 @@ Post-pipeline steps:
 - SNP-based GWAS: pyseer                   In progress
 - Pan-GWAS: pyseer 	  	                   In progress
 - DBGWAS: pyseer                           In progress
+- QC Steps                                 In progress
 
 ------------------------------------------------------------------------------------------------
 ###########################
