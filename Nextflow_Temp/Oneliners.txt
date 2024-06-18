@@ -169,12 +169,29 @@ source activate multiqc
 #######################################
 # Step XX : Whole genome SNP alignment #
 #######################################
-# Tool: snippy-core
+# Tool: snippy
 
 source activate snippy
 
+# Run snippy-core to get whole genome alignment
 sbatch -p shared -t 0-02:00 --mem=100000 --wrap="snippy-core --ref 'SRR5063682/ref.fa' SRR*"
+# Run snippy-clean_full_aln to clean the whole genome alignment
+sbatch -p shared -t 0-05:00 --mem=50000 --wrap="snippy-clean_full_aln core.full.aln > clean.full.aln"
 
+------------------------------------------------------------------------------------------------
+#######################################
+# Step XX : Remove recombination     #
+#######################################
+# Tool: Gubbins
+
+source activate snippy
+
+# Activate Gubbins
+source activate gubbins
+
+# Run Gubbins
+cd 9.3.Gubbins
+sbatch -p shared -t 0-05:00 --mem=50000 --wrap="run_gubbins.py -p gubbins clean.full.aln"
 
 ------------------------------------------------------------------------------------------------
 
