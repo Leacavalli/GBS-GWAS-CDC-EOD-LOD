@@ -9,9 +9,10 @@ Pipeline steps:
 7. Gene annotation, prokka                 DONE
 
 Post-pipeline steps: 
-1. Genome quality control - MULTIQC        DONE
+- Genome quality control - MULTIQC         DONE
 - Merge Snippy results - SNIPPY-core       DONE
 - Pangenome analysis: Panaroo              DONE
+  -Alternate Pangenome analysis: Roary     In progress
 - Phylogeny: FastTree                      DONE
 - unitig calling: unitig-caller/-counter   In progress
 - SNP-based GWAS: pyseer                   In progress
@@ -212,6 +213,19 @@ sbatch -p shared -t 0-05:00 --mem=100000 --wrap="panaroo -i *.gff -o panaroo_res
 panaroo -i *.gff3 -o panaroo_results --clean-mode strict --alignment pan --aligner mafft
   
 ------------------------------------------------------------------------------------------------
+
+##########################################
+# Step XX : Alternate Pangenome Analysis #
+##########################################
+# Tool: Roary
+
+conda create -n Roary
+
+conda install -c "bioconda/label/cf201901" roary
+
+sbatch -p shared  -t 0-4:00 --mem=20000 --wrap="roary -e --mafft -p 8 *.gff"
+
+-------------------------------------------------------------------------------------------------
 
 ###############################
 # Step XX : Call Unitigs      #
