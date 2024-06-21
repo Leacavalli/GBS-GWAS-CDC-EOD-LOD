@@ -13,6 +13,7 @@ Post-pipeline steps:
 - Merge Snippy results - SNIPPY-core       DONE
 - Pangenome analysis: Panaroo              DONE
   -Alternate Pangenome analysis: Roary     In progress
+  -Alternate sub-analysis: CLARC           In progress 
 - Phylogeny: FastTree                      DONE
 - unitig calling: unitig-caller/-counter   In progress
 - SNP-based GWAS: pyseer                   In progress
@@ -219,11 +220,26 @@ panaroo -i *.gff3 -o panaroo_results --clean-mode strict --alignment pan --align
 ##########################################
 # Tool: Roary
 
+#Installation
 conda create -n Roary
 
 conda install -c "bioconda/label/cf201901" roary
 
+#Navigate to gff folder (output of prokka) 
 sbatch -p shared  -t 0-4:00 --mem=20000 --wrap="roary -e --mafft -p 8 *.gff"
+
+-------------------------------------------------------------------------------------------------
+
+##########################################
+# Step XX : Alternate Pangenome Analysis #
+##########################################
+# Tool: CLARC
+
+git clone https://github.com/IndraGonz/CLARC.git
+cd CLARC/envs
+conda env create --file clarc_env.yml
+
+
 
 -------------------------------------------------------------------------------------------------
 
