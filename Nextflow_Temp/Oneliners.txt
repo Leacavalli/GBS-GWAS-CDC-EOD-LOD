@@ -231,16 +231,22 @@ sbatch -p shared  -t 0-4:00 --mem=20000 --wrap="roary -e --mafft -p 8 *.gff"
 -------------------------------------------------------------------------------------------------
 
 ##########################################
-# Step XX : Alternate Pangenome Analysis #
+# Step XX : Redefine COGS with CLARC     #
 ##########################################
 # Tool: CLARC
+# Inputs: presence_abscence_csv (presence absence matrix for each COG for each sample used for pangenome analysis, direct output of Roary), pan_genome_reference.fa (representative COG sequences, direct output of Roary), needed_sample_names.txt (text files of samples needed (if pangenome was constructed using more samples than required for the analysis)  
+# All inputs to be put in clarc/data folder 
 
+#Installation 
 git clone https://github.com/IndraGonz/CLARC.git
 cd CLARC/envs
 conda env create --file clarc_env.yml
+conda activate clarc_env
+cd CLARC
+python setup.py install
 
-
-
+#Run CLARC 
+clarc --input_dir PATH/clarc/data --output_dir PATH/clarc_output
 -------------------------------------------------------------------------------------------------
 
 ###############################
