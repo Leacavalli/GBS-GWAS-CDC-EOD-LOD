@@ -1,7 +1,7 @@
 Pipeline steps:
 1. Trim - Trimmomatic                      DONE
-2. Check contamination - Kraken            DONE
-3. Remove contamination - KrakenTools      DONE
+2. Check contamination - Kraken            DONE (Potentially exclude?)
+3. Remove contamination - KrakenTools      DONE (Potentially exclude?)
 4. Read Quality Check - FASTQC             DONE
 5. Serotyping + MLST - SRST2               DONE
 6. Mapping+ variant calling - SNIPPY       DONE
@@ -9,7 +9,7 @@ Pipeline steps:
 7. Gene annotation, prokka                 DONE
 
 Post-pipeline steps: 
-- Genome quality control - MULTIQC         DONE
+- Genome quality control - MULTIQC         DONE (Potentially replace with QUAS?) 
 - Merge Snippy results - SNIPPY-core       DONE
 - Pangenome analysis: Panaroo              DONE
   -Alternate Pangenome analysis: Roary     In progress
@@ -18,7 +18,7 @@ Post-pipeline steps:
 - unitig calling: unitig-caller/-counter   In progress
 - SNP-based GWAS: pyseer                   In progress
 - Pan-GWAS: pyseer 	  	                   In progress
-  -Alternate sub-analysis: run with MASH distance
+  -Alternate sub-analysis: run with MASH distance In progress
 - DBGWAS: pyseer                           In progress
 - QC Steps                                 In progress
 
@@ -373,6 +373,32 @@ chmod +x *.sh
 
 #produce tab delimited text file, each line contains a fasta file with corresponding L50, N50 and GC content 
 BBMmap/sh/statswrapper.sh in = *.fasta
+
+
+############################################################
+# QC Steps (potential alternate on assembly stats): QUAST  #
+############################################################
+
+#Tool: QUAST
+#Outputs a report with N50, GC (%), Number of contigs, total genome length,  
+
+#Installation
+sudo apt-get update && sudo apt-get install -y pkg-config libfreetype6-dev libpng-dev python3-matplotlib
+./setup.py install
+
+#Navigate to folder with assemblies (7.ASSEMBLY)
+
+for i in *fasta;
+do
+base=$(echo $i | cut -d '_' -f1-1)
+sbatch -p shared  -t 0-01:00 --mem=40000 --wrap="python /usr/local/bin/quast.py -o $base\.quast.out/ $base.fasta"
+done
+
+#QC thresholds: 
+#N50 less than 30 kb 
+#Genome length of GBS approx 2,000,000 bp, exclude if less than 1.7 MB or greater than 2.4 MB 
+#GC content is approximately 35%, exclude if greater than 40% or less than 30%
+#Contig number <= 250 
 
 
 
