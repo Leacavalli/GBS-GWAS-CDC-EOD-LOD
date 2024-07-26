@@ -5,24 +5,32 @@ Pipeline steps:
 4. Read Quality Check - FASTQC             DONE
 5. Serotyping + MLST - SRST2               DONE
 6. Mapping+ variant calling - SNIPPY       DONE
-6. Assembly, unicycler                     DONE
-7. Gene annotation, prokka                 DONE
+6. Assembly - unicycler                    DONE
+7. Gene annotation - prokka                DONE
+8. QC Steps: Check contamination - FastANI DONE 
+9. QC Steps (BBmap)                         In progress (Potentially remove?)
+9. QC Steps (QUAST)                         In progress
+11. Remove Poor Quality samples 
 
 Post-pipeline steps: 
 - Genome quality control - MULTIQC         DONE (Potentially replace with QUAST?- remove isolates here and continue with GWAS) 
-- Merge Snippy results - SNIPPY-core       DONE
+- Merge + Clean Snippy results - SNIPPY    DONE
+- Remove recombination - Gubbins           DONE
+- Phylogeny: FastTree                      DONE (Will be replaced with RAxML)
+- Phylogeny: RAxML                         In progress
 - Pangenome analysis: Panaroo              DONE
-  -Alternate Pangenome analysis: Roary     In progress
-  -Alternate sub-analysis: CLARC           In progress 
-- Phylogeny: FastTree                      DONE
-- unitig calling: unitig-caller/-counter   In progress
+  -Alternate Pangenome analysis: Roary     DONE
+  -Alternate sub-analysis: CLARC           DONE
+- unitig calling: unitig-counter    	   DONE
 - SNP-based GWAS: pyseer                   In progress
-- Pan-GWAS: pyseer 	  	                   In progress
+- Pan-GWAS: pyseer 	  	           In progress
   -Alternate sub-analysis: run with MASH distance In progress
 - DBGWAS: pyseer                           In progress
+- QC Steps: Check contamination - FastANI  DONE (Note: this can be run on individual samples or all samples)  
 - QC Steps (BBmap)                         In progress (Potentially remove?)
 - QC Steps (QUAST)                         In progress
-- QC Steps (FastANI)                       In progress
+- QC Steps: Check contamination - FastANI  DONE (Note: this can be run on individual samples or all samples)  
+- Poppunk 			           DONE 
 
 ------------------------------------------------------------------------------------------------
 ###########################
@@ -141,8 +149,6 @@ mv $base\.unicycler.out/assembly.fasta $base.fasta
 rm $base\.unicycler.out"
 done
 
-
-------------------------------------------------------------------------------------------------
 #######################
 # Step 7 : Annotation #
 #######################
@@ -157,7 +163,130 @@ mv $base\_prokka/$base\.gff .
 rm -r $base\_prokka"
 done
 
+
 ------------------------------------------------------------------------------------------------
+################################
+# Step 8: QC - Check Contamination #
+################################
+# Tool: FastANI
+conda create -n fastani
+source activate fastani
+conda install bioconda::fastani
+
+fastANI -h 
+# fastANI -q [QUERY_GENOME] -r [REFERENCE_GENOME] -o [OUTPUT_FILE] 
+sbatch -p shared  -t 0-01:00 --mem=40000 --wrap="fastANI -q $i -r $path_nextflow_dir/Files/AP018935.1.fa -o $path_nextflow_dir/8.FastANI/$base.fastani.out"
+
+ls *fasta > fasta_list.txt
+sbatch -p shared  -t 0-01:00 --mem=40000 --wrap="fastANI --ql fasta_list.txt -r /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/Files/AP018935.1.fa -o fastani_v2.out"
+
+# Run on each sample 
+path_nextflow_dir=$(echo "/n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE")
+mkdir $path_nextflow_dir/8.FastANI
+for i in $path_nextflow_dir/7.ASSEMBLIES/*fasta;
+do
+  base=$(echo $i | cut -d '/' -f12-12 | cut -d '.' -f1-1)
+sbatch -p shared  -t 0-01:00 --mem=40000 --wrap="fastANI -q $i -r $path_nextflow_dir/Files/AP018935.1.fa -o $path_nextflow_dir/8.FastANI/$base.fastani.out"
+done
+
+------------------------------------------------------------------------------------------------
+
+##############################
+# Step 9:QC - N50 Calculation  #
+##############################
+
+#Tool bbmap
+
+wget https://downloads.sourceforge.net/project/bbmap/BBMap_38.91.tar.gz
+tar -xzvf BBMap_38.91.tar.gz
+cd bbmap
+
+#Ensure file is executable
+chmod +x *.sh
+
+#produce tab delimited text file, each line contains a fasta file with corresponding L50, N50 and GC content 
+BBMmap/sh/statswrapper.sh in = *.fasta
+
+------------------------------------------------------------------------------------------------
+
+####################
+# Step 10 :QC - QUAST  #
+####################
+
+#Tool: QUAST
+#Outputs a report with N50, GC (%), Number of contigs, total genome length,  
+
+#Installation
+sudo apt-get update && sudo apt-get install -y pkg-config libfreetype6-dev libpng-dev python3-matplotlib
+./setup.py install
+
+
+#Navigate to folder with assemblies (7.ASSEMBLY)
+
+for i in *fasta;
+do
+base=$(echo $i | cut -d '_' -f1-1)
+sbatch -p shared  -t 0-01:00 --mem=40000 --wrap="python /usr/local/bin/quast.py -o $base\.quast.out/ $base.fasta"
+done
+
+# Or conda: 
+conda create -n quast
+source activate quast
+conda install bioconda::quast
+# run 
+path_nextflow_dir=$(echo "/n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE")
+for i in $path_nextflow_dir/7.ASSEMBLIES/*fasta;
+do
+  base=$(echo $i | cut -d '/' -f12-12 | cut -d '.' -f1-1)
+sbatch -p shared  -t 0-01:00 --mem=40000 --wrap="quast -o $path_nextflow_dir/9.QUAST/$base\.quast.out $path_nextflow_dir/7.ASSEMBLIES/$base\.fasta"
+done
+
+
+#QC thresholds: 
+#N50 less than 30 kb 
+#Genome length of GBS approx 2,000,000 bp, exclude if less than 1.7 MB or greater than 2.4 MB 
+#GC content is approximately 35%, exclude if greater than 40% or less than 30%
+#Contig number <= 250 
+
+------------------------------------------------------------------------------------------------
+
+##########################################
+# Step 11 : Remove Poor Quality samples  #
+##########################################
+
+path_nextflow_dir=$(echo "/n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE")
+
+mkdir $path_nextflow_dir/6.SNIPPY/Filter_out_QC
+mkdir $path_nextflow_dir/7.ASSEMBLIES/Filter_out_QC
+mkdir $path_nextflow_dir/8.ANNOTATION/Filter_out_QC
+
+
+for i in $path_nextflow_dir/9.QUAST/*.quast.out;
+do
+  # Extract the necessary values from the QUAST output file
+  assembly=$(grep "Assembly" $i/report.txt | awk '{print $2}')
+  n50=$(grep -w "N50" $i/report.txt | awk '{print $2}')
+  gc=$(grep -w "GC (%)" $i/report.txt | awk '{print $3}')
+  total_length=$(grep -w "Total length" $i/report.txt | grep -v "(>= " | awk '{print $3}')
+  contigs=$(grep "^# contigs " $i/report.txt | tail -1 | awk '{print $3}')
+  # Extract the necessary values from the FastANI output file
+  ANI=$(cat $path_nextflow_dir/8.FastANI/$assembly\.fastani.out| awk '{print $3}')
+
+  # Check the conditions
+  if (( $(echo "$ANI < 95" | bc -l) )) ||[ "$n50" -lt  30000 ] || [ "$contigs" -gt 250 ]  || (( $(echo "$gc <= 30" | bc -l) )) || (( $(echo "$gc >= 40" | bc -l) )) || [ "$total_length" -lt 1700000 ] || [ "$total_length" -gt 2400000 ] ; then
+    mv $path_nextflow_dir/6.SNIPPY/$assembly $path_nextflow_dir/6.SNIPPY/Filter_out_QC
+    mv $path_nextflow_dir/7.ASSEMBLIES/$assembly\.fasta $path_nextflow_dir/7.ASSEMBLIES/Filter_out_QC
+    mv $path_nextflow_dir/8.ANNOTATION/$assembly\.gff $path_nextflow_dir/8.ANNOTATION/Filter_out_QC
+  fi
+done
+
+
+------------------------------------------------------------------------------------------------
+
+____________________________________________________________________________________________
+POST PIPELINE
+____________________________________________________________________________________________
+
 ###############################
 #    Step XX : MultiQC        #
 ###############################
@@ -197,6 +326,36 @@ source activate gubbins
 # Run Gubbins
 cd 9.3.Gubbins
 sbatch -p shared -t 0-05:00 --mem=50000 --wrap="run_gubbins.py -p gubbins clean.full.aln"
+
+------------------------------------------------------------------------------------------------
+###############################
+# Step XX : Build phylogeny   #
+###############################
+# Tool: FastTree
+
+# install FastTree
+curl -O http://www.microbesonline.org/fasttree/FastTree.c
+gcc -O3 -finline-functions -funroll-loops -Wall -o FastTree FastTree.c -lm
+
+# Run
+sbatch -p shared -t 0-02:00 --mem=100000 --wrap="FastTree -gtr -nt core.full.aln > phylo.aln"
+ 
+------------------------------------------------------------------------------------------------
+###############################
+# Step XX : Build phylogeny   #
+###############################
+# Tool: RAxML
+
+# Install: https://cme.h-its.org/exelixis/web/software/raxml/
+
+# /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/standard-RAxML/raxmlHPC-PTHREADS-SSE3 -s input.fasta -T 48 -m GTRGAMMA -# 100 -f t -p 1234 -t initial.tre -n output_prefix
+
+# controlling for ascertainment bias
+# /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/standard-RAxML/raxmlHPC-PTHREADS-SSE3 -s input.fasta -T 48 -m ASC_GTRGAMMA ­­asc­corr=stamatakis ­q part -# 100 -f t -p 1234 -t initial.tre -n output_prefix
+# How to make part file ? 
+
+# Run RAxML
+sbatch -p shared -c 48 -t 3-00:00 --mem=100000 --wrap="/n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/standard-RAxML/raxmlHPC-PTHREADS-SSE3 -s /n/holyscratch01/hanage_lab/lcavalli/GBS-Global-NFDS/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.3.Gubbins/gubbins.filtered_polymorphic_sites.fasta -T 48 -m GTRGAMMA -# 100 -f t -p 1234 -t /n/holyscratch01/hanage_lab/lcavalli/GBS-Global-NFDS/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.3.Gubbins/gubbins.final_tree.tre -n GBS_GWAS"
 
 ------------------------------------------------------------------------------------------------
 
@@ -240,16 +399,27 @@ sbatch -p shared  -t 0-4:00 --mem=20000 --wrap="roary -e --mafft -p 8 *.gff"
 # Inputs: presence_abscence_csv (presence absence matrix for each COG for each sample used for pangenome analysis, direct output of Roary), pan_genome_reference.fa (representative COG sequences, direct output of Roary), needed_sample_names.txt (text files of samples needed (if pangenome was constructed using more samples than required for the analysis)  
 # All inputs to be put in clarc/data folder 
 
-#Installation 
+# Installation
 git clone https://github.com/IndraGonz/CLARC.git
 cd CLARC/envs
 conda env create --file clarc_env.yml
-conda activate clarc_env
-cd CLARC
+source activate clarc_env
+cd ../
 python setup.py install
 
-#Run CLARC 
-clarc --input_dir PATH/clarc/data --output_dir PATH/clarc_output
+# Prepare input Files
+mkdir data
+cp /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.6.Pangenome_analysis/gene_presence_absence.csv data
+cp /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.6.Pangenome_analysis/pan_genome_reference.fa data
+for i in /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/8.ANNOTATION/*.gff
+do
+ base=$(echo $i | cut -d '/' -f9-9 | cut -d '.' -f1-1)
+ echo $base
+done > data/needed_sample_names.txt
+
+# Run CLARC
+mkdir Output
+sbatch -p shared -t 0-05:00 --mem=50000 --wrap="clarc --input_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.6.Pangenome_analysis/CLARC/data --output_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.6.Pangenome_analysis/CLARC/Output"
 -------------------------------------------------------------------------------------------------
 
 ###############################
@@ -272,19 +442,6 @@ sbatch -p shared -c 8 -t 0-05:00 --mem=100000 --wrap="unitig-counter -strains st
 sbatch -p shared -c 8 -t 0-05:00 --mem=100000 --wrap="cdbg-ops extend --graph graph --unitigs unitigs.txt > extended.txt"
 
 
-------------------------------------------------------------------------------------------------
-###############################
-# Step XX : Build phylogeny   #
-###############################
-# Tool: FastTree
-
-# install FastTree
-curl -O http://www.microbesonline.org/fasttree/FastTree.c
-gcc -O3 -finline-functions -funroll-loops -Wall -o FastTree FastTree.c -lm
-
-# Run
-sbatch -p shared -t 0-02:00 --mem=100000 --wrap="FastTree -gtr -nt core.full.aln > phylo.aln"
- 
 
 ------------------------------------------------------------------------------------------------
 ###############################
@@ -358,75 +515,30 @@ pyseer --lmm --phenotypes phenotypes --pres gene_presence_absence.Rtab --distanc
 
 pyseer --lmm --phenotypes phenotypes --kmers /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.4.Unitig_counter/Unitig_counter/unitigs.txt --similarity phylogeny_K.tsv --output-patterns unitig_patterns.txt --cpu 8 > phenotype_unitigs.txt
 
-------------------------------------------------------------------------------------------------
-
-##############################
-# QC Steps: N50 Calculation  #
-##############################
-
-#Tool bbmap
-
-wget https://downloads.sourceforge.net/project/bbmap/BBMap_38.91.tar.gz
-tar -xzvf BBMap_38.91.tar.gz
-cd bbmap
-
-#Ensure file is executable
-chmod +x *.sh
-
-#produce tab delimited text file, each line contains a fasta file with corresponding L50, N50 and GC content 
-BBMmap/sh/statswrapper.sh in = *.fasta
-
-
-####################
-# QC Steps: QUAST  #
-####################
-
-#Tool: QUAST
-#Outputs a report with N50, GC (%), Number of contigs, total genome length,  
-
-#Installation
-sudo apt-get update && sudo apt-get install -y pkg-config libfreetype6-dev libpng-dev python3-matplotlib
-./setup.py install
-
-#Navigate to folder with assemblies (7.ASSEMBLY)
-
-for i in *fasta;
-do
-base=$(echo $i | cut -d '_' -f1-1)
-sbatch -p shared  -t 0-01:00 --mem=40000 --wrap="python /usr/local/bin/quast.py -o $base\.quast.out/ $base.fasta"
-done
-
-#QC thresholds: 
-#N50 less than 30 kb 
-#Genome length of GBS approx 2,000,000 bp, exclude if less than 1.7 MB or greater than 2.4 MB 
-#GC content is approximately 35%, exclude if greater than 40% or less than 30%
-#Contig number <= 250 
-_________________________________________________________________________________________________________________________
-
 ######################
-# QC Steps: FastANI #
+# QC Steps: Poppunk #
 ######################
-#Tool : FastANI
+#Tool : Poppunk
 
-#Navigate to assemblies folder
-
-#Installation
-https://github.com/ParBLiSS/FastANI.git
-
-mkdir build 
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release [--install-prefix ...  -DGSL_SHARED=... -DGSL_ROOT_DIR=... -DBOOST_ROOT=...]
-cmake --build .
-
-for i *fasta
+# Prepare input file
+cd X.poppunk
+for i in /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/7.ASSEMBLIES/*fasta
 do
-base=$(echo $i | cut -d '_' -f1-1)
-sbatch -p shared  -t 0-01:00 --mem=40000 --wrap="$ ./fastANI -q $base.fasta -r AP018935.1.fa -o $base\.fastani.out"
-done
-
-
-
-
+base=$(echo $i | cut -d '/' -f9-9 | cut -d '.' -f1-1)
+echo $base $i
+done > qfile.txt
+sed -i 's/\ /\t/g' qfile.txt
+cat qfile.txt
+# Activate package
+source activate poppunk
+poppunk -h
+# Run
+# 1. Create sketch database
+sbatch -p shared -c 8 -t 2-00:00 --mem=10000 --wrap="poppunk --create-db --output GBS_Global_NFDS_db --r-files qfile.txt --threads 8"
+# 2. Run QC on the database
+sbatch -p shared -c 8 -t 0-05:00 --mem=10000 --wrap="poppunk --qc-db --ref-db GBS_Global_NFDS_db --length-range 1500000 2500000 --threads 8"
+# 3. Fit a model, check cluster (core+accessory)
+sbatch -p shared -c 8 -t 0-08:00 --mem=10000 --wrap="poppunk --fit-model dbscan --ref-db GBS_Global_NFDS_db  --threads 8"
 
 
 
