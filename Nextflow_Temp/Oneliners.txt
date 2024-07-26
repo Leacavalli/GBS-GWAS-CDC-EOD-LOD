@@ -9,7 +9,7 @@ Pipeline steps:
 7. Gene annotation, prokka                 DONE
 
 Post-pipeline steps: 
-- Genome quality control - MULTIQC         DONE (Potentially replace with QUAS?) 
+- Genome quality control - MULTIQC         DONE (Potentially replace with QUAST?- remove isolates here and continue with GWAS) 
 - Merge Snippy results - SNIPPY-core       DONE
 - Pangenome analysis: Panaroo              DONE
   -Alternate Pangenome analysis: Roary     In progress
