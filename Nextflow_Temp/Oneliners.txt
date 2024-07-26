@@ -20,7 +20,9 @@ Post-pipeline steps:
 - Pan-GWAS: pyseer 	  	                   In progress
   -Alternate sub-analysis: run with MASH distance In progress
 - DBGWAS: pyseer                           In progress
-- QC Steps                                 In progress
+- QC Steps (BBmap)                         In progress (Potentially remove?)
+- QC Steps (QUAST)                         In progress
+- QC Steps (FastANI)                       In progress
 
 ------------------------------------------------------------------------------------------------
 ###########################
@@ -375,9 +377,9 @@ chmod +x *.sh
 BBMmap/sh/statswrapper.sh in = *.fasta
 
 
-############################################################
-# QC Steps (potential alternate on assembly stats): QUAST  #
-############################################################
+####################
+# QC Steps: QUAST  #
+####################
 
 #Tool: QUAST
 #Outputs a report with N50, GC (%), Number of contigs, total genome length,  
@@ -399,8 +401,28 @@ done
 #Genome length of GBS approx 2,000,000 bp, exclude if less than 1.7 MB or greater than 2.4 MB 
 #GC content is approximately 35%, exclude if greater than 40% or less than 30%
 #Contig number <= 250 
+_________________________________________________________________________________________________________________________
 
+######################
+# QC Steps: FastANI #
+######################
+#Tool : FastANI
 
+#Navigate to assemblies folder
+
+#Installation
+https://github.com/ParBLiSS/FastANI.git
+
+mkdir build 
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release [--install-prefix ...  -DGSL_SHARED=... -DGSL_ROOT_DIR=... -DBOOST_ROOT=...]
+cmake --build .
+
+for i *fasta
+do
+base=$(echo $i | cut -d '_' -f1-1)
+sbatch -p shared  -t 0-01:00 --mem=40000 --wrap="$ ./fastANI -q $base.fasta -r AP018935.1.fa -o $base\.fastani.out"
+done
 
 
 
