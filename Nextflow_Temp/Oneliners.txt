@@ -18,6 +18,7 @@ Post-pipeline steps:
 - unitig calling: unitig-caller/-counter   In progress
 - SNP-based GWAS: pyseer                   In progress
 - Pan-GWAS: pyseer 	  	                   In progress
+  -Alternate sub-analysis: run with MASH distance
 - DBGWAS: pyseer                           In progress
 - QC Steps                                 In progress
 
@@ -316,6 +317,33 @@ pyseer --lmm --phenotypes phenotypes --vcf core.vcf --similarity phylogeny_K.tsv
 
 pyseer --lmm --phenotypes phenotypes --pres gene_presence_absence.Rtab --similarity phylogeny_K.tsv > EOD_LOD_COGs.txt
 ------------------------------------------------------------------------------------------------
+
+###############################
+# Step XX : DBGWAS            #
+###############################
+# Tool: pyseer (installation as above)
+# phenotypes is a file of presence absence (EOD vs LOD) for each isolate
+# unitigs.txt directly from output of unitig-counter 
+
+pyseer --lmm --phenotypes phenotypes --kmers /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.4.Unitig_counter/Unitig_counter/unitigs.txt --similarity phylogeny_K.tsv --output-patterns unitig_patterns.txt --cpu 8 > phenotype_unitigs.txt
+
+------------------------------------------------------------------------------------------------
+
+###############################
+# Step XX : Pan GWAS with MASH distance #
+###############################
+# Tool: Pyseer
+# phenotypes is a file of presence absence (EOD vs LOD) for each isolate
+# gene_presence_absence.Rtab directly from output of panaroo 
+
+# Move to the folder with cleaned assemblies
+#Create mash sketches
+mash sketch -s 10000 -o mash_sketch assemblies/*.fa
+
+#Calculate pairwise distance
+mash dist mash_sketch.msh mash_sketch.msh| square_mash > mash.tsv
+
+pyseer --lmm --phenotypes phenotypes --pres gene_presence_absence.Rtab --distances mash.tsv --save-m mash_mds --max-dimensions 8 > EOD_LOD_COGs_mash.txt
 
 ------------------------------------------------------------------------------------------------
 
