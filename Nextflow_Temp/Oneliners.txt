@@ -31,6 +31,7 @@ Post-pipeline steps:
 - QC Steps (QUAST)                         In progress
 - QC Steps: Check contamination - FastANI  DONE (Note: this can be run on individual samples or all samples)  
 - Poppunk 			           DONE 
+- Assign CC                In progress
 
 ------------------------------------------------------------------------------------------------
 ###########################
@@ -539,6 +540,34 @@ sbatch -p shared -c 8 -t 2-00:00 --mem=10000 --wrap="poppunk --create-db --outpu
 sbatch -p shared -c 8 -t 0-05:00 --mem=10000 --wrap="poppunk --qc-db --ref-db GBS_Global_NFDS_db --length-range 1500000 2500000 --threads 8"
 # 3. Fit a model, check cluster (core+accessory)
 sbatch -p shared -c 8 -t 0-08:00 --mem=10000 --wrap="poppunk --fit-model dbscan --ref-db GBS_Global_NFDS_db  --threads 8"
+
+#############
+# Assign CC #
+#############
+
+cd /5.ANNOTATION #navigate to folder with mlst outputs 
+
+# following script will append all results from mlst to a single file 
+find /path/to/your/folder -type f -name '*__mlst__Streptococcus_agalactiae#1__results.txt' -exec cat {} + >> combined_results.txt
+
+#R script to match ST to CC using mapping excel 
+
+#setwd()
+library(dplyr)
+
+#load dataframes
+map <- read.csv("GBS_CC_BIGSdb_2798265_4857213195_63187.csv", header = TRUE)
+combined_results <- read.table("combined_results.txt")
+
+combined_results <- combined_results %>%
+  left_join(map %>% select(ST, clonal_complex), by = "ST")
+
+
+
+
+
+
+
 
 
 
