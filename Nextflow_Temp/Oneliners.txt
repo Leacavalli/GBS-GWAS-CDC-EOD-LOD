@@ -1,16 +1,13 @@
 Pipeline steps:
 1. Trim - Trimmomatic                      DONE
-2. Check contamination - Kraken            DONE (Potentially exclude?)
-3. Remove contamination - KrakenTools      DONE (Potentially exclude?)
-4. Read Quality Check - FASTQC             DONE
-5. Serotyping + MLST - SRST2               DONE
-6. Mapping+ variant calling - SNIPPY       DONE
-6. Assembly - unicycler                    DONE
-7. Gene annotation - prokka                DONE
-8. QC Steps: Check contamination - FastANI DONE 
-9. QC Steps (BBmap)                         In progress (Potentially remove?)
-9. QC Steps (QUAST)                         In progress
-11. Remove Poor Quality samples 
+2. Read Quality Check - FASTQC             DONE (To check for proper trimming) 
+3. Serotyping + MLST - SRST2               DONE
+4. Mapping+ variant calling - SNIPPY       DONE
+5. Assembly - unicycler                    DONE
+6. Gene annotation - prokka                DONE
+7. QC Steps: Check contamination - FastANI DONE 
+8. QC Steps (QUAST)                        DONE
+9. Remove Poor Quality samples 
 
 Post-pipeline steps: 
 - Genome quality control - MULTIQC         DONE (Potentially replace with QUAST?- remove isolates here and continue with GWAS) 
@@ -26,12 +23,24 @@ Post-pipeline steps:
 - Pan-GWAS: pyseer 	  	           In progress
   -Alternate sub-analysis: run with MASH distance In progress
 - DBGWAS: pyseer                           In progress
-- QC Steps: Check contamination - FastANI  DONE (Note: this can be run on individual samples or all samples)  
-- QC Steps (BBmap)                         In progress (Potentially remove?)
-- QC Steps (QUAST)                         In progress
-- QC Steps: Check contamination - FastANI  DONE (Note: this can be run on individual samples or all samples)  
 - Poppunk 			           DONE 
 - Assign CC                In progress
+
+Question 1: What are the genetic determinants of time of onset of GBS infection in the US 
+  - Pan GWAS, DB GWAS, SNP GWAS 
+Sub Analysis Q: How sensitive is the Pan GWAS to how accessory genes are defined 
+
+Main Analysis: Phylogeny with RAxML controlling for ascertainment bias, Panaroo, (no CLARC) 
+Sub Analaysis 1: Phylogeny with RAxML controlling for ascertainment bias, Roary, (no CLARC)
+Sub Analaysis 2: Phylogeny with RAxML controlling for ascertainment bias, Panaroo, (with CLARC) 
+Sub Analaysis 3: Phylogeny with RAxML controlling for ascertainment bias, Roary, (with CLARC) 
+
+Question 2: How sensitive are GWAS results to the methods used for controlling population structure 
+
+Main Analysis: Phylogeny with RAxML controlling for ascertainment bias, Panaroo, (no CLARC) 
+Sub Analaysis 3: Phylogeny with FastTree, Panaroo, (no CLARC)
+Sub Analaysis 4: Mash Distances, Panaroo, (no CLARC) 
+Sub Analaysis 5: Classification with SC, Panaroo (no CLARC) 
 
 ------------------------------------------------------------------------------------------------
 ###########################
