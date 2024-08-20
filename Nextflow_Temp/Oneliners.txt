@@ -36,6 +36,7 @@ Sub Analaysis 2: Phylogeny with RAxML controlling for ascertainment bias, Panaro
 Sub Analaysis 3: Phylogeny with RAxML controlling for ascertainment bias, Roary, (with CLARC) 
 
 Question 2: How sensitive are GWAS results to the methods used for controlling population structure 
+- Pan GWAS, DB GWAS, SNP GWAS
 
 Main Analysis: Phylogeny with RAxML controlling for ascertainment bias, Panaroo, (no CLARC) 
 Sub Analaysis 3: Phylogeny with FastTree, Panaroo, (no CLARC)
