@@ -76,9 +76,14 @@ conda install bioconda::fastqc
 for i in *.fq.gz;
 do
   sbatch -p shared -t 0-01:00 --mem=4000 --wrap="fastqc $i --extract –o /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade/2.FASTQC"
+  base=$(echo "SRR9088851_trimmed_1.fq.gz" | sed 's/\.fq.*//')
+  grep "Adapter Content" $base_fastqc/summary.txt | awk '{print $1}'
 done
 
 sbatch -p shared -t 0-01:00 --mem=4000 --wrap="fastqc SRR9088851_trimmed_1.fq.gz --extract -o /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade/2.FASTQC"
+
+
+
 ------------------------------------------------------------------------------------------------
 ######################################
 #     Step 3: Serotyping + MLST      #
