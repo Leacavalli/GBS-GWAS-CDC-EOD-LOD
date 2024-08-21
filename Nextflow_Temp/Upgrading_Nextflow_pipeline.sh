@@ -76,4 +76,4 @@ workflow {
 
 
 
-sbatch -p shared -c 3 -t 0-01:00 --mem=40000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline_V06.nf --path_nextflow_dir /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade"
+sbatch -p shared -c 3 -t 0-05:00 --mem=40000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline_V1.nf --path_nextflow_dir /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade"

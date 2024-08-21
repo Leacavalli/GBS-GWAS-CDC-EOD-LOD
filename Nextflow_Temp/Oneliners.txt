@@ -1,20 +1,21 @@
-Pipeline steps:
+Steps:
 1. Trim - Trimmomatic                      DONE
-2. Read Quality Check - FASTQC             DONE (To check for proper trimming) 
+2. QC: check for proper trimming - FASTQC  DONE 
 3. Serotyping + MLST - SRST2               DONE
 4. Mapping+ variant calling - SNIPPY       DONE
 5. Assembly - unicycler                    DONE
 6. Gene annotation - prokka                DONE
-7. QC Steps: Check contamination - FastANI DONE 
-8. QC Steps (QUAST)                        DONE
-9. Remove Poor Quality samples 
+7. QC: Check contamination - FastANI       DONE 
+8. QC: Check Assembly - QUAST              DONE
 
-Post-pipeline steps: 
-- Genome quality control - MULTIQC         DONE (Potentially replace with QUAST?- remove isolates here and continue with GWAS) 
+X. Genome quality control - MULTIQC        DONE (Potentially remove ?) 
+X. Remove Poor Quality samples             (After or Before ?)
 - Merge + Clean Snippy results - SNIPPY    DONE
 - Remove recombination - Gubbins           DONE
 - Phylogeny: FastTree                      DONE (Will be replaced with RAxML)
 - Phylogeny: RAxML                         In progress
+- Poppunk 			           DONE 
+- Assign CC                                In progress
 - Pangenome analysis: Panaroo              DONE
   -Alternate Pangenome analysis: Roary     DONE
   -Alternate sub-analysis: CLARC           DONE
@@ -23,8 +24,7 @@ Post-pipeline steps:
 - Pan-GWAS: pyseer 	  	           In progress
   -Alternate sub-analysis: run with MASH distance In progress
 - DBGWAS: pyseer                           In progress
-- Poppunk 			           DONE 
-- Assign CC                In progress
+
 
 Question 1: What are the genetic determinants of time of onset of GBS infection in the US 
   - Pan GWAS, DB GWAS, SNP GWAS 
@@ -62,38 +62,8 @@ done
 
 
 ------------------------------------------------------------------------------------------------
-################################
-# Step 2 : Check Contamination #
-################################
-# Tool: kraken2
-# https://github.com/DerrickWood/kraken2
-
-for i in *trimmed_1.fq.gz;
-do
-  base=$(echo $i | cut -d '_' -f1-1) ;
-sbatch -p shared  -t 0-01:00 --mem=100000 --wrap="kraken2 --db /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/kraken2/standard_db --report $base\_report.txt --paired $base\_trimmed_1.fq.gz $base\_trimmed_2.fq.gz > $base\_kraken.out";
-done
-
-
-------------------------------------------------------------------------------------------------
-################################
-# Step 3: Remove Contamination #
-################################
-# Tool: Kraken tools
-
-conda activate biopython
-
-for i in *trimmed_1.fq.gz;
-do
-  base=$(echo $i | cut -d '_' -f1-1) ;
-sbatch -p shared  -t 0-00:10 --mem=5000 --wrap="extract_kraken_reads.py -k $base\_kraken.out -s1 $base\_trimmed_1.fq.gz -s2 $base\_trimmed_2.fq.gz -o $base\_filtered_1.fq -o2 $base\_filtered_2.fq --fastq-output --taxid 1301
-gzip $base\_filtered_1.fq
-gzip $base\_filtered_2.fq"
-done
-
-------------------------------------------------------------------------------------------------
 ######################################
-#           Step 4: FastQC           #
+#           Step 2: FastQC           #
 ######################################
 # Tool: fastqc
 
@@ -105,13 +75,13 @@ conda install bioconda::fastqc
 
 for i in *.fq.gz;
 do
-  sbatch -p shared -t 0-01:00 --mem=4000 --wrap="fastqc $i –o /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_NEW/4.FASTQC"
+  sbatch -p shared -t 0-01:00 --mem=4000 --wrap="fastqc $i --extract –o /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade/2.FASTQC"
 done
 
-sbatch -p shared -t 0-01:00 --mem=4000 --wrap="fastqc SRR5063682_filtered_1.fq.gz -o /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_NEW/4.FASTQC"
+sbatch -p shared -t 0-01:00 --mem=4000 --wrap="fastqc SRR9088851_trimmed_1.fq.gz --extract -o /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade/2.FASTQC"
 ------------------------------------------------------------------------------------------------
 ######################################
-#     Step 4: Serotyping + MLST      #
+#     Step 3: Serotyping + MLST      #
 ######################################
 
 source activate srst2
@@ -122,7 +92,7 @@ sbatch -p shared  -t 0-01:00 --mem=100000 --wrap="srst2 --input_pe ../0.RAW_READ
 
 ------------------------------------------------------------------------------------------------
 ######################################
-# Step 5: Mapping+ variant calling   #
+# Step 4: Mapping+ variant calling   #
 ######################################
 # Tool: snippy
 
@@ -146,7 +116,7 @@ done
 
 ------------------------------------------------------------------------------------------------
 #####################
-# Step 6 : ASSEMBLY #
+# Step 5 : ASSEMBLY #
 #####################
 # Tool: unicycler
 
@@ -161,7 +131,7 @@ rm $base\.unicycler.out"
 done
 
 #######################
-# Step 7 : Annotation #
+# Step 6 : Annotation #
 #######################
 # Tool: prokka
 source activate prokka
@@ -177,7 +147,7 @@ done
 
 ------------------------------------------------------------------------------------------------
 ################################
-# Step 8: QC - Check Contamination #
+# Step 7: QC - Check Contamination #
 ################################
 # Tool: FastANI
 conda create -n fastani
@@ -202,26 +172,8 @@ done
 
 ------------------------------------------------------------------------------------------------
 
-##############################
-# Step 9:QC - N50 Calculation  #
-##############################
-
-#Tool bbmap
-
-wget https://downloads.sourceforge.net/project/bbmap/BBMap_38.91.tar.gz
-tar -xzvf BBMap_38.91.tar.gz
-cd bbmap
-
-#Ensure file is executable
-chmod +x *.sh
-
-#produce tab delimited text file, each line contains a fasta file with corresponding L50, N50 and GC content 
-BBMmap/sh/statswrapper.sh in = *.fasta
-
-------------------------------------------------------------------------------------------------
-
 ####################
-# Step 10 :QC - QUAST  #
+# Step 8 :QC - QUAST  #
 ####################
 
 #Tool: QUAST
@@ -362,11 +314,16 @@ sbatch -p shared -t 0-02:00 --mem=100000 --wrap="FastTree -gtr -nt core.full.aln
 # /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/standard-RAxML/raxmlHPC-PTHREADS-SSE3 -s input.fasta -T 48 -m GTRGAMMA -# 100 -f t -p 1234 -t initial.tre -n output_prefix
 
 # controlling for ascertainment bias
-# /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/standard-RAxML/raxmlHPC-PTHREADS-SSE3 -s input.fasta -T 48 -m ASC_GTRGAMMA ­­asc­corr=stamatakis ­q part -# 100 -f t -p 1234 -t initial.tre -n output_prefix
+# Create a partition file with 1 partition of length of the Core SNP alignment (containing only variant sites)
+variant_sites=$(head -2 core.aln | tail -1 | wc -c)
+echo "[asc~p1_fel.txt], ASC_DNA, prt1 = 1-$variant_sites" > part1.txt
+cat part1.txt
+# Run RAxML
+/n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/standard-RAxML/raxmlHPC-PTHREADS-SSE3 -s input.fasta -T 48 -m ASC_GTRGAMMA ­­asc­corr=felsenstein ­-q part1.txt -N 100 -p 1234 -f t -t initial.tre -n output_prefix
 # How to make part file ? 
 
 # Run RAxML
-sbatch -p shared -c 48 -t 3-00:00 --mem=100000 --wrap="/n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/standard-RAxML/raxmlHPC-PTHREADS-SSE3 -s /n/holyscratch01/hanage_lab/lcavalli/GBS-Global-NFDS/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.3.Gubbins/gubbins.filtered_polymorphic_sites.fasta -T 48 -m GTRGAMMA -# 100 -f t -p 1234 -t /n/holyscratch01/hanage_lab/lcavalli/GBS-Global-NFDS/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.3.Gubbins/gubbins.final_tree.tre -n GBS_GWAS"
+sbatch -p shared -c 48 -t 3-00:00 --mem=100000 --wrap="/n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/standard-RAxML/raxmlHPC-PTHREADS-SSE3 -s /n/holyscratch01/hanage_lab/lcavalli/GBS-Global-NFDS/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.3.Gubbins/gubbins.filtered_polymorphic_sites.fasta -T 48 -m GTRGAMMA -p 1234 -N 100 -t /n/holyscratch01/hanage_lab/lcavalli/GBS-Global-NFDS/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.3.Gubbins/gubbins.final_tree.tre -n GBS_GWAS"
 
 ------------------------------------------------------------------------------------------------
 
@@ -555,13 +512,16 @@ sbatch -p shared -c 8 -t 0-08:00 --mem=10000 --wrap="poppunk --fit-model dbscan 
 # Assign CC #
 #############
 
-cd /5.ANNOTATION #navigate to folder with mlst outputs 
+#navigate to folder with mlst outputs 
+cd /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade/3.SEROTYPE_MLST
 
 # following script will append all results from mlst to a single file 
-find /path/to/your/folder -type f -name '*__mlst__Streptococcus_agalactiae#1__results.txt' -exec cat {} + >> combined_results.txt
+find /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade/3.SEROTYPE_MLST -type f -name '*__mlst__Streptococcus_agalactiae__results.txt' -exec cat {} + >> /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade//combined_results.txt
+module load R/4.3.1-fasrc01
+export R_LIBS_USER=$HOME/apps/R_4.3.1/:$R_LIBS_USER
+R CMD BATCH --quiet --no-restore --no-save /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade/Files/Assign_CC.R
 
-#R script to match ST to CC using mapping excel 
-
+# R script ("Assign_CC.R")
 #setwd()
 library(dplyr)
 
