@@ -26,22 +26,23 @@ X. Remove Poor Quality samples             (After or Before ?)
 - DBGWAS: pyseer                           In progress
 
 
-Question 1: What are the genetic determinants of time of onset of GBS infection in the US 
-  - Pan GWAS, DB GWAS, SNP GWAS 
-Sub Analysis Q: How sensitive is the Pan GWAS to how accessory genes are defined 
+Main Analysis 
+Question: What are the genetic determinants of time of onset of GBS infection in the US ? (Methods: Pan GWAS, DB GWAS, SNP GWAS 
+Methods: SNPGWAS, DBGWAS, and  PanGWAS (population structure control = RAxML Phylogeny controlling for ascertainment bias, accessory genome analysis= Panaroo) 
 
-Main Analysis: Phylogeny with RAxML controlling for ascertainment bias, Panaroo, (no CLARC) 
-Sub Analaysis 1: Phylogeny with RAxML controlling for ascertainment bias, Roary, (no CLARC)
-Sub Analaysis 2: Phylogeny with RAxML controlling for ascertainment bias, Panaroo, (with CLARC) 
-Sub Analaysis 3: Phylogeny with RAxML controlling for ascertainment bias, Roary, (with CLARC) 
+Sub Analysis 1
+Question: How sensitive are the PanGWAS results to the method used to defined accessory genes ?
+Main Analysis: PanGWAS analysis with population structure control with RAxML Phylogeny controlling for ascertainment bias, and  accessory genome analysis with Panaroo (no CLARC). 
+Sub Analysis 1.1: same, but accessory genome analysis with Roary (no CLARC)
+Sub Analysis 1.2: same, but accessory genome analysis with Panaroo + CLARC
+Sub Analysis 1.3: same, but accessory genome analysis with Roary + CLARC
 
-Question 2: How sensitive are GWAS results to the methods used for controlling population structure 
-- Pan GWAS, DB GWAS, SNP GWAS
-
-Main Analysis: Phylogeny with RAxML controlling for ascertainment bias, Panaroo, (no CLARC) 
-Sub Analaysis 3: Phylogeny with FastTree, Panaroo, (no CLARC)
-Sub Analaysis 4: Mash Distances, Panaroo, (no CLARC) 
-Sub Analaysis 5: Classification with SC, Panaroo (no CLARC) 
+Sub Analysis 2
+Question: How sensitive are GWAS results to the methods used for controlling population structure ? 
+Main Analysis:  PanGWAS analysis with population structure control with RAxML Phylogeny controlling for ascertainment bias, and  accessory genome analysis with Panaroo (no CLARC).
+Sub Analaysis 2.1: same, but population structure control with FastTree Phylogeny.
+Sub Analaysis 2.2: same, but population structure control with Mash Distances.
+Sub Analaysis 2.3: same, but population structure control with SC Classification.
 
 ------------------------------------------------------------------------------------------------
 ###########################
@@ -318,14 +319,21 @@ sbatch -p shared -t 0-02:00 --mem=100000 --wrap="FastTree -gtr -nt core.full.aln
 
 # /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/standard-RAxML/raxmlHPC-PTHREADS-SSE3 -s input.fasta -T 48 -m GTRGAMMA -# 100 -f t -p 1234 -t initial.tre -n output_prefix
 
-# controlling for ascertainment bias
-# Create a partition file with 1 partition of length of the Core SNP alignment (containing only variant sites)
+# RAxML controlling for ascertainment bias
+
+# 1. Create a partition file with 1 partition of length of the Core SNP alignment (containing only variant sites)
 variant_sites=$(head -2 core.aln | tail -1 | wc -c)
 echo "[asc~p1_fel.txt], ASC_DNA, prt1 = 1-$variant_sites" > part1.txt
 cat part1.txt
-# Run RAxML
-/n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/standard-RAxML/raxmlHPC-PTHREADS-SSE3 -s input.fasta -T 48 -m ASC_GTRGAMMA ­­asc­corr=felsenstein ­-q part1.txt -N 100 -p 1234 -f t -t initial.tre -n output_prefix
-# How to make part file ? 
+
+# 2. Create a Felsenstein correction input file displaying the number of invariant sites
+echo "2263191,$variant_sites" | tr ',' '-' | bc > p1_fel.txt
+cat p1_fel.txt
+
+# 3. Run RAxML
+raxmlHPC-PTHREADS-SSE3 -s input.fasta -T 48 -m ASC_GTRGAMMA ­­asc­corr=felsenstein ­-q part1.txt -N 100 -p 1234 -f t -t initial.tre -n output_prefix
+
+
 
 # Run RAxML
 sbatch -p shared -c 48 -t 3-00:00 --mem=100000 --wrap="/n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/standard-RAxML/raxmlHPC-PTHREADS-SSE3 -s /n/holyscratch01/hanage_lab/lcavalli/GBS-Global-NFDS/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.3.Gubbins/gubbins.filtered_polymorphic_sites.fasta -T 48 -m GTRGAMMA -p 1234 -N 100 -t /n/holyscratch01/hanage_lab/lcavalli/GBS-Global-NFDS/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.3.Gubbins/gubbins.final_tree.tre -n GBS_GWAS"
