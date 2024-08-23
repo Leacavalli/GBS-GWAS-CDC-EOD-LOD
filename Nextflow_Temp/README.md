@@ -56,6 +56,13 @@ The pipeline contains the steps that can be run for each sample individually. Fr
 ```
 git clone https://github.com/Leacavalli/GBS-GWAS-pipeline.git
 ```
+## 3. Create de conda environment
+```
+cd Files
+module load python
+conda env create -p /path/to/directory -f environment.yml
+conda activate myenvnextflow_env
+```
 ## 2. Download Raw reads from NCBI (Optional)
 Note: SraAccList.txt contains the list of accessions you want
 ```

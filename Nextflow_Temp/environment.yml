@@ -1,0 +1,10 @@
+name: nextflow_env
+dependencies:
+  - openjdk=11
+  - fastqc
+  - srst2
+  - snippy
+  - unicycler
+  - prokka
+  - fastani
+  - quast

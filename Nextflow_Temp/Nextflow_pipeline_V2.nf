@@ -32,10 +32,11 @@ process FastQC {
 
   script:
   """
-  fastqc ${filtered_read1} -o ${params.path_nextflow_dir}/2.FASTQC
-  fastqc ${filtered_read2} -o ${params.path_nextflow_dir}/2.FASTQC
+  fastqc ${filtered_read1} --extract -o ${params.path_nextflow_dir}/2.FASTQC
+  fastqc ${filtered_read2} --extract -o ${params.path_nextflow_dir}/2.FASTQC
   """
 }
+
 
 process Serotype_MLST {
   conda "srst2"
@@ -99,7 +100,7 @@ process ASSEMBLY {
   script:
   """
   unicycler -1 ${filtered_read1}  -2 ${filtered_read2} -o ${base}.unicycler.out
-  mv ${base}.unicycler.out/assembly.fasta ${base}.fasta
+  mv ${base}.unicycler.out/base.fasta ${base}.fasta
   rm -r ${base}.unicycler.out
   """
 }
@@ -179,27 +180,26 @@ process Filter_out_QC {
 
   script:
   """
-  mkdir ${params.path_nextflow_dir}/4.SNIPPY/Filter_out_QC
-  mkdir ${params.path_nextflow_dir}/5.ASSEMBLIES/Filter_out_QC
-  mkdir ${params.path_nextflow_dir}/6.ANNOTATION/Filter_out_QC
+  # Create necessary directories if they don't already exist
+    mkdir -p ${params.path_nextflow_dir}/4.SNIPPY/Filter_out_QC
+    mkdir -p ${params.path_nextflow_dir}/5.ASSEMBLIES/Filter_out_QC
+    mkdir -p ${params.path_nextflow_dir}/6.ANNOTATION/Filter_out_QC
 
+  # Extract information from the QUAST report
+    n50=\$(grep -w "N50" ${quast_file}/report.txt | awk '{print \$2}')
+    gc=\$(grep -w "GC (%)" ${quast_file}/report.txt | awk '{print \$3}')
+    total_length=\$(grep -w "Total length" ${quast_file}/report.txt | grep -v "(>= " | awk '{print \$3}')
+    contigs=\$(grep "^# contigs " ${quast_file}/report.txt | tail -1 | awk '{print \$3}')
+    ANI=\$(cat ${params.path_nextflow_dir}/7.FastANI/\${base}.fastani.out | awk '{print \$3}')
+    Adapter_content_1=\$(grep "Adapter Content" ${params.path_nextflow_dir}/2.FASTQC/${base}_trimmed_1_fastqc/summary.txt | awk '{print \$1}')
+    Adapter_content_2=\$(grep "Adapter Content" ${params.path_nextflow_dir}/2.FASTQC/${base}_trimmed_2_fastqc/summary.txt | awk '{print \$1}')
 
-  for i in ${params.path_nextflow_dir}/8.QUAST/*.quast.out;
-  do
-    assembly=$(grep "Assembly" $i/report.txt | awk '{print $2}')
-    n50=$(grep -w "N50" $i/report.txt | awk '{print $2}')
-    gc=$(grep -w "GC (%)" $i/report.txt | awk '{print $3}')
-    total_length=$(grep -w "Total length" $i/report.txt | grep -v "(>= " | awk '{print $3}')
-    contigs=$(grep "^# contigs " $i/report.txt | tail -1 | awk '{print $3}')
-    ANI=$(cat ${params.path_nextflow_dir}/7.FastANI/$assembly\.fastani.out| awk '{print $3}')
-
-    # Check the conditions
-    if (( $(echo "$ANI < 95" | bc -l) )) ||[ "$n50" -lt  30000 ] || [ "$contigs" -gt 250 ]  || (( $(echo "$gc <= 30" | bc -l) )) || (( $(echo "$gc >= 40" | bc -l) )) || [ "$total_length" -lt 1700000 ] || [ "$total_length" -gt 2400000 ] ; then
-      mv ${params.path_nextflow_dir}/4.SNIPPY/$assembly ${params.path_nextflow_dir}/4.SNIPPY/Filter_out_QC
-      mv ${params.path_nextflow_dir}/5.ASSEMBLIES/$assembly\.fasta ${params.path_nextflow_dir}/5.ASSEMBLIES/Filter_out_QC
-      mv ${params.path_nextflow_dir}/6.ANNOTATION/$assembly\.gff ${params.path_nextflow_dir}/6.ANNOTATION/Filter_out_QC
+  # Check the conditions and move files if necessary
+    if (( \$(echo "\$ANI < 95" | bc -l) )) || [ "\$n50" -lt 30000 ] || [ "\$contigs" -gt 250 ] || (( \$(echo "\$gc <= 30" | bc -l) )) || (( \$(echo "\$gc >= 40" | bc -l) )) || [ "\$total_length" -lt 1700000 ] || [ "\$total_length" -gt 2400000 ] || [[ "\$Adapter_content_1" == "FAIL" || "\$Adapter_content_2" == "FAIL" ]]; then
+      mv ${params.path_nextflow_dir}/4.SNIPPY/${base} ${params.path_nextflow_dir}/4.SNIPPY/Filter_out_QC
+      mv ${params.path_nextflow_dir}/5.ASSEMBLIES/${base}.fasta ${params.path_nextflow_dir}/5.ASSEMBLIES/Filter_out_QC
+      mv ${params.path_nextflow_dir}/6.ANNOTATION/${base}.gff ${params.path_nextflow_dir}/6.ANNOTATION/Filter_out_QC
     fi
-  done
   """
 }
 

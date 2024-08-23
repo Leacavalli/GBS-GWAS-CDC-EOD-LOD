@@ -1,0 +1,58 @@
+process TEST {
+  input:
+  val base
+
+  output:
+  val base
+
+  script:
+  """
+  echo "test" >> ${params.path_nextflow_dir}/test.txt
+  """
+}
+
+
+process PANAROO_CLARC {
+  conda "unitig-counter"
+
+  script:
+  """
+  mkdir -p ${params.path_nextflow_dir}/10.Pangenome_analysis/10.3.Panaroo_CLARC
+  # Prepare input Files
+  mkdir -p ${params.path_nextflow_dir}/CLARC/data
+  cp ${params.path_nextflow_dir}/10.Pangenome_analysis/10.1.Panaroo/gene_presence_absence.csv ${params.path_nextflow_dir}/CLARC/data
+  cp ${params.path_nextflow_dir}/10.Pangenome_analysis/10.1.Panaroo/pan_genome_reference.fa ${params.path_nextflow_dir}/CLARC/data
+  for i in /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/8.ANNOTATION/*.gff
+  do
+   base=$(echo $i | cut -d '/' -f9-9 | cut -d '.' -f1-1)
+   echo $base
+  done > ${params.path_nextflow_dir}/CLARC/data/needed_sample_names.txt
+
+  # Run CLARC
+  mkdir -p ${params.path_nextflow_dir}/CLARC/Output
+  sbatch -p shared -t 0-05:00 --mem=50000 --wrap="clarc --input_dir ${params.path_nextflow_dir}/CLARC/data --output_dir ${params.path_nextflow_dir}/CLARC/Output"
+
+  """
+}
+
+
+workflow flow1 {
+    take: data
+    main:
+        TEST(data)
+    emit: TEST.out
+}
+
+workflow flow2 {
+    take: data
+    main:
+        UNITIG()
+}
+
+workflow {
+  channel.fromFilePairs("${params.path_nextflow_dir}/0.RAW_READS/SRR*_{1,2}.fastq.gz")
+         .map { it[0] }
+         | flow1
+         | collect
+         | flow2
+}

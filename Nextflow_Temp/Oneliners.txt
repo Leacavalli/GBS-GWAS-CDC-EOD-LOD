@@ -7,18 +7,20 @@ Steps:
 6. Gene annotation - prokka                DONE
 7. QC: Check contamination - FastANI       DONE 
 8. QC: Check Assembly - QUAST              DONE
+9. Remove Poor Quality samples             (After or Before ?)
 
-X. Genome quality control - MULTIQC        DONE (Potentially remove ?) 
-X. Remove Poor Quality samples             (After or Before ?)
-- Merge + Clean Snippy results - SNIPPY    DONE
-- Remove recombination - Gubbins           DONE
-- Phylogeny: FastTree                      DONE (Will be replaced with RAxML)
-- Phylogeny: RAxML                         In progress
-- Poppunk 			           DONE 
-- Assign CC                                In progress
-- Pangenome analysis: Panaroo              DONE
-  -Alternate Pangenome analysis: Roary     DONE
-  -Alternate sub-analysis: CLARC           DONE
+10 Poppunk (SC) 			   DONE 
+11. Assign CC                                In progress
+12. Merge + Clean Snippy results - SNIPPY    DONE
+13. Remove recombination - Gubbins           DONE
+14. Phylogeny
+	14.1 RAxML                         In progress
+	14.2 FastTree                      DONE (Will be replaced with RAxML)
+15. Pangenome analysis: 
+	15.1 Panaroo              		DONE
+	15.2 Roary     				DONE
+	15.3 Panaroo + CLARC           		DONE
+	15.4 Roary + CLARC           		DONE
 - unitig calling: unitig-counter    	   DONE
 - SNP-based GWAS: pyseer                   In progress
 - Pan-GWAS: pyseer 	  	           In progress
@@ -28,21 +30,23 @@ X. Remove Poor Quality samples             (After or Before ?)
 
 Main Analysis 
 Question: What are the genetic determinants of time of onset of GBS infection in the US ? (Methods: Pan GWAS, DB GWAS, SNP GWAS 
-Methods: SNPGWAS, DBGWAS, and  PanGWAS (population structure control = RAxML Phylogeny controlling for ascertainment bias, accessory genome analysis= Panaroo) 
+Main Analysis 1: SNPGWAS with population structure control with RAxML Phylogeny controlling for ascertainment bias
+Main Analysis 2: DBGWAS with population structure control with RAxML Phylogeny controlling for ascertainment bias
+Main Analysis 3: PanGWAS analysis with population structure control with RAxML Phylogeny controlling for ascertainment bias, and  accessory genome analysis with Panaroo (no CLARC). 
 
 Sub Analysis 1
 Question: How sensitive are the PanGWAS results to the method used to defined accessory genes ?
-Main Analysis: PanGWAS analysis with population structure control with RAxML Phylogeny controlling for ascertainment bias, and  accessory genome analysis with Panaroo (no CLARC). 
-Sub Analysis 1.1: same, but accessory genome analysis with Roary (no CLARC)
+Reference Analysis : Main Analysis 3 ("PanGWAS analysis with population structure control with RAxML Phylogeny controlling for ascertainment bias, and  accessory genome analysis with Panaro")
+Sub Analysis 1.1: same, but accessory genome analysis with Roary
 Sub Analysis 1.2: same, but accessory genome analysis with Panaroo + CLARC
 Sub Analysis 1.3: same, but accessory genome analysis with Roary + CLARC
 
 Sub Analysis 2
 Question: How sensitive are GWAS results to the methods used for controlling population structure ? 
-Main Analysis:  PanGWAS analysis with population structure control with RAxML Phylogeny controlling for ascertainment bias, and  accessory genome analysis with Panaroo (no CLARC).
-Sub Analaysis 2.1: same, but population structure control with FastTree Phylogeny.
+Reference Analysis: Main Analyses 1, 2, and 3 (most complete), or just Main Analysis 1 (Simplest). 
+Sub Analysis 2.1: same, but population structure control with FastTree Phylogeny.
 Sub Analaysis 2.2: same, but population structure control with Mash Distances.
-Sub Analaysis 2.3: same, but population structure control with SC Classification.
+Sub Analysis 2.3: same, but population structure control with SC Classification.
 
 ------------------------------------------------------------------------------------------------
 ###########################
@@ -77,14 +81,9 @@ conda install bioconda::fastqc
 for i in *.fq.gz;
 do
   sbatch -p shared -t 0-01:00 --mem=4000 --wrap="fastqc $i --extract –o /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade/2.FASTQC"
-  base=$(echo "SRR9088851_trimmed_1.fq.gz" | sed 's/\.fq.*//')
-  grep "Adapter Content" $base_fastqc/summary.txt | awk '{print $1}'
 done
 
 sbatch -p shared -t 0-01:00 --mem=4000 --wrap="fastqc SRR9088851_trimmed_1.fq.gz --extract -o /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade/2.FASTQC"
-
-
-
 ------------------------------------------------------------------------------------------------
 ######################################
 #     Step 3: Serotyping + MLST      #
@@ -322,7 +321,7 @@ sbatch -p shared -t 0-02:00 --mem=100000 --wrap="FastTree -gtr -nt core.full.aln
 # RAxML controlling for ascertainment bias
 
 # 1. Create a partition file with 1 partition of length of the Core SNP alignment (containing only variant sites)
-variant_sites=$(head -2 core.aln | tail -1 | wc -c)
+variant_sites=$(head -2 ../9.SNIPPY_MULTI/core.aln | tail -1 | wc -c)
 echo "[asc~p1_fel.txt], ASC_DNA, prt1 = 1-$variant_sites" > part1.txt
 cat part1.txt
 
@@ -331,7 +330,7 @@ echo "2263191,$variant_sites" | tr ',' '-' | bc > p1_fel.txt
 cat p1_fel.txt
 
 # 3. Run RAxML
-raxmlHPC-PTHREADS-SSE3 -s input.fasta -T 48 -m ASC_GTRGAMMA ­­asc­corr=felsenstein ­-q part1.txt -N 100 -p 1234 -f t -t initial.tre -n output_prefix
+sbatch -p shared -c 4 -t 3-00:00 --mem=100000 --wrap="/n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/standard-RAxML/raxmlHPC-PTHREADS-SSE3 -s /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/10.GUBBINS/GBS_GWAS.filtered_polymorphic_sites.fasta -T 4 -m ASC_GTRGAMMA --asc-corr=felsenstein -q part1.txt -N 100 -p 1234 -f t -t /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/10.GUBBINS/GBS_GBS_GWAS.final_tree.tre -n GBS_GWAS"
 
 
 

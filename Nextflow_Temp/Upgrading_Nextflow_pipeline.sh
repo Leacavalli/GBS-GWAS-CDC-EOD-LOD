@@ -76,4 +76,21 @@ workflow {
 
 
 
-sbatch -p shared -c 3 -t 0-05:00 --mem=40000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline_V1.nf --path_nextflow_dir /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade"
+sbatch -p shared -c 3 -t 0-05:00 --mem=100000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline_Part1.nf --path_nextflow_dir /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade"
+sbatch -p shared -c 3 -t 0-05:00 --mem=100000 --wrap="nextflow -C nextflow.config run test.nf --base /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade"
+
+sbatch -p shared -c 4 -t 0-05:00 --mem=100000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline_Part1.nf --path_nextflow_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade"
+sbatch -p shared -c 8 -t 0-01:00 --mem=40000 --wrap="nextflow -C nextflow.config run test_part2.nf --path_nextflow_dir /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE"
+
+module load python
+source activate java
+sbatch -p shared -c 4 -t 0-05:00 --mem=100000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline.nf --path_nextflow_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE"
+
+sbatch -p shared -c 8 -t 0-01:00 --mem=40000 --wrap="nextflow -C nextflow.config run test_part2_V3.nf --path_nextflow_dir /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE"
+
+
+for i in ../0.RAW_READS/*_1.fastq.gz
+do
+ base=$(echo $i | cut -d '/' -f3-3 | cut -d '_' -f1-1)
+ sbatch -p shared -t 0-01:00 --mem=40000 --wrap="nextflow -C nextflow.config run test1.nf --path_nextflow_dir /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade --base $base"
+done
