@@ -7,7 +7,7 @@ Steps:
 6. Gene annotation - prokka                DONE
 7. QC: Check contamination - FastANI       DONE 
 8. QC: Check Assembly - QUAST              DONE
-9. Remove Poor Quality samples             (After or Before ?)
+9. Remove Poor Quality samples             DONE
 
 10 Poppunk (SC) 			   DONE 
 11. Assign CC                                In progress
@@ -21,12 +21,20 @@ Steps:
 	15.2 Roary     				DONE
 	15.3 Panaroo + CLARC           		DONE
 	15.4 Roary + CLARC           		DONE
-- unitig calling: unitig-counter    	   DONE
-- SNP-based GWAS: pyseer                   In progress
-- Pan-GWAS: pyseer 	  	           In progress
-  -Alternate sub-analysis: run with MASH distance In progress
-- DBGWAS: pyseer                           In progress
-
+16. unitig calling: unitig-counter    	   DONE
+17. GWAS - pyseer
+	17.1. SNP-based GWAS            	In progress
+		17.1.1. RAxML               	In progress
+		17.1.2. Mash Distances          In progress
+		17.1.3. SC classification       In progress
+	17.2. Pan-GWAS 	  	        	In progress
+		17.2.1. RAxML               	In progress
+		17.2.2. Mash Distances          In progress
+		17.2.3. SC classification       In progress
+ 	17.3. DBGWAS                            In progress
+		17.3.1. RAxML               	In progress
+		17.3.2. Mash Distances          In progress
+		17.3.3. SC classification       In progress
 
 Main Analysis 
 Question: What are the genetic determinants of time of onset of GBS infection in the US ? (Methods: Pan GWAS, DB GWAS, SNP GWAS 
@@ -379,10 +387,10 @@ sbatch -p shared  -t 0-4:00 --mem=20000 --wrap="roary -e --mafft -p 8 *.gff"
 # Inputs: presence_abscence_csv (presence absence matrix for each COG for each sample used for pangenome analysis, direct output of Roary), pan_genome_reference.fa (representative COG sequences, direct output of Roary), needed_sample_names.txt (text files of samples needed (if pangenome was constructed using more samples than required for the analysis)  
 # All inputs to be put in clarc/data folder 
 
-# Installation
+# Install CLARC
 git clone https://github.com/IndraGonz/CLARC.git
 cd CLARC/envs
-conda env create --file clarc_env.yml
+conda env create --file clarc_env.yml -p 
 source activate clarc_env
 cd ../
 python setup.py install
@@ -400,6 +408,8 @@ done > data/needed_sample_names.txt
 # Run CLARC
 mkdir Output
 sbatch -p shared -t 0-05:00 --mem=50000 --wrap="clarc --input_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.6.Pangenome_analysis/CLARC/data --output_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.6.Pangenome_analysis/CLARC/Output"
+
+sbatch -p shared -t 0-01:00 --mem=50000 --wrap="clarc --input_dir /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/Files/CLARC/data --output_dir /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/Files/CLARC/Output"
 -------------------------------------------------------------------------------------------------
 
 ###############################
