@@ -11,17 +11,16 @@ process TEST {
   """
 }
 
+process GUBBINS {
+  conda "gubbins"
 
-process UNITIG {
-  conda "unitig-counter"
+  publishDir "${params.path_nextflow_dir}/10.GUBBINS", overwrite: true
 
   script:
   """
-  unitig-counter -strains ${params.path_nextflow_dir}/9.POPPUNK/qfile.txt -output ${params.path_nextflow_dir}/11.Unitigs -nb-cores 8
-  cdbg-ops extend --graph ${params.path_nextflow_dir}/11.Unitigs/graph --unitigs ${params.path_nextflow_dir}/11.Unitigs/unitigs.txt > ${params.path_nextflow_dir}/11.Unitigs/extended.txt
+  run_gubbins.py -p GBS_GWAS ${params.path_nextflow_dir}/9.SNIPPY_MULTI/clean.full.aln
   """
 }
-
 
 workflow flow1 {
     take: data
@@ -33,7 +32,7 @@ workflow flow1 {
 workflow flow2 {
     take: data
     main:
-        UNITIG()
+        GUBBINS()
 }
 
 workflow {

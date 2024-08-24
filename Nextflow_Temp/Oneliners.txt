@@ -14,8 +14,8 @@ Steps:
 12. Merge + Clean Snippy results - SNIPPY    DONE
 13. Remove recombination - Gubbins           DONE
 14. Phylogeny
-	14.1 RAxML                         In progress
-	14.2 FastTree                      DONE (Will be replaced with RAxML)
+	14.1. RAxML                         In progress
+	14.2. FastTree                      DONE 
 15. Pangenome analysis: 
 	15.1 Panaroo              		DONE
 	15.2 Roary     				DONE
