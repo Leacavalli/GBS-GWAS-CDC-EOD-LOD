@@ -432,14 +432,14 @@ sbatch -p shared -c 8 -t 0-05:00 --mem=100000 --wrap="unitig-counter -strains st
 sbatch -p shared -c 8 -t 0-05:00 --mem=100000 --wrap="cdbg-ops extend --graph graph --unitigs unitigs.txt > extended.txt"
 
 
-
 ------------------------------------------------------------------------------------------------
-###############################
-# Step XX : SNP-Based GWAS   #
-###############################
+############################################
+# Step 17.1.1 : SNP-Based GWAS  with RAxML #
+############################################
 # Tool: pyseer
 # phenotypes is a file of presence absence (EOD vs LOD) for each isolate
 # core.vcf is a vcf file of snps mapped to our reference of choice (output of snippy-core) 
+# GBS_GWAS.tre is the output of RAxML 
 
 
 #installation
@@ -448,35 +448,210 @@ source activate pyseer
 conda install pyseer
 
 #create phylogeny tsv file
-python scripts/phylogeny_distance.py --lmm core_genome_aln.tree > phylogeny_K.tsv
+python scripts/phylogeny_distance.py --lmm GBS_GWAS.tre > phylogeny_K.tsv
 
 #snp based pyseer
 pyseer --lmm --phenotypes phenotypes --vcf core.vcf --similarity phylogeny_K.tsv > EOD_LOD_SNPs.txt
 
+
+_________________________________________________________________________________________________
+
+####################################################
+# Step 17.1.2 : SNP-Based GWAS with Mash Distances #
+####################################################
+
+# Tool: Pyseer
+# phenotypes is a file of presence absence (EOD vs LOD) for each isolate
+# core.vcf is a vcf file of snps mapped to our reference of choice (output of snippy-core) 
+
+# Move to the folder with cleaned assemblies
+#Create mash sketches
+mash sketch -s 10000 -o mash_sketch assemblies/*.fa
+
+#Calculate pairwise distance
+mash dist mash_sketch.msh mash_sketch.msh| square_mash > mash.tsv
+
+pyseer --phenotypes phenotypes --vcf core.vcf --similarity mash.tsv > EOD_LOD_SNPs_mash.txt
+
+
+________________________________________________________________________________________________
+
+#######################################################
+# Step 17.1.3 : SNP-Based GWAS with SC classification # ***
+#######################################################
+
+# Tool: Pyseer
+# phenotypes is a file of presence absence (EOD vs LOD) for each isolate
+# core.vcf is a vcf file of snps mapped to our reference of choice (output of snippy-core) 
+# sc_classifications.csv is a file  where each row corresponds to an isolate, and a column specifies the SC assignment
+
+
+#Panda bash script 
+import pandas as pd
+
+# Load your SC classifications
+sc_data = pd.read_csv("sc_classifications.csv", index_col=0)
+samples = sc_data.index
+
+# Create an empty similarity matrix
+similarity_matrix = pd.DataFrame(0, index=samples, columns=samples)
+
+# Fill the matrix: 1 if in the same SC, 0 otherwise
+for sc in sc_data['SC'].unique():
+    members = sc_data[sc_data['SC'] == sc].index
+    for member1 in members:
+        for member2 in members:
+            similarity_matrix.loc[member1, member2] = 1
+
+# Save the matrix
+similarity_matrix.to_csv("sc_similarity_matrix.tsv", sep="\t")
+
+pyseer --phenotypes phenotypes --vcf core.vcf --similarity sc_similarity_matrix.tsv > EOD_LOD_SNPs_sc.txt
+
+
 ------------------------------------------------------------------------------------------------
 
-###############################
-# Step XX : Pan GWAS   #
-###############################
+######################################
+# Step 17.2.1 : Pan GWAS  with RAxML #
+######################################
+
 # Tool: pyseer (installation as above)
 # phenotypes is a file of presence absence (EOD vs LOD) for each isolate
-# gene_presence_absence.Rtab directly from output of panaroo 
+# gene_presence_absence.Rtab directly from output of panaroo (or CLARC depending on step)
+
+
+#create phylogeny tsv file
+python scripts/phylogeny_distance.py --lmm GBS_GWAS.tre > phylogeny_K.tsv
+
 
 #COG based pyseer
-
 pyseer --lmm --phenotypes phenotypes --pres gene_presence_absence.Rtab --similarity phylogeny_K.tsv > EOD_LOD_COGs.txt
 ------------------------------------------------------------------------------------------------
 
+##############################################
+# Step 17.2.2 : Pan GWAS with Mash distances #
+##############################################
+
+# Tool: pyseer (installation as above)
+# phenotypes is a file of presence absence (EOD vs LOD) for each isolate
+# gene_presence_absence.Rtab directly from output of panaroo (or CLARC depending on step)
+
+
+# Move to the folder with cleaned assemblies
+#Create mash sketches
+mash sketch -s 10000 -o mash_sketch assemblies/*.fa
+
+#Calculate pairwise distance
+mash dist mash_sketch.msh mash_sketch.msh| square_mash > mash.tsv
+
+#COG based pyseer
+pyseer --lmm --phenotypes phenotypes --pres gene_presence_absence.Rtab --similarity mash.tsv > EOD_LOD_COGs_mash.txt
+
+------------------------------------------------------------------------------------------------
+
+#################################################
+# Step 17.2.3 : Pan GWAS with SC Classification #
+#################################################
+
+# Tool: pyseer (installation as above)
+# phenotypes is a file of presence absence (EOD vs LOD) for each isolate
+# gene_presence_absence.Rtab directly from output of panaroo (or CLARC depending on step)
+
+
+#Panda bash script 
+import pandas as pd
+
+# Load your SC classifications
+sc_data = pd.read_csv("sc_classifications.csv", index_col=0)
+samples = sc_data.index
+
+# Create an empty similarity matrix
+similarity_matrix = pd.DataFrame(0, index=samples, columns=samples)
+
+# Fill the matrix: 1 if in the same SC, 0 otherwise
+for sc in sc_data['SC'].unique():
+    members = sc_data[sc_data['SC'] == sc].index
+    for member1 in members:
+        for member2 in members:
+            similarity_matrix.loc[member1, member2] = 1
+
+# Save the matrix
+similarity_matrix.to_csv("sc_similarity_matrix.tsv", sep="\t")
+
+#COG based pyseer
+pyseer --lmm --phenotypes phenotypes --pres gene_presence_absence.Rtab --similarity sc_similarity_matrix.tsv > EOD_LOD_COGs_sc.txt
+
+
+------------------------------------------------------------------------------------------------
+
+
 ###############################
-# Step XX : DBGWAS            #
+# Step 17.3.1 : DBGWAS with RAxML #
 ###############################
 # Tool: pyseer (installation as above)
 # phenotypes is a file of presence absence (EOD vs LOD) for each isolate
 # unitigs.txt directly from output of unitig-counter 
 
+
+#create phylogeny tsv file
+python scripts/phylogeny_distance.py --lmm GBS_GWAS.tre > phylogeny_K.tsv
+
+
 pyseer --lmm --phenotypes phenotypes --kmers /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.4.Unitig_counter/Unitig_counter/unitigs.txt --similarity phylogeny_K.tsv --output-patterns unitig_patterns.txt --cpu 8 > phenotype_unitigs.txt
 
-------------------------------------------------------------------------------------------------
+
+__________________________________________________________________________________________________
+
+
+############################################
+# Step 17.3.2 : DBGWAS with Mash Distances #
+############################################
+
+# Tool: pyseer (installation as above)
+# phenotypes is a file of presence absence (EOD vs LOD) for each isolate
+# unitigs.txt directly from output of unitig-counter 
+
+
+# Move to the folder with cleaned assemblies
+#Create mash sketches
+mash sketch -s 10000 -o mash_sketch assemblies/*.fa
+
+
+pyseer --lmm --phenotypes phenotypes --kmers /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.4.Unitig_counter/Unitig_counter/unitigs.txt --similarity mash.tsv --output-patterns unitig_patterns.txt --cpu 8 > phenotype_unitigs_mash.txt
+
+__________________________________________________________________________________________________
+
+###############################################
+# Step 17.3.3 : DBGWAS with SC Classification #
+###############################################
+
+# Tool: pyseer (installation as above)
+# phenotypes is a file of presence absence (EOD vs LOD) for each isolate
+# unitigs.txt directly from output of unitig-counter 
+
+#Panda bash script 
+import pandas as pd
+
+# Load your SC classifications
+sc_data = pd.read_csv("sc_classifications.csv", index_col=0)
+samples = sc_data.index
+
+# Create an empty similarity matrix
+similarity_matrix = pd.DataFrame(0, index=samples, columns=samples)
+
+# Fill the matrix: 1 if in the same SC, 0 otherwise
+for sc in sc_data['SC'].unique():
+    members = sc_data[sc_data['SC'] == sc].index
+    for member1 in members:
+        for member2 in members:
+            similarity_matrix.loc[member1, member2] = 1
+
+# Save the matrix
+similarity_matrix.to_csv("sc_similarity_matrix.tsv", sep="\t")
+
+pyseer --lmm --phenotypes phenotypes --kmers /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.4.Unitig_counter/Unitig_counter/unitigs.txt --similarity sc_similarity_matrix.tsv --output-patterns unitig_patterns.txt --cpu 8 > phenotype_unitigs_mash.txt
+
+________________________________________________________________________________________________
 
 ###############################
 # Step XX : Pan GWAS with MASH distance #
