@@ -19,7 +19,7 @@ Steps:
 15. Pangenome analysis: 
 	15.1 Panaroo              		DONE
 	15.2 Roary     				DONE
-	15.3 Panaroo + CLARC           		DONE
+	15.3 Panaroo + CLARC (update CLARC to use gene presence abscence)        		DONE
 	15.4 Roary + CLARC           		DONE
 16. unitig calling: unitig-counter    	   DONE
 17. GWAS - pyseer
