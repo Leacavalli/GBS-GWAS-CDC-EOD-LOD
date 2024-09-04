@@ -477,7 +477,7 @@ mash sketch -s 10000 -o mash_sketch assemblies/*.fa
 #Calculate pairwise distance
 mash dist mash_sketch.msh mash_sketch.msh| square_mash > mash.tsv
 
-pyseer --phenotypes phenotypes --vcf core.vcf --similarity mash.tsv > EOD_LOD_SNPs_mash.txt
+pyseer --phenotypes phenotypes --vcf core.vcf --distances mash.tsv > EOD_LOD_SNPs_mash.txt
 
 
 ________________________________________________________________________________________________
@@ -551,7 +551,7 @@ mash sketch -s 10000 -o mash_sketch assemblies/*.fa
 mash dist mash_sketch.msh mash_sketch.msh| square_mash > mash.tsv
 
 #COG based pyseer
-pyseer --lmm --phenotypes phenotypes --pres gene_presence_absence.Rtab --similarity mash.tsv > EOD_LOD_COGs_mash.txt
+pyseer --lmm --phenotypes phenotypes --pres gene_presence_absence.Rtab --distances mash.tsv > EOD_LOD_COGs_mash.txt
 
 ------------------------------------------------------------------------------------------------
 
@@ -623,7 +623,7 @@ ________________________________________________________________________________
 mash sketch -s 10000 -o mash_sketch assemblies/*.fa
 
 
-pyseer --lmm --phenotypes phenotypes --kmers /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.4.Unitig_counter/Unitig_counter/unitigs.txt --similarity mash.tsv --output-patterns unitig_patterns.txt --cpu 8 > phenotype_unitigs_mash.txt
+pyseer --lmm --phenotypes phenotypes --kmers /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.4.Unitig_counter/Unitig_counter/unitigs.txt --distances mash.tsv --output-patterns unitig_patterns.txt --cpu 8 > phenotype_unitigs_mash.txt
 
 __________________________________________________________________________________________________
 
