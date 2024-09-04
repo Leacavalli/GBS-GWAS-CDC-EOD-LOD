@@ -443,9 +443,15 @@ sbatch -p shared -c 8 -t 0-05:00 --mem=100000 --wrap="cdbg-ops extend --graph gr
 
 
 #installation
+
 conda -n create pyseer
 source activate pyseer
-conda install pyseer
+conda install bioconda::pyseer
+
+pip install pandas
+pip install dendropy
+
+git clone https://github.com/mgalardini/pyseer 
 
 #create phylogeny tsv file
 python scripts/phylogeny_distance.py --lmm GBS_GWAS.tre > phylogeny_K.tsv
