@@ -65,8 +65,6 @@ process GUBBINS {
 }
 
 process RAxML {
-  conda "gubbins"
-
   publishDir "${params.path_nextflow_dir}/11.RAxML", overwrite: true
 
   input:

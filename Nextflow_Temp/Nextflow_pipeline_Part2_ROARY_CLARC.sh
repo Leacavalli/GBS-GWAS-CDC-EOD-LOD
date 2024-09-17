@@ -12,7 +12,7 @@ process TEST {
 }
 
 
-process CLARC {
+process ROARY_CLARC {
   conda "${params.path_conda_envs}/clarc_env"
 
   script:

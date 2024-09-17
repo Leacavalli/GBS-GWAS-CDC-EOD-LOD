@@ -56,12 +56,55 @@ The pipeline contains the steps that can be run for each sample individually. Fr
 ```
 git clone https://github.com/Leacavalli/GBS-GWAS-pipeline.git
 ```
-## 3. Create de conda environment
+# 2. Install Unicycler
 ```
 cd Files
+git clone https://github.com/IndraGonz/CLARC.git
+cd CLARC/envs
 module load python
-conda env create -p /path/to/directory -f environment.yml
-conda activate myenvnextflow_env
+conda env create --file clarc_env.yml
+source activate clarc_env
+cd ../
+python setup.py install
+```
+
+# 3. Install CLARC
+```
+conda create -n unicycler
+source activate unicycler
+conda install bioconda::unicycler
+```
+# 4. Install trimmomatic
+```
+cd Files
+wget https://github.com/usadellab/Trimmomatic/files/5854859/Trimmomatic-0.39.zip
+unzip Trimmomatic-0.39.zip
+```
+# 6. install FastTree
+```
+curl -O http://www.microbesonline.org/fasttree/FastTree.c
+gcc -O3 -finline-functions -funroll-loops -Wall -o FastTree FastTree.c -lm
+FastTree -h
+```
+# 7. Install RAxML
+```
+# download
+cd Files
+wget https://github.com/stamatak/standard-RAxML/archive/master.zip
+unzip master.zip
+# compile source code
+cd standard-RAxML-master/
+make -f Makefile.SSE3.PTHREADS.gcc # parallelized and x86 processor optimized version
+ls raxmlHPC*
+```
+# 8. Install Pyseer files
+```
+cd Files
+mkdir pyseer
+cd pyseer
+wget https://github.com/mgalardini/pyseer/blob/4b8d22f43bc5943483d9a54df1e22c6a35cd0121/scripts/phylogeny_distance.py
+git clone https://github.com/mgalardini/pyseer
+
 ```
 ## 2. Download Raw reads from NCBI (Optional)
 Note: SraAccList.txt contains the list of accessions you want

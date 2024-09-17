@@ -62,7 +62,7 @@ process Serotype_MLST {
 }
 
 process SNIPPY {
-  conda "snippy"
+  conda "${params.path_conda_envs}/Files/snippy_env"
 
   input:
   val base
@@ -83,7 +83,7 @@ process SNIPPY {
 }
 
 process ASSEMBLY {
-  conda "unicycler"
+  conda "${params.path_nextflow_dir}/Files/Unicycler_environment.yml"
 
   publishDir "${params.path_nextflow_dir}/5.ASSEMBLIES", overwrite: true
 

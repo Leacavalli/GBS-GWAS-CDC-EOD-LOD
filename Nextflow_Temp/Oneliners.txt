@@ -329,12 +329,13 @@ sbatch -p shared -t 0-02:00 --mem=100000 --wrap="FastTree -gtr -nt core.full.aln
 # RAxML controlling for ascertainment bias
 
 # 1. Create a partition file with 1 partition of length of the Core SNP alignment (containing only variant sites)
-variant_sites=$(head -2 ../9.SNIPPY_MULTI/core.aln | tail -1 | wc -c)
+variant_sites=$(head -2 ../11.SNIPPY_MULTI/core.aln | tail -1 | wc -c)
+awk '/^>/ {if (seqlen){print seqlen}; printf $0"\t"; seqlen=0; next} {seqlen += length($0)} END {print seqlen}' ../11.SNIPPY_MULTI/core.aln  | head -1 | awk '{print $2}
 echo "[asc~p1_fel.txt], ASC_DNA, prt1 = 1-$variant_sites" > part1.txt
 cat part1.txt
 
 # 2. Create a Felsenstein correction input file displaying the number of invariant sites
-echo "2263191,$variant_sites" | tr ',' '-' | bc > p1_fel.txt
+echo "2231314,$variant_sites" | tr ',' '-' | bc > p1_fel.txt
 cat p1_fel.txt
 
 # 3. Run RAxML

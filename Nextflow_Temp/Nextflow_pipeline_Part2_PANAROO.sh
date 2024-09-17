@@ -12,7 +12,7 @@ process TEST {
 }
 
 process PANAROO {
-  conda "/n/home02/lcavalli/.conda/envs/Panaroo"
+  conda "${params.path_nextflow_dir}/Files/environment.yml"
 
   script:
   """
