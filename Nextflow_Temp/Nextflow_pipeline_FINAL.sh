@@ -155,7 +155,7 @@ process FastANI {
 }
 
 process QUAST {
-  conda "quast"
+  conda "quast joblib"
 
   publishDir "${params.path_nextflow_dir}/8.QUAST", overwrite: true
 
