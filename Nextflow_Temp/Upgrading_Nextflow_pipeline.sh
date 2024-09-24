@@ -1,8 +1,32 @@
 
 module load python
 source activate java
+sbatch -p sapphire -c 60 -t 3-00:00 --mem=100000 --wrap="nextflow -C nextflow.config run test.nf --main --sub1 --sub2 --path_nextflow_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade5 --path_conda_envs /n/home02/lcavalli/.conda/envs"
+sbatch -p intermediate -c 60 -t 3-00:00 --mem=100000 --wrap="nextflow -C nextflow.config run test.nf --main --sub1 --sub2 --path_nextflow_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade5 --path_conda_envs /n/home02/lcavalli/.conda/envs"
+
+sbatch -p test -c 20 -t 0-12:00 --mem=100000 --wrap="nextflow -C nextflow.config run test.nf --path_nextflow_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade_18 --path_conda_envs /n/home02/lcavalli/.conda/envs"
+
+module load python
+source activate java
+sbatch -p test -c 112 -t 0-12:00 --mem=100000 --wrap="nextflow -C nextflow.config run test.nf --path_nextflow_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade5 --path_conda_envs /n/home02/lcavalli/.conda/envs"
+
+
+module load python
+source activate java
+sbatch -p test -c 112 -t 0-12:00 --mem=100000 --wrap="nextflow -C nextflow.config run test.nf --main --sub1 --sub2 --path_nextflow_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade5 --path_conda_envs /n/home02/lcavalli/.conda/envs"
+
+
+sbatch -p shared -c 48 -t 3-00:00 --mem=100000 --wrap="nextflow -C nextflow.config run test.nf --main --sub1 --sub2 --path_nextflow_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade5 --path_conda_envs /n/home02/lcavalli/.conda/envs"
+
+module load python
+source activate java
+sbatch -p test -c 4 -t 0-12:00 --mem=100000 --wrap="nextflow -C nextflow.config run test.nf --main --sub1 --sub2 --path_nextflow_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade5 --path_conda_envs /n/home02/lcavalli/.conda/envs"
+
+
 sbatch -p test -c 60 -t 0-12:00 --mem=100000 --wrap="nextflow -C nextflow.config run test.nf --path_nextflow_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade5 --path_conda_envs /n/home02/lcavalli/.conda/envs"
 sbatch -p test -c 60 -t 0-12:00 --mem=100000 --wrap="nextflow -C nextflow.config run test_RAxML.nf --path_nextflow_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade5 --path_conda_envs /n/home02/lcavalli/.conda/envs"
+
+sbatch -p test -c 60 -t 2-00:00 --mem=100000 --wrap="nextflow -C nextflow.config run test.nf --path_nextflow_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade5 --path_conda_envs /n/home02/lcavalli/.conda/envs"
 
 
 module load python
@@ -33,7 +57,15 @@ sbatch -p test -c 50 -t 0-05:00 --mem=100000 --wrap="/n/holylfs05/LABS/hanage_la
 
 
 -s $path_nextflow_dir/11.SNIPPY_MULTI/clean.full.aln -T 50 -m GTRGAMMA -p 1234 -b 12345 -N 100 -w $path_nextflow_dir/13.Phylogeny/13.1.RAxML -n GBS_GWAS
+
+path_nextflow_dir="/n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade5"
 sbatch -p test -c 50 -t 0-05:00 --mem=100000 --wrap="/n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/standard-RAxML/raxmlHPC-PTHREADS-SSE3 -T 50 -f a -m GTRGAMMA -p 12345 -x 12345 -N 100 -s $path_nextflow_dir/11.SNIPPY_MULTI/clean.full.aln -w $path_nextflow_dir/13.Phylogeny/13.1.RAxML -n GBS_GWAS"
+
+module load python
+source activate java
+sbatch -p test -c 50 -t 0-12:00 --mem=100000 --wrap="nextflow -C nextflow.config run test_RAxML.nf --path_nextflow_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade5 --path_conda_envs /n/home02/lcavalli/.conda/envs"
+
+
 raxmlHPC-PTHREADS-SSE3 -s $path_nextflow_dir/11.SNIPPY_MULTI/core.vcf -T 48 -m ASC_GTRGAMMA --asc-corr=felsenstein ­-q ${params.path_nextflow_dir}/11.RAxML/part1.txt -N 100 -p 1234 -f t -t ${params.path_nextflow_dir}/10.GUBBINS/GBS_GWAS.final_tree.tre -n GBS_GWAS
 
 $path_nextflow_dir/Files/standard-RAxML/raxmlHPC-PTHREADS-SSE3

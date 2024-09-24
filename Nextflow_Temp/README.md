@@ -56,7 +56,7 @@ The pipeline contains the steps that can be run for each sample individually. Fr
 ```
 git clone https://github.com/Leacavalli/GBS-GWAS-pipeline.git
 ```
-# 2. Install Unicycler
+# 2. Install CLARC
 ```
 cd Files
 git clone https://github.com/IndraGonz/CLARC.git
@@ -67,26 +67,19 @@ source activate clarc_env
 cd ../
 python setup.py install
 ```
-
-# 3. Install CLARC
-```
-conda create -n unicycler
-source activate unicycler
-conda install bioconda::unicycler
-```
-# 4. Install trimmomatic
+# 3. Install trimmomatic
 ```
 cd Files
 wget https://github.com/usadellab/Trimmomatic/files/5854859/Trimmomatic-0.39.zip
 unzip Trimmomatic-0.39.zip
 ```
-# 6. install FastTree
+# 4. install FastTree
 ```
 curl -O http://www.microbesonline.org/fasttree/FastTree.c
 gcc -O3 -finline-functions -funroll-loops -Wall -o FastTree FastTree.c -lm
 FastTree -h
 ```
-# 7. Install RAxML
+# 5. Install RAxML
 ```
 # download
 cd Files
@@ -97,7 +90,7 @@ cd standard-RAxML-master/
 make -f Makefile.SSE3.PTHREADS.gcc # parallelized and x86 processor optimized version
 ls raxmlHPC*
 ```
-# 8. Install Pyseer files
+# 6. Install Pyseer files
 ```
 cd Files
 mkdir pyseer

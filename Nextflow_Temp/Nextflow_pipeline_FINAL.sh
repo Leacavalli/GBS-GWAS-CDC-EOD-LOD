@@ -57,7 +57,6 @@ process Trimmomatic {
 
   """
   java -jar ${params.path_nextflow_dir}/Files/Trimmomatic-0.39/trimmomatic-0.39.jar PE -phred33 -trimlog ${base}_1.log ${params.path_nextflow_dir}/0.RAW_READS/${base}_1.fastq.gz ${params.path_nextflow_dir}/0.RAW_READS/${base}_2.fastq.gz ${base}_trimmed_1.fq.gz ${base}_unpaired_1.fq.gz ${base}_trimmed_2.fq.gz ${base}_unpaired_2.fq.gz ILLUMINACLIP:${params.path_nextflow_dir}/Files/Trimmomatic-0.39/adapters/TruSeq3-PE.fa:2:30:10 SLIDINGWINDOW:5:20 MINLEN:50 > ${base}_trim.out
-  rm ${base}_1.log ${base}_unpaired_1.fq.gz ${base}_unpaired_2.fq.gz ${base}_trim.out
   """
 }
 
@@ -68,6 +67,9 @@ process FastQC {
   val base
   val trimmed_read1
   val trimmed_read2
+
+  output:
+  val base
 
   script:
   """
@@ -83,6 +85,9 @@ process SNIPPY {
   val base
   val trimmed_read1
   val trimmed_read2
+
+  output:
+  val base
 
   script:
   """
@@ -100,7 +105,6 @@ process ASSEMBLY {
   val trimmed_read1
   val trimmed_read2
 
-
   output:
   val base
   path "${base}.fasta"
@@ -109,7 +113,6 @@ process ASSEMBLY {
   """
   unicycler -1 ${trimmed_read1}  -2 ${trimmed_read2} -o ${base}.unicycler.out
   mv ${base}.unicycler.out/assembly.fasta ${base}.fasta
-  rm -r ${base}.unicycler.out
   """
 }
 
@@ -130,7 +133,6 @@ process ANNOTATION {
   """
   prokka ${fasta_file} --outdir ${base}_prokka  --prefix ${base}
   mv ${base}_prokka/*.gff .
-  rm -r ${base}_prokka
   """
 }
 
@@ -206,11 +208,16 @@ process Filter_out_QC {
 
 
 process POPPUNK {
+  cpus 8
+
   conda "poppunk==2.6.0"
 
   publishDir "${params.path_nextflow_dir}/9.POPPUNK", overwrite: true
 
   input:
+  val base
+
+  output:
   val base
 
   script:
@@ -235,6 +242,9 @@ process POPPUNK {
 
 process ASSIGN_CC {
 input:
+val base
+
+output:
 val base
 
 script:
@@ -279,35 +289,12 @@ conda "${params.path_nextflow_dir}/Files/Snippy_environment.yml"
   """
 }
 
-process GUBBINS {
-  conda "gubbins"
-
-  publishDir "${params.path_nextflow_dir}/12.GUBBINS", overwrite: true
+process FASTTREE {
 
   input:
   val snippy_out
 
   output:
-  path "GBS_GWAS.recombination_predictions.embl"
-  path "GBS_GWAS.recombination_predictions.gff"
-  path "GBS_GWAS.branch_base_reconstruction.embl"
-  path "GBS_GWAS.summary_of_snp_distribution.vcf"
-  path "GBS_GWAS.per_branch_statistics.csv"
-  path "GBS_GWAS.filtered_polymorphic_sites.fasta"
-  path "GBS_GWAS.filtered_polymorphic_sites.phylip"
-  path "GBS_GWAS.final_tree.tre"
-  path "GBS_GWAS.node_labelled.final_tree.tre"
-  path "GBS_GWAS.log"
-
-  script:
-  """
-  run_gubbins.py -p GBS_GWAS ${params.path_nextflow_dir}/11.SNIPPY_MULTI/clean.full.aln
-  """
-}
-
-process FASTTREE {
-
-  input:
   val snippy_out
 
   script:
@@ -319,9 +306,14 @@ process FASTTREE {
 }
 
 process RAxML {
+  cpus 50
+
   publishDir "${params.path_nextflow_dir}/11.RAxML", overwrite: true
 
   input:
+  val snippy_out
+
+  output:
   val snippy_out
 
   script:
@@ -333,6 +325,8 @@ process RAxML {
 }
 
 process PANAROO {
+  cpus 8
+
   conda "${params.path_nextflow_dir}/Files/Panaroo_environment.yml"
 
   input:
@@ -355,6 +349,9 @@ process PANAROO_CLARC {
   input:
   val base
 
+  output:
+  val base
+
   script:
   """
   mkdir -p ${params.path_nextflow_dir}/14.Pangenome_analysis/14.3.Panaroo_CLARC
@@ -374,7 +371,6 @@ process PANAROO_CLARC {
   clarc --panaroo --input_dir ${params.path_nextflow_dir}/14.Pangenome_analysis/14.3.Panaroo_CLARC/data --output_dir ${params.path_nextflow_dir}/14.Pangenome_analysis/14.3.Panaroo_CLARC/Output
   """
 }
-
 
 process ROARY {
   conda "roary"
@@ -398,6 +394,9 @@ process ROARY_CLARC {
   input:
   val base
 
+  output:
+  val base
+
   script:
   """
   mkdir -p ${params.path_nextflow_dir}/14.Pangenome_analysis/14.4.ROARY_CLARC
@@ -418,11 +417,12 @@ process ROARY_CLARC {
 }
 
 process UNITIG {
+  cpus 8
+
   conda "unitig-counter"
 
   input:
   val base
-
 
   output:
   val base
@@ -446,10 +446,12 @@ process RAxML_dist {
   conda "pyseer"
 
   input:
-  val base
+  val input1
+  val input2
+  val input3
 
   output:
-  val base
+  val input1
 
   script:
   """
@@ -463,6 +465,8 @@ process RAxML_dist {
 }
 
 process SNPGWAS_RAxML {
+  cpus 8
+
   conda "pyseer"
 
   input:
@@ -475,6 +479,8 @@ process SNPGWAS_RAxML {
 }
 
 process DBGWAS_RAxML {
+  cpus 8
+
   conda "pyseer"
 
   input:
@@ -487,6 +493,8 @@ process DBGWAS_RAxML {
 }
 
 process PanGWAS_Panaroo_RAxML {
+  cpus 8
+
   conda "pyseer"
 
   input:
@@ -503,10 +511,12 @@ process Fasttree_dist {
   conda "pyseer"
 
   input:
-  val base
+  val input1
+  val input2
+  val input3
 
   output:
-  val base
+  val input1
 
   script:
   """
@@ -521,6 +531,8 @@ process Fasttree_dist {
 }
 
 process SNPGWAS_Fasttree {
+  cpus 8
+
   conda "pyseer"
 
   input:
@@ -534,6 +546,8 @@ process SNPGWAS_Fasttree {
 }
 
 process DBGWAS_Fasttree {
+  cpus 8
+
   conda "pyseer"
 
   input:
@@ -547,6 +561,8 @@ process DBGWAS_Fasttree {
 }
 
 process PanGWAS_Panaroo_Fasttree {
+  cpus 8
+
   conda "pyseer"
 
   input:
@@ -563,10 +579,12 @@ process Mash_dist {
   conda "pyseer"
 
   input:
-  val base
+  val input1
+  val input2
+  val input3
 
   output:
-  val base
+  val input1
 
   script:
   """
@@ -582,6 +600,8 @@ process Mash_dist {
 }
 
 process SNPGWAS_Mash {
+  cpus 8
+
   conda "pyseer"
 
   input:
@@ -595,6 +615,8 @@ process SNPGWAS_Mash {
 }
 
 process DBGWAS_Mash {
+  cpus 8
+
   conda "pyseer"
 
   input:
@@ -608,6 +630,8 @@ process DBGWAS_Mash {
 }
 
 process PanGWAS_Panaroo_Mash {
+  cpus 8
+
   conda "pyseer"
 
   input:
@@ -624,10 +648,12 @@ process SC_dist {
   conda "pyseer"
 
   input:
-  val base
+  val input1
+  val input2
+  val input3
 
   output:
-  val base
+  val input1
 
   script:
   """
@@ -642,6 +668,8 @@ process SC_dist {
 }
 
 process SNPGWAS_SC {
+  cpus 8
+
   conda "pyseer"
 
   input:
@@ -655,6 +683,8 @@ process SNPGWAS_SC {
 }
 
 process DBGWAS_SC {
+  cpus 8
+
   conda "pyseer"
 
   input:
@@ -668,6 +698,8 @@ process DBGWAS_SC {
 }
 
 process PanGWAS_Panaroo_SC {
+  cpus 8
+
   conda "pyseer"
 
   input:
@@ -681,6 +713,8 @@ process PanGWAS_Panaroo_SC {
 }
 
 process PanGWAS_Roary_RAxML {
+  cpus 8
+
   conda "pyseer"
 
   input:
@@ -699,6 +733,8 @@ process PanGWAS_Roary_RAxML {
 }
 
 process PanGWAS_Panaroo_CLARC_RAxML {
+  cpus 8
+
   conda "pyseer"
 
   input:
@@ -735,6 +771,8 @@ process PanGWAS_Panaroo_CLARC_RAxML {
 }
 
 process PanGWAS_Roary_CLARC_RAxML {
+  cpus 8
+
   conda "pyseer"
 
   input:
@@ -772,16 +810,30 @@ process PanGWAS_Roary_CLARC_RAxML {
 workflow flow1 {
 take: data
 main:
+    // Step 1: Start with Make_architecture process
     Make_architecture(data)
-    Serotype_MLST(Make_architecture.out[0])
-    Trimmomatic(Make_architecture.out[0])
+
+    // Step 2: Serotype_MLST and Trimmomatic both depend on Make_architecture's output
+    Serotype_MLST(Make_architecture.out)
+    Trimmomatic(Make_architecture.out)
+
+    // Step 3: FastQC, SNIPPY, and ASSEMBLY depend on Trimmomatic's output
     FastQC(Trimmomatic.out)
     SNIPPY(Trimmomatic.out)
     ASSEMBLY(Trimmomatic.out)
+
+    // Step 4: ANNOTATION, FastANI, and QUAST depend on ASSEMBLY's output
     ANNOTATION(ASSEMBLY.out)
     FastANI(ASSEMBLY.out)
     QUAST(ASSEMBLY.out)
-emit: QUAST.out[0]
+
+    emit:
+      QUAST.out[0]
+      Serotype_MLST.out[0]
+      FastQC.out[0]
+      SNIPPY.out[0]
+      ANNOTATION.out[0]
+      FastANI.out[0]
 }
 
 workflow flow2 {
@@ -794,59 +846,93 @@ emit: Filter_out_QC.out
 workflow flow3 {
     take: data
     main:
+    // Step 1: Run all processes that take 'data' as input in parallel
     POPPUNK(data)
     ASSIGN_CC(data)
     SNIPPY_MULTI(data)
+    PANAROO(data)
+    ROARY(data)
+    UNITIG(data)
+
+    // Step 2: FASTTREE and RAxML both depend on the output of SNIPPY_MULTI
     FASTTREE(SNIPPY_MULTI.out[0])
     RAxML(SNIPPY_MULTI.out[0])
-    PANAROO(data)
+
+    // Step 3: PANAROO_CLARC depends on PANAROO output, and ROARY_CLARC depends on ROARY output
     PANAROO_CLARC(PANAROO.out[0])
-    ROARY(data)
     ROARY_CLARC(ROARY.out[0])
-    UNITIG(data)
-    emit: UNITIG.out
+
+    emit:
+    RAxML.out[0]
+    UNITIG.out[0]
+    PANAROO.out[0]
+    SNIPPY_MULTI.out[0]
+    POPPUNK.out[0]
+    FASTTREE.out[0]
+    PANAROO_CLARC.out[0]
+    ROARY_CLARC.out[0]
 }
 
 workflow flow_main {
-    take: data
+    take:
+    raxml_data
+    unitig_data
+    panaroo_data
+
     main:
-    RAxML_dist(data)
+    RAxML_dist(raxml_data, unitig_data, panaroo_data)
     SNPGWAS_RAxML(RAxML_dist.out[0])
     DBGWAS_RAxML(RAxML_dist.out[0])
     PanGWAS_Panaroo_RAxML(RAxML_dist.out[0])
 }
 
 workflow flow_sub1_Fasttree {
-    take: data
+    take:
+    fasttree_data
+    unitig_data
+    panaroo_data
+
     main:
-    Fasttree_dist(data)
+    Fasttree_dist(fasttree_data, unitig_data, panaroo_data)
     SNPGWAS_Fasttree(Fasttree_dist.out[0])
     DBGWAS_Fasttree(Fasttree_dist.out[0])
     PanGWAS_Panaroo_Fasttree(Fasttree_dist.out[0])
 }
 
 workflow flow_sub1_Mash {
-    take: data
+    take:
+    snippy_data
+    unitig_data
+    panaroo_data
+
     main:
-    Mash_dist(data)
+    Mash_dist(snippy_data,unitig_data, panaroo_data)
     SNPGWAS_Mash(Mash_dist.out[0])
     DBGWAS_Mash(Mash_dist.out[0])
     PanGWAS_Panaroo_Mash(Mash_dist.out[0])
 }
 
 workflow flow_sub1_SC {
-    take: data
+    take:
+    poppunk_data
+    unitig_data
+    panaroo_data
+
     main:
-    SC_dist(data)
+    SC_dist(poppunk_data, unitig_data, panaroo_data)
     SNPGWAS_SC(SC_dist.out[0])
     DBGWAS_SC(SC_dist.out[0])
     PanGWAS_Panaroo_SC(SC_dist.out[0])
 }
 
 workflow flow_sub2 {
-    take: data
+    take:
+    raxml_data
+    panaroo_clarc_data
+    roary_clarc_data
+
     main:
-    RAxML_dist(data)
+    RAxML_dist(raxml_data , panaroo_clarc_data, roary_clarc_data)
     PanGWAS_Roary_RAxML(RAxML_dist.out[0])
     PanGWAS_Panaroo_CLARC_RAxML(RAxML_dist.out[0])
     PanGWAS_Roary_CLARC_RAxML(RAxML_dist.out[0])
@@ -856,35 +942,37 @@ workflow {
 channel.fromFilePairs("${params.path_nextflow_dir}/0.RAW_READS/SRR*_{1,2}.fastq.gz")
        .map { it[0] }
        | flow1
-       | flow2
+
+flow2(flow1.out[0])
        | collect
        | flow3
+
   if( params.main ) {
-    flow_main(flow3.out.collect())
+    flow_main(flow3.out[0], flow3.out[1], flow3.out[2])
     println "Running the Main Analysis: SNP-GWAS, DB-GWAS and Pan-GWAS, with the population structure controlled using a RAxML phylogeny and the accessory genome defined per Panaroo."
   } else {
     println "Skipping the Main Analysis (SNP-GWAS, DB-GWAS and Pan-GWAS, with the population structure controlled using a RAxML phylogeny and the accessory genome defined per Panaroo)."
   }
   if( params.sub1 ) {
-    flow_sub1_Fasttree(flow3.out.collect())
-    flow_sub1_Mash(flow3.out.collect())
-    flow_sub1_SC(flow3.out.collect())
+    flow_sub1_Fasttree(flow3.out[5], flow3.out[1], flow3.out[2])
+    flow_sub1_Mash(flow3.out[3], flow3.out[1], flow3.out[2])
+    flow_sub1_SC(flow3.out[4], flow3.out[1], flow3.out[2])
     println "Running the Sub-Analysis #1: SNP-GWAS, DB-GWAS and Pan-GWAS, with the population structure controlled using a Fastree phylogeny, Mash distances and Sequence Cluster (SC) classifications."
   }
   if( params.Fasttree ) {
-    flow_sub1_Fasttree(flow3.out.collect())
+    flow_sub1_Fasttree(flow3.out[5], flow3.out[1], flow3.out[2])
     println "Running SNP-GWAS, DB-GWAS and Pan-GWAS, with the population structure controlled using a Fastree phylogeny and the accessory genome defined per Panaroo.."
   }
   if( params.Mash ) {
-    flow_sub1_Mash(flow3.out.collect())
+    flow_sub1_Mash(flow3.out[3],flow3.out[1], flow3.out[2])
     println "Running SNP-GWAS, DB-GWAS and Pan-GWAS, with the population structure controlled using Mash distances and the accessory genome defined per Panaroo.."
   }
   if( params.SC ) {
-    flow_sub1_SC(flow3.out.collect())
+    flow_sub1_SC(flow3.out[4], flow3.out[1], flow3.out[2])
     println "Running SNP-GWAS, DB-GWAS and Pan-GWAS, with the population structure controlled using Sequence Cluster (SC) classifications and the accessory genome defined per Panaroo.."
   }
   if( params.sub2 ) {
-    flow_sub2(flow3.out.collect())
+    flow_sub2(flow3.out[0], flow3.out[6], flow3.out[7])
     println "Running the Sub-Analysis #2: Pan-GWAS, with the accessory genome defined per Roary, CLARC-redefined Panaroo genes, and CLARC-redefined Roary genes."
   }
 }
