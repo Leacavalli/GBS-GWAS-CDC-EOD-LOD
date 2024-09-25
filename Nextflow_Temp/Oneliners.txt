@@ -1,16 +1,15 @@
 Steps:
-1. Trim - Trimmomatic                      DONE
-2. QC: check for proper trimming - FASTQC  DONE 
-3. Serotyping + MLST - SRST2               DONE
+1. Serotyping + MLST - SRST2               DONE
+2. Trim Raw Reads - Trimmomatic		   DONE
+3. QC: check for proper trimming - FASTQC  DONE 
 4. Mapping+ variant calling - SNIPPY       DONE
 5. Assembly - unicycler                    DONE
 6. Gene annotation - prokka                DONE
 7. QC: Check contamination - FastANI       DONE 
 8. QC: Check Assembly - QUAST              DONE
 9. Remove Poor Quality samples             DONE
-
 10 Poppunk (SC) 			   DONE 
-11. Assign CC                                In progress
+11. Assign CC                              DONE
 12. Merge + Clean Snippy results - SNIPPY    DONE
 13. Remove recombination - Gubbins           DONE
 14. Phylogeny
@@ -55,28 +54,37 @@ Reference Analysis: Main Analyses 1, 2, and 3 (most complete), or just Main Anal
 Sub Analysis 2.1: same, but population structure control with FastTree Phylogeny.
 Sub Analaysis 2.2: same, but population structure control with Mash Distances.
 Sub Analysis 2.3: same, but population structure control with SC Classification.
+------------------------------------------------------------------------------------------------
+######################################
+#     Step 1: Serotyping + MLST      #
+######################################
+
+source activate srst2
+getmlst.py --species 'Streptococcus agalactiae'
+
+sbatch -p shared  -t 0-01:00 --mem=100000 --wrap="srst2 --input_pe ../0.RAW_READS/*.fastq.gz --output $base --log --gene_db /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/GBS-SBG/GBS-SBG.fasta --mlst_db /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/srst2/Streptococcus_agalactiae.fasta --mlst_definitions /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/srst2/profiles_csv --mlst_delimiter '_'"
+
 
 ------------------------------------------------------------------------------------------------
 ###########################
-# Step 1 : Trim Raw Reads #
+# Step 2 : Trim Raw Reads #
 ###########################
 # Tool: Trimmomatic
-#
+
 module load python
-conda activate java
-java -version
+conda create -n java
+source activate java
+conda install openjdk=11 
 
 for i in *1.fastq
 do
 base=$(echo $i | cut -d '_' -f1-1)
 sbatch -p shared  -t 0-00:30 --mem=5000 --wrap="java -jar /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/Trimmomatic-0.39/trimmomatic-0.39.jar PE -phred33 -trimlog $base\_1.log $base\_1.fastq $base\_2.fastq $base\_trimmed_1.fq.gz $base\_unpaired_1.fq.gz $base\_trimmed_2.fq.gz $base\_unpaired_2.fq.gz ILLUMINACLIP:/n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/Trimmomatic-0.39/adapters/TruSeq3-PE.fa:2:30:10 SLIDINGWINDOW:5:20 MINLEN:50> $base\_trim.out;
-rm $base\_trim.out $base\_1.log $base\_unpaired_1.fq.gz $base\_unpaired_2.fq.gz"
 done
-
 
 ------------------------------------------------------------------------------------------------
 ######################################
-#           Step 2: FastQC           #
+#           Step 3: FastQC           #
 ######################################
 # Tool: fastqc
 
@@ -91,19 +99,8 @@ do
   sbatch -p shared -t 0-01:00 --mem=4000 --wrap="fastqc $i --extract –o /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade/2.FASTQC"
 done
 
-sbatch -p shared -t 0-01:00 --mem=4000 --wrap="fastqc SRR9088851_trimmed_1.fq.gz --extract -o /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade/2.FASTQC"
 ------------------------------------------------------------------------------------------------
-######################################
-#     Step 3: Serotyping + MLST      #
-######################################
 
-source activate srst2
-getmlst.py --species 'Streptococcus agalactiae'
-
-sbatch -p shared  -t 0-01:00 --mem=100000 --wrap="srst2 --input_pe ../0.RAW_READS/*.fastq.gz --output $base --log --gene_db /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/GBS-SBG/GBS-SBG.fasta --mlst_db /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/srst2/Streptococcus_agalactiae.fasta --mlst_definitions /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/srst2/profiles_csv --mlst_delimiter '_'"
-
-
-------------------------------------------------------------------------------------------------
 ######################################
 # Step 4: Mapping+ variant calling   #
 ######################################
@@ -124,7 +121,7 @@ ncbi-acc-download --format fasta AP018935.1 #switch reference as needed
 for i in *1.fq.gz
 do
   base=$(echo $i | cut -d '/' -f2-2 | cut -d '_' -f1-1)
-  sbatch -p shared -t 0-05:00 --mem=100000 --wrap="snippy --outdir $base --R1 $base\_filtered_1.fq.gz --R2 $base\_filtered_2.fq.gz --ref AP018935.1.fa --cpus 16"
+  sbatch -p shared -t 0-05:00 --mem=100000 --wrap="snippy --outdir $base --R1 $base\_filtered_1.fq.gz --R2 $base\_filtered_2.fq.gz --ref AP018935.1.fa"
 done
 
 ------------------------------------------------------------------------------------------------
@@ -135,12 +132,11 @@ done
 
 source activate unicycler
 
-for i in *_filtered_1.fq.gz;
+for i in *_trimmed_1.fq.gz;
 do
 base=$(echo $i | cut -d '_' -f1-1)
 sbatch -p shared  -t 0-01:00 --mem=40000 --wrap="unicycler -1 $base\_filtered_1.fq.gz  -2 $base\_filtered_2.fq.gz -o $base\.unicycler.out
 mv $base\.unicycler.out/assembly.fasta $base.fasta
-rm $base\.unicycler.out"
 done
 
 #######################
@@ -154,61 +150,36 @@ do
   base=$(echo $i | cut -d '/' -f2-2 | cut -d '.' -f1-1)
   sbatch -p shared  -t 0-01:00 --mem=100000 --wrap="prokka $i --outdir $base\_prokka --prefix $base
 mv $base\_prokka/$base\.gff .
-rm -r $base\_prokka"
 done
 
 
 ------------------------------------------------------------------------------------------------
-################################
+####################################
 # Step 7: QC - Check Contamination #
-################################
+####################################
 # Tool: FastANI
 conda create -n fastani
 source activate fastani
 conda install bioconda::fastani
 
-fastANI -h 
-# fastANI -q [QUERY_GENOME] -r [REFERENCE_GENOME] -o [OUTPUT_FILE] 
-sbatch -p shared  -t 0-01:00 --mem=40000 --wrap="fastANI -q $i -r $path_nextflow_dir/Files/AP018935.1.fa -o $path_nextflow_dir/8.FastANI/$base.fastani.out"
 
-ls *fasta > fasta_list.txt
-sbatch -p shared  -t 0-01:00 --mem=40000 --wrap="fastANI --ql fasta_list.txt -r /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/Files/AP018935.1.fa -o fastani_v2.out"
-
-# Run on each sample 
-path_nextflow_dir=$(echo "/n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE")
-mkdir $path_nextflow_dir/8.FastANI
-for i in $path_nextflow_dir/7.ASSEMBLIES/*fasta;
-do
-  base=$(echo $i | cut -d '/' -f12-12 | cut -d '.' -f1-1)
 sbatch -p shared  -t 0-01:00 --mem=40000 --wrap="fastANI -q $i -r $path_nextflow_dir/Files/AP018935.1.fa -o $path_nextflow_dir/8.FastANI/$base.fastani.out"
-done
 
 ------------------------------------------------------------------------------------------------
 
-####################
-# Step 8 :QC - QUAST  #
-####################
+#######################
+# Step 8: QC - QUAST  #
+#######################
 
 #Tool: QUAST
 #Outputs a report with N50, GC (%), Number of contigs, total genome length,  
 
-#Installation
-sudo apt-get update && sudo apt-get install -y pkg-config libfreetype6-dev libpng-dev python3-matplotlib
-./setup.py install
 
-
-#Navigate to folder with assemblies (7.ASSEMBLY)
-
-for i in *fasta;
-do
-base=$(echo $i | cut -d '_' -f1-1)
-sbatch -p shared  -t 0-01:00 --mem=40000 --wrap="python /usr/local/bin/quast.py -o $base\.quast.out/ $base.fasta"
-done
-
-# Or conda: 
 conda create -n quast
 source activate quast
 conda install bioconda::quast
+conda "quast joblib"
+
 # run 
 path_nextflow_dir=$(echo "/n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE")
 for i in $path_nextflow_dir/7.ASSEMBLIES/*fasta;
@@ -227,7 +198,7 @@ done
 ------------------------------------------------------------------------------------------------
 
 ##########################################
-# Step 11 : Remove Poor Quality samples  #
+# Step 9 : Remove Poor Quality samples   #
 ##########################################
 
 path_nextflow_dir=$(echo "/n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE")
@@ -257,57 +228,79 @@ do
 done
 
 
-------------------------------------------------------------------------------------------------
-
-____________________________________________________________________________________________
-POST PIPELINE
-____________________________________________________________________________________________
+_______________________________
+Collect all samples 
+_______________________________
 
 ###############################
-#    Step XX : MultiQC        #
+#    Step 10: PopPunk         #
 ###############################
-# Tool: MultiQC
 
-# conda create -n multiqc
-source activate multiqc
-# conda install multiqc
+#Tool : Poppunk
 
- sbatch -p shared  -t 0-03:00 --mem=100000 --wrap="multiqc ."
+# Prepare input file
+cd X.poppunk
+for i in /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/7.ASSEMBLIES/*fasta
+do
+base=$(echo $i | cut -d '/' -f9-9 | cut -d '.' -f1-1)
+echo $base $i
+done > qfile.txt
+sed -i 's/\ /\t/g' qfile.txt
+cat qfile.txt
+# Activate package
+source activate poppunk
+poppunk -h
+# Run
+# 1. Create sketch database
+sbatch -p shared -c 8 -t 2-00:00 --mem=10000 --wrap="poppunk --create-db --output GBS_Global_NFDS_db --r-files qfile.txt --threads 8"
+# 2. Run QC on the database
+sbatch -p shared -c 8 -t 0-05:00 --mem=10000 --wrap="poppunk --qc-db --ref-db GBS_Global_NFDS_db --length-range 1700000 2400000 --threads 8"
+# 3. Fit a model, check cluster (core+accessory)
+sbatch -p shared -c 8 -t 0-08:00 --mem=10000 --wrap="poppunk --fit-model dbscan --ref-db GBS_Global_NFDS_db  --threads 8"
 
 
 ------------------------------------------------------------------------------------------------
-#######################################
-# Step XX : Whole genome SNP alignment #
-#######################################
+
+
+#####################
+# Step 11 Assign CC #
+#####################
+
+ # Create Output Directory
+  mkdir -p ${params.path_nextflow_dir}/10.ASSIGN_CC
+
+  # Append all results from mlst to a single file
+  awk '(NR == 1) || (FNR > 1)' ${params.path_nextflow_dir}/3.SEROTYPE_MLST/*__mlst__Streptococcus_agalactiae__results.txt > ${params.path_nextflow_dir}/3.SEROTYPE_MLST/combined_results.txt
+  cut -f1,2 ${params.path_nextflow_dir}/3.SEROTYPE_MLST/combined_results.txt  | tail -n +2  | sed 's/\t/,/g' | sort -t',' -k2,2  > ${params.path_nextflow_dir}/10.ASSIGN_CC/STs.txt
+
+  # Define the file paths
+  cut -d',' -f1,9 ${params.path_nextflow_dir}/Files/GBS_CC_profiles.csv | tail -n +2  | sort -t',' -k1,1 > ${params.path_nextflow_dir}/10.ASSIGN_CC/GBS_ST_CC_ref.txt
+
+  # Process the files and join them based on the 'ST' column
+  echo "ST,Sample,clonal_complex" > ${params.path_nextflow_dir}/10.ASSIGN_CC/combined_results_with_cc.txt
+  join -t',' -1 2 -2 1 -a 1 -e 'NA' -o 1.2,1.1,2.2 ${params.path_nextflow_dir}/10.ASSIGN_CC/STs.txt ${params.path_nextflow_dir}/10.ASSIGN_CC/GBS_ST_CC_ref.txt -a1  >> ${params.path_nextflow_dir}/10.ASSIGN_CC/combined_results_with_cc.txt
+  
+
+
+------------------------------------------------------------------------------------------------
+
+########################################
+# Step 12 : Whole genome SNP alignment #
+########################################
 # Tool: snippy
 
 source activate snippy
 
 # Run snippy-core to get whole genome alignment
-sbatch -p shared -t 0-02:00 --mem=100000 --wrap="snippy-core --ref 'SRR5063682/ref.fa' SRR*"
+sbatch -p shared -t 0-02:00 --mem=100000 --wrap="snippy-core --ref 'SRR5063682/ref.fa' *RR*"
 # Run snippy-clean_full_aln to clean the whole genome alignment
 sbatch -p shared -t 0-05:00 --mem=50000 --wrap="snippy-clean_full_aln core.full.aln > clean.full.aln"
 
 ------------------------------------------------------------------------------------------------
-#######################################
-# Step XX : Remove recombination     #
-#######################################
-# Tool: Gubbins
-
-source activate snippy
-
-# Activate Gubbins
-source activate gubbins
-
-# Run Gubbins
-cd 9.3.Gubbins
-sbatch -p shared -t 0-05:00 --mem=50000 --wrap="run_gubbins.py -p gubbins clean.full.aln"
-
-------------------------------------------------------------------------------------------------
 ###############################
-# Step XX : Build phylogeny   #
+# Step 13 : Build phylogeny   #
 ###############################
-# Tool: FastTree
+# Tool: RAxML
 
 # install FastTree
 curl -O http://www.microbesonline.org/fasttree/FastTree.c
@@ -687,54 +680,6 @@ pyseer --lmm --phenotypes phenotypes --pres gene_presence_absence.Rtab --distanc
 
 pyseer --lmm --phenotypes phenotypes --kmers /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.4.Unitig_counter/Unitig_counter/unitigs.txt --similarity phylogeny_K.tsv --output-patterns unitig_patterns.txt --cpu 8 > phenotype_unitigs.txt
 
-######################
-# QC Steps: Poppunk #
-######################
-#Tool : Poppunk
-
-# Prepare input file
-cd X.poppunk
-for i in /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/7.ASSEMBLIES/*fasta
-do
-base=$(echo $i | cut -d '/' -f9-9 | cut -d '.' -f1-1)
-echo $base $i
-done > qfile.txt
-sed -i 's/\ /\t/g' qfile.txt
-cat qfile.txt
-# Activate package
-source activate poppunk
-poppunk -h
-# Run
-# 1. Create sketch database
-sbatch -p shared -c 8 -t 2-00:00 --mem=10000 --wrap="poppunk --create-db --output GBS_Global_NFDS_db --r-files qfile.txt --threads 8"
-# 2. Run QC on the database
-sbatch -p shared -c 8 -t 0-05:00 --mem=10000 --wrap="poppunk --qc-db --ref-db GBS_Global_NFDS_db --length-range 1500000 2500000 --threads 8"
-# 3. Fit a model, check cluster (core+accessory)
-sbatch -p shared -c 8 -t 0-08:00 --mem=10000 --wrap="poppunk --fit-model dbscan --ref-db GBS_Global_NFDS_db  --threads 8"
-
-#############
-# Assign CC #
-#############
-
-#navigate to folder with mlst outputs 
-cd /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade/3.SEROTYPE_MLST
-
-# following script will append all results from mlst to a single file 
-find /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade/3.SEROTYPE_MLST -type f -name '*__mlst__Streptococcus_agalactiae__results.txt' -exec cat {} + >> /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade//combined_results.txt
-module load R/4.3.1-fasrc01
-export R_LIBS_USER=$HOME/apps/R_4.3.1/:$R_LIBS_USER
-R CMD BATCH --quiet --no-restore --no-save /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade/Files/Assign_CC.R
-
-# R script ("Assign_CC.R")
-#setwd()
-library(dplyr)
-
-#load dataframes
-map <- read.csv("GBS_CC_BIGSdb_2798265_4857213195_63187.csv", header = TRUE)
-combined_results <- read.table("combined_results.txt")
-
-combined_results <- combined_results %>%
-  left_join(map %>% select(ST, clonal_complex), by = "ST")
 
 
 
