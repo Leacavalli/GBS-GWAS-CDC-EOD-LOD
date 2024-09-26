@@ -11,10 +11,9 @@ Steps:
 10 Poppunk (SC) 			   DONE 
 11. Assign CC                              DONE
 12. Merge + Clean Snippy results - SNIPPY    DONE
-13. Remove recombination - Gubbins           DONE
-14. Phylogeny
-	14.1. RAxML                         In progress
-	14.2. FastTree                      DONE 
+13. Phylogeny
+	13.1. RAxML                         DONE
+	13.2. FastTree                      DONE 
 15. Pangenome analysis: 
 	15.1 Panaroo              		DONE
 	15.2 Roary     				DONE
@@ -298,9 +297,29 @@ sbatch -p shared -t 0-05:00 --mem=50000 --wrap="snippy-clean_full_aln core.full.
 
 ------------------------------------------------------------------------------------------------
 ###############################
-# Step 13 : Build phylogeny   #
+# Step 13.1 : Build phylogeny   #
 ###############################
-# Tool: RAxML
+# Tool: RAxML (without branch support) 
+
+#Installation 
+cd Files
+wget https://github.com/stamatak/standard-RAxML/archive/master.zip
+unzip master.zip
+# compile source code
+cd standard-RAxML-master/
+make -f Makefile.SSE3.PTHREADS.gcc # parallelized and x86 processor optimized version
+cd ../
+standard-RAxML-master/raxmlHPC-PTHREADS-SSE3 -h
+
+mkdir -p ${params.path_nextflow_dir}/12.Phylogeny
+mkdir -p ${params.path_nextflow_dir}/12.Phylogeny/12.1.RAxML
+${params.path_nextflow_dir}/Files/standard-RAxML-master/raxmlHPC-PTHREADS-SSE3 -T 50 -f a -m GTRGAMMA -p 12345 -x 12345 -N 100 -s ${params.path_nextflow_dir}/11.SNIPPY_MULTI/clean.full.aln -w ${params.path_nextflow_dir}/12.Phylogeny/12.1.RAxML -n GBS_GWAS
+
+------------------------------------------------------------------------------------------------
+###############################
+# Step 13.2 : Build phylogeny   #
+###############################
+# Tool: FastTree
 
 # install FastTree
 curl -O http://www.microbesonline.org/fasttree/FastTree.c
@@ -308,36 +327,6 @@ gcc -O3 -finline-functions -funroll-loops -Wall -o FastTree FastTree.c -lm
 
 # Run
 sbatch -p shared -t 0-02:00 --mem=100000 --wrap="FastTree -gtr -nt core.full.aln > phylo.aln"
- 
-------------------------------------------------------------------------------------------------
-###############################
-# Step XX : Build phylogeny   #
-###############################
-# Tool: RAxML
-
-# Install: https://cme.h-its.org/exelixis/web/software/raxml/
-
-# /n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/standard-RAxML/raxmlHPC-PTHREADS-SSE3 -s input.fasta -T 48 -m GTRGAMMA -# 100 -f t -p 1234 -t initial.tre -n output_prefix
-
-# RAxML controlling for ascertainment bias
-
-# 1. Create a partition file with 1 partition of length of the Core SNP alignment (containing only variant sites)
-variant_sites=$(head -2 ../11.SNIPPY_MULTI/core.aln | tail -1 | wc -c)
-awk '/^>/ {if (seqlen){print seqlen}; printf $0"\t"; seqlen=0; next} {seqlen += length($0)} END {print seqlen}' ../11.SNIPPY_MULTI/core.aln  | head -1 | awk '{print $2}
-echo "[asc~p1_fel.txt], ASC_DNA, prt1 = 1-$variant_sites" > part1.txt
-cat part1.txt
-
-# 2. Create a Felsenstein correction input file displaying the number of invariant sites
-echo "2231314,$variant_sites" | tr ',' '-' | bc > p1_fel.txt
-cat p1_fel.txt
-
-# 3. Run RAxML
-sbatch -p shared -c 4 -t 3-00:00 --mem=100000 --wrap="/n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/standard-RAxML/raxmlHPC-PTHREADS-SSE3 -s /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/10.GUBBINS/GBS_GWAS.filtered_polymorphic_sites.fasta -T 4 -m ASC_GTRGAMMA --asc-corr=felsenstein -q part1.txt -N 100 -p 1234 -f t -t /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/10.GUBBINS/GBS_GBS_GWAS.final_tree.tre -n GBS_GWAS"
-
-
-
-# Run RAxML
-sbatch -p shared -c 48 -t 3-00:00 --mem=100000 --wrap="/n/holylfs05/LABS/hanage_lab/Lab/holyscratch01/lcavalli/Software/standard-RAxML/raxmlHPC-PTHREADS-SSE3 -s /n/holyscratch01/hanage_lab/lcavalli/GBS-Global-NFDS/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.3.Gubbins/gubbins.filtered_polymorphic_sites.fasta -T 48 -m GTRGAMMA -p 1234 -N 100 -t /n/holyscratch01/hanage_lab/lcavalli/GBS-Global-NFDS/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.3.Gubbins/gubbins.final_tree.tre -n GBS_GWAS"
 
 ------------------------------------------------------------------------------------------------
 
