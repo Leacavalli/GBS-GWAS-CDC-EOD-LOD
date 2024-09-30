@@ -14,25 +14,24 @@ Steps:
 13. Phylogeny
 	13.1. RAxML                         DONE
 	13.2. FastTree                      DONE 
-15. Pangenome analysis: 
-	15.1 Panaroo              		DONE
-	15.2 Roary     				DONE
-	15.3 Panaroo + CLARC (update CLARC to use gene presence abscence)        		DONE
-	15.4 Roary + CLARC           		DONE
-16. unitig calling: unitig-counter    	   DONE
-17. GWAS - pyseer
-	17.1. SNP-based GWAS            	In progress
-		17.1.1. RAxML               	In progress
-		17.1.2. Mash Distances          In progress
-		17.1.3. SC classification       In progress
-	17.2. Pan-GWAS 	  	        	In progress
-		17.2.1. RAxML               	In progress
-		17.2.2. Mash Distances          In progress
-		17.2.3. SC classification       In progress
- 	17.3. DBGWAS                            In progress
-		17.3.1. RAxML               	In progress
-		17.3.2. Mash Distances          In progress
-		17.3.3. SC classification       In progress
+14. Pangenome analysis: 
+	14.1 Panaroo              		DONE
+	14.2 Roary     				DONE
+	14.3 Roary + CLARC (update CLARC to use gene presence abscence)        		
+15. unitig calling: unitig-counter    	   DONE
+16. GWAS - pyseer
+	16.1. SNP-based GWAS            	In progress
+		16.1.1. RAxML               	In progress
+		16.1.2. Mash Distances          In progress
+		16.1.3. SC classification       In progress
+	16.2. Pan-GWAS 	  	        	In progress
+		16.2.1. RAxML               	In progress
+		16.2.2. Mash Distances          In progress
+		16.2.3. SC classification       In progress
+ 	16.3. DBGWAS                            In progress
+		16.3.1. RAxML               	In progress
+		16.3.2. Mash Distances          In progress
+		16.3.3. SC classification       In progress
 
 Main Analysis 
 Question: What are the genetic determinants of time of onset of GBS infection in the US ? (Methods: Pan GWAS, DB GWAS, SNP GWAS 
@@ -239,12 +238,15 @@ _______________________________
 
 # Prepare input file
 cd X.poppunk
-for i in /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/7.ASSEMBLIES/*fasta
-do
-base=$(echo $i | cut -d '/' -f9-9 | cut -d '.' -f1-1)
-echo $base $i
-done > qfile.txt
+# Prepare input file
+  mkdir -p ${params.path_nextflow_dir}/6.POPPUNK
+  for i in ${params.path_nextflow_dir}/3.ASSEMBLIES/*fasta
+  do
+  sample=\$(basename \$i | cut -d '.' -f1)
+  echo -e "\$sample\t\$i"
+  done > ${params.path_nextflow_dir}/6.POPPUNK/qfile.txt
 sed -i 's/\ /\t/g' qfile.txt
+
 cat qfile.txt
 # Activate package
 source activate poppunk
@@ -331,7 +333,7 @@ sbatch -p shared -t 0-02:00 --mem=100000 --wrap="FastTree -gtr -nt core.full.aln
 ------------------------------------------------------------------------------------------------
 
 ###############################
-# Step XX : Pangenome Analysis #
+# Step 14.1 : Pangenome Analysis #
 ###############################
 # Tool: panaroo
 
@@ -349,7 +351,7 @@ panaroo -i *.gff3 -o panaroo_results --clean-mode strict --alignment pan --align
 ------------------------------------------------------------------------------------------------
 
 ##########################################
-# Step XX : Alternate Pangenome Analysis #
+# Step 14.2 : Alternate Pangenome Analysis #
 ##########################################
 # Tool: Roary
 
@@ -359,12 +361,12 @@ conda create -n Roary
 conda install -c "bioconda/label/cf201901" roary
 
 #Navigate to gff folder (output of prokka) 
-sbatch -p shared  -t 0-4:00 --mem=20000 --wrap="roary -e --mafft -p 8 *.gff"
+sbatch -p shared  -t 0-4:00 --mem=20000 --wrap="roary -e --mafft -p 8 *.gff -f path/to/directory"
 
 -------------------------------------------------------------------------------------------------
 
 ##########################################
-# Step XX : Redefine COGS with CLARC     #
+# Step 14.3 : Redefine COGS with CLARC     #
 ##########################################
 # Tool: CLARC
 # Inputs: presence_abscence_csv (presence absence matrix for each COG for each sample used for pangenome analysis, direct output of Roary), pan_genome_reference.fa (representative COG sequences, direct output of Roary), needed_sample_names.txt (text files of samples needed (if pangenome was constructed using more samples than required for the analysis)  
@@ -396,7 +398,7 @@ sbatch -p shared -t 0-01:00 --mem=50000 --wrap="clarc --input_dir /n/holylfs05/L
 -------------------------------------------------------------------------------------------------
 
 ###############################
-# Step XX : Call Unitigs      #
+# Step 15 : Call Unitigs      #
 ###############################
 # Tool: unitig-counter
 
@@ -404,20 +406,20 @@ sbatch -p shared -t 0-01:00 --mem=50000 --wrap="clarc --input_dir /n/holylfs05/L
 source activate unitig-counter
 # conda install unitig-counter
 
-echo -e "ID\tPath" > strain_list.txt
-for i in *.fasta
-do
-  base=$(echo "$i" | cut -d '.' -f1)
-  echo -e "$base\t$i"
-done >> strain_list.txt
+# Prepare input file
+  for i in ${params.path_nextflow_dir}/5.ASSEMBLIES/*fasta
+  do
+  sample=\$(echo \$i | cut -d '/' -f9-9 | cut -d '.' -f1-1)
+  echo -e "\$sample\t\$i"
+  done > qfile.txt
 
-sbatch -p shared -c 8 -t 0-05:00 --mem=100000 --wrap="unitig-counter -strains strain_list.txt -output output -nb-cores 8"
-sbatch -p shared -c 8 -t 0-05:00 --mem=100000 --wrap="cdbg-ops extend --graph graph --unitigs unitigs.txt > extended.txt"
-
+  # Run Unitig
+  unitig-counter -strains qfile.txt -output ${params.path_nextflow_dir}/14.UNITIGS -nb-cores 8
+  cdbg-ops extend --graph ${params.path_nextflow_dir}/14.UNITIGS/graph --unitigs ${params.path_nextflow_dir}/14.UNITIGS/unitigs.txt > ${params.path_nextflow_dir}/14.UNITIGS/extended.txt
 
 ------------------------------------------------------------------------------------------------
 ############################################
-# Step 17.1.1 : SNP-Based GWAS  with RAxML #
+# Step 16.1.1 : SNP-Based GWAS  with RAxML #
 ############################################
 # Tool: pyseer
 # phenotypes is a file of presence absence (EOD vs LOD) for each isolate
@@ -446,7 +448,7 @@ pyseer --lmm --phenotypes phenotypes --vcf core.vcf --similarity phylogeny_K.tsv
 _________________________________________________________________________________________________
 
 ####################################################
-# Step 17.1.2 : SNP-Based GWAS with Mash Distances #
+# Step 16.1.2 : SNP-Based GWAS with Mash Distances #
 ####################################################
 
 # Tool: Pyseer
@@ -466,7 +468,7 @@ pyseer --phenotypes phenotypes --vcf core.vcf --distances mash.tsv > EOD_LOD_SNP
 ________________________________________________________________________________________________
 
 #######################################################
-# Step 17.1.3 : SNP-Based GWAS with SC classification # ***
+# Step 16.1.3 : SNP-Based GWAS with SC classification # ***
 #######################################################
 
 # Tool: Pyseer
@@ -501,7 +503,7 @@ pyseer --phenotypes phenotypes --vcf core.vcf --similarity sc_similarity_matrix.
 ------------------------------------------------------------------------------------------------
 
 ######################################
-# Step 17.2.1 : Pan GWAS  with RAxML #
+# Step 16.2.1 : Pan GWAS  with RAxML #
 ######################################
 
 # Tool: pyseer (installation as above)
@@ -518,7 +520,7 @@ pyseer --lmm --phenotypes phenotypes --pres gene_presence_absence.Rtab --similar
 ------------------------------------------------------------------------------------------------
 
 ##############################################
-# Step 17.2.2 : Pan GWAS with Mash distances #
+# Step 16.2.2 : Pan GWAS with Mash distances #
 ##############################################
 
 # Tool: pyseer (installation as above)
@@ -539,7 +541,7 @@ pyseer --lmm --phenotypes phenotypes --pres gene_presence_absence.Rtab --distanc
 ------------------------------------------------------------------------------------------------
 
 #################################################
-# Step 17.2.3 : Pan GWAS with SC Classification #
+# Step 16.2.3 : Pan GWAS with SC Classification #
 #################################################
 
 # Tool: pyseer (installation as above)
@@ -575,7 +577,7 @@ pyseer --lmm --phenotypes phenotypes --pres gene_presence_absence.Rtab --similar
 
 
 ###############################
-# Step 17.3.1 : DBGWAS with RAxML #
+# Step 16.3.1 : DBGWAS with RAxML #
 ###############################
 # Tool: pyseer (installation as above)
 # phenotypes is a file of presence absence (EOD vs LOD) for each isolate
@@ -593,7 +595,7 @@ ________________________________________________________________________________
 
 
 ############################################
-# Step 17.3.2 : DBGWAS with Mash Distances #
+# Step 16.3.2 : DBGWAS with Mash Distances #
 ############################################
 
 # Tool: pyseer (installation as above)
@@ -611,7 +613,7 @@ pyseer --lmm --phenotypes phenotypes --kmers /n/holylfs05/LABS/hanage_lab/Lab/hs
 __________________________________________________________________________________________________
 
 ###############################################
-# Step 17.3.3 : DBGWAS with SC Classification #
+# Step 16.3.3 : DBGWAS with SC Classification #
 ###############################################
 
 # Tool: pyseer (installation as above)
@@ -639,43 +641,4 @@ for sc in sc_data['SC'].unique():
 similarity_matrix.to_csv("sc_similarity_matrix.tsv", sep="\t")
 
 pyseer --lmm --phenotypes phenotypes --kmers /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.4.Unitig_counter/Unitig_counter/unitigs.txt --similarity sc_similarity_matrix.tsv --output-patterns unitig_patterns.txt --cpu 8 > phenotype_unitigs_mash.txt
-
-________________________________________________________________________________________________
-
-###############################
-# Step XX : Pan GWAS with MASH distance #
-###############################
-# Tool: Pyseer
-# phenotypes is a file of presence absence (EOD vs LOD) for each isolate
-# gene_presence_absence.Rtab directly from output of panaroo 
-
-# Move to the folder with cleaned assemblies
-#Create mash sketches
-mash sketch -s 10000 -o mash_sketch assemblies/*.fa
-
-#Calculate pairwise distance
-mash dist mash_sketch.msh mash_sketch.msh| square_mash > mash.tsv
-
-pyseer --lmm --phenotypes phenotypes --pres gene_presence_absence.Rtab --distances mash.tsv --save-m mash_mds --max-dimensions 8 > EOD_LOD_COGs_mash.txt
-
-------------------------------------------------------------------------------------------------
-
-###############################
-# Step XX : DBGWAS            #
-###############################
-# Tool: pyseer (installation as above)
-# phenotypes is a file of presence absence (EOD vs LOD) for each isolate
-# unitigs.txt directly from output of unitig-counter 
-
-pyseer --lmm --phenotypes phenotypes --kmers /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.4.Unitig_counter/Unitig_counter/unitigs.txt --similarity phylogeny_K.tsv --output-patterns unitig_patterns.txt --cpu 8 > phenotype_unitigs.txt
-
-
-
-
-
-
-
-
-
-
 
