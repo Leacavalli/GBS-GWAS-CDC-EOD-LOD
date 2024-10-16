@@ -27,4 +27,10 @@ write.table(phenotypes, "phenotypes.txt",
             quote = F, 
             sep = '\t')
 
+# Write SraAccList file 
+write.table(phenotypes |> select(SRA), "SraAccList.txt", 
+            row.names = F, 
+            col.names = F, 
+            quote = F, 
+            sep = '\t')
 
