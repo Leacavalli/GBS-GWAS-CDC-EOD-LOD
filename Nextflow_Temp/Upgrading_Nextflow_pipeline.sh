@@ -21,13 +21,18 @@ sbatch -p test -c 112 -t 0-12:00 --mem=990000 --wrap="nextflow -C nextflow.confi
 module load python
 source activate java
 sbatch -p test -c 112 -t 0-12:00 --mem=990000 --wrap="nextflow -C nextflow.config run Test.nf --main --sub1 --sub2 --path_nextflow_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade_500 --path_conda_envs /n/home02/lcavalli/.conda/envs"
-
+sbatch -p test -c 112 -t 0-12:00 --mem=990000 --wrap="nextflow -C nextflow.config run Test2.nf --main --Fasttree --sub2 --path_nextflow_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade_500 --path_conda_envs /n/home02/lcavalli/.conda/envs"
+sbatch -p sapphire -c 112 -t 3-00:00 --mem=990000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline_FINAL.nf --main --sub1 --sub2 --path_nextflow_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade_500_TEST --path_conda_envs /n/home02/lcavalli/.conda/envs"
+sbatch -p intermediate -c 112 -t 6-00:00 --mem=990000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline_FINAL.nf --main  --sub1 --sub2 --path_nextflow_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade_500_TEST2 --path_conda_envs /n/home02/lcavalli/.conda/envs"
 
 module load python
 source activate java
 sbatch -p test -c 112 -t 0-12:00 --mem=990000 --wrap="nextflow -C nextflow.config run Test.nf --path_nextflow_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_test --path_conda_envs /n/home02/lcavalli/.conda/envs"
 
-sbatch -p test -c 112 -t 0-12:00 --mem=200000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline_FINAL.nf --path_nextflow_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade_56 --path_conda_envs /n/home02/lcavalli/.conda/envs"
+sbatch -p sapphire -c 112 -t 3-00:00 --mem=990000 --wrap="nextflow -C nextflow.config run Test.nf --path_nextflow_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade_56 --path_conda_envs /n/home02/lcavalli/.conda/envs"
+
+
+Nextflow_pipeline_FINAL.nf
 
 grep -v "^SRR9083146\s" /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_test/Files/phenotypes_filtered.txt > /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_test/Files/phenotypes_filtered.tmp
 
@@ -129,3 +134,35 @@ sbatch -p shared -c 50 -t 0-01:00 --mem=10000 --wrap="/n/holyscratch01/hanage_la
 
 SNIPPY_DIRS=$(find /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade_56/4.SNIPPY -maxdepth 1 -type d ! -name "Outgroup")
 sbatch -p shared -c 1 -t 0-01:00 --mem=10000 --wrap="snippy-core --ref /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade_56/Files/AP018935.1.fa $SNIPPY_DIRS"
+
+for i in 5.ASSEMBLY/*bam
+do
+sample=$(echo $i | cut -d '/' -f2-2 | cut -d '.' -f1-1)
+mv 0.RAW_READS/$sample\-r{1,2}.fq.gz 0.RAW_READS/DONE/
+done
+
+for i in *_coverage.txt
+do
+sample=$(echo $i | cut -d '_' -f1-1)
+mv ../5.ASSEMBLY/$sample*bam ../5.ASSEMBLY/DONE
+done
+
+
+for i in *.fa.gz
+do
+sbatch -p shared -t 0-02:00 --mem=100000 --wrap="gunzip $i"
+done
+
+for i in *.fa
+do
+  base=$(echo $i | cut -d '.' -f1-1)
+  sed -i "s/NC_045512.2/$base/g" $i
+  mv $i DONE
+done
+
+
+
+for i in *fa.gz
+do
+
+done
