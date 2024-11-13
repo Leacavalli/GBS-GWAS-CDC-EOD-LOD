@@ -1,0 +1,111 @@
+---
+title: "GBS_GWAS_Figures"
+output: html_document
+date: "2024-11-06"
+---
+
+```{r}
+library(qqman)
+library(circilize)
+library(VennDiagram)
+
+```
+
+```{r}
+data <- read.table("SNPGWAS_Fasttree.plot", sep = "\t")
+colnames(data) <- c("CHR", "SNP","BP","minLOG10(P)","log10(p)","r^2")
+data$CHR <- 1
+
+manhattan(
+  data,
+  chr = "CHR",
+  bp = "BP",
+  p = "minLOG10(P)",  # Use the column with -log10(p-values)
+  snp = "SNP",
+  main = "Manhattan Plot of SNP GWAS FastTree",
+  col = c("skyblue", "orange"),  # Customize colors as desired
+  genomewideline = -log10(5e-8),  # Set a genome-wide significance line if desired
+  suggestiveline = -log10(1e-5)   # Set a suggestive significance line if needed
+)
+```
+
+```{r}
+data <- read.table("SNPGWAS_mash.plot", sep = "\t")
+colnames(data) <- c("CHR", "SNP","BP","minLOG10(P)","log10(p)","r^2")
+data$CHR <- 1
+data <- data[is.finite(data$`minLOG10(P)`) & is.finite(data$`log10(p)`), ]
+
+manhattan(
+  data,
+  chr = "CHR",
+  bp = "BP",
+  p = "minLOG10(P)",  # Use the column with -log10(p-values)
+  snp = "SNP",
+  main = "Manhattan Plot of SNP GWAS Mash",
+  col = c("skyblue", "orange"),  # Customize colors as desired
+  genomewideline = -log10(5e-8),  # Set a genome-wide significance line if desired
+  suggestiveline = -log10(1e-5)   # Set a suggestive significance line if needed
+)
+```
+
+
+```{r}
+data <- read.table("SNPGWAS_SC.plot", sep = "\t")
+colnames(data) <- c("CHR", "SNP","BP","minLOG10(P)","log10(p)","r^2")
+data$CHR <- 1
+
+manhattan(
+  data,
+  chr = "CHR",
+  bp = "BP",
+  p = "minLOG10(P)",  # Use the column with -log10(p-values)
+  snp = "SNP",
+  main = "Manhattan Plot of SNP GWAS SC",
+  col = c("skyblue", "orange"),  # Customize colors as desired
+  genomewideline = -log10(5e-8),  # Set a genome-wide significance line if desired
+  suggestiveline = -log10(1e-5)   # Set a suggestive significance line if needed
+)
+```
+
+Significant snps comparison 
+
+```{r}
+
+fast <- read.table("SNPGWAS_Fasttree.txt", header = TRUE, fill = TRUE)
+mash <- read.table("SNPGWAS_mash.txt", header = TRUE, fill = TRUE)
+sc <- read.table("SNPGWAS_SC.txt", header = TRUE, fill = TRUE)
+
+threshold <- 0.05/nrow(sc) 
+
+significant_snps_fast <- fast[fast$lrt.pvalue < threshold, ]
+significant_snps_mash <- mash[mash$lrt.pvalue < threshold, ]
+significant_snps_sc <- sc[sc$lrt.pvalue < threshold, ]
+
+set1 <- unique(significant_snps_fast$variant)
+set2 <- unique(significant_snps_mash$variant)
+set3 <- unique(significant_snps_sc$variant)
+
+venn_data <- calculate.overlap(x = list(set1 = set1, set2 = set2, set3 = set3))
+
+
+links <- data.frame(
+  from = c("Set1", "Set1", "Set2"),
+  to = c("Set2", "Set3", "Set3"),
+  value = c(length(intersect(set1, set2)), 
+            length(intersect(set1, set3)), 
+            length(intersect(set2, set3)))
+)
+
+circos.par(gap.after = c(rep(5, length(links$from) - 1), 15))
+chordDiagram(
+  links,
+  transparency = 0.5,
+  annotationTrack = "grid",
+  preAllocateTracks = list(track.height = 0.05),
+  grid.col = c(Set1 = "skyblue", Set2 = "orange", Set3 = "green")
+)
+circos.clear()
+```
+
+
+
