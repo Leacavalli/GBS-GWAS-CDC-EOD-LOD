@@ -1,0 +1,682 @@
+---
+title: "Sub-Analysis-2"
+output: html_document
+date: "2024-11-08"
+---
+
+# 0. Prepare environment and Load data 
+```{r}
+# Clean environment
+rm( list = ls() )
+
+# load necessary libraries
+library(tidyverse)
+library(ggplot2)
+library(khroma)
+library(ggrepel)
+
+# load Pangenome Analysis Output data 
+## Panaroo
+gene_presence_absence_Panaroo <- read.csv("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Preliminary Analysis/Lea Figures/Data/500_Samples/13.Pangenome_analysis/13.1.Panaroo/gene_presence_absence.csv")
+## Roary
+gene_presence_absence_Roary <- read.csv("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Preliminary Analysis/Lea Figures/Data/500_Samples/13.Pangenome_analysis/13.2.ROARY/gene_presence_absence.csv")
+## Panaroo + Clarc
+gene_presence_absence_Panaroo_Clarc <- read.csv("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Preliminary Analysis/Lea Figures/Data/500_Samples/13.Pangenome_analysis/13.3.Panaroo_CLARC/clarc_condensed_presence_absence.csv")
+## Roary + Clarc
+gene_presence_absence_Roary_Clarc <- read.csv("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Preliminary Analysis/Lea Figures/Data/500_Samples/13.Pangenome_analysis/13.4.ROARY_CLARC/clarc_condensed_presence_absence.csv")
+
+# load Pyseer Output data 
+## Panaroo
+PanGWAS_Panaroo <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Preliminary Analysis/Lea Figures/Data/500_Samples/15.2.Subanalysis_1/16.2.1.Fasttree/PanGWAS_Panaroo_phylo_Fasttree.txt")
+## Roary
+PanGWAS_Roary <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Preliminary Analysis/Lea Figures/Data/500_Samples/15.3.Subanalysis_2/PanGWAS_Roary_Fasttree.txt")
+## Panaroo + Clarc
+PanGWAS_Panaroo_Clarc <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Preliminary Analysis/Lea Figures/Data/500_Samples/15.3.Subanalysis_2/PanGWAS_Panaroo_CLARC_Fasttree.txt")
+## Roary + Clarc
+PanGWAS_Roary_Clarc <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Preliminary Analysis/Lea Figures/Data/500_Samples/15.3.Subanalysis_2/PanGWAS_Roary_CLARC_Fasttree.txt")
+```
+
+# 1. Compare pangenome tool outputs
+## 1.0. Prepare data
+```{r}
+# Format data
+## Panaroo
+gene_presence_absence_Panaroo_V1 <- gene_presence_absence_Panaroo|>
+  select(Gene, contains("SRR"))|> 
+  mutate(across(contains("SRR"), ~ ifelse(. == "", "0", "1")))|>
+  mutate(af = rowSums(across(contains("SRR")) == "1") / ncol(gene_presence_absence_Panaroo|>select(contains("SRR")))) |>
+  mutate(Category= ifelse(af<0.95, "accessory", "core"))
+gene_presence_absence_Panaroo_V2 <- gene_presence_absence_Panaroo_V1|> filter(af>=0.05)
+gene_presence_absence_Panaroo_Accessory <- gene_presence_absence_Panaroo_V2|>
+  filter(Category =="accessory")
+gene_presence_absence_Panaroo_Core <- gene_presence_absence_Panaroo_V2|>
+  filter(Category =="core")
+## Roary
+gene_presence_absence_Roary_V1 <- gene_presence_absence_Roary|>
+  select(Gene, contains("SRR"))|> 
+  mutate(across(contains("SRR"), ~ ifelse(. == "", "0", "1")))|>
+  mutate(af = rowSums(across(contains("SRR")) == "1") / ncol(gene_presence_absence_Roary|>select(contains("SRR"))))  |>
+  mutate(Category= ifelse(af<0.95, "accessory", "core"))
+gene_presence_absence_Roary_V2 <- gene_presence_absence_Roary_V1 |> filter(af>=0.05)
+gene_presence_absence_Roary_Accessory <- gene_presence_absence_Roary_V2|>
+  filter(Category =="accessory")
+gene_presence_absence_Roary_Core <- gene_presence_absence_Roary_V2|>
+  filter(Category =="core")
+## Panaroo + CLARC
+gene_presence_absence_Panaroo_Clarc_V2 <- as.data.frame(t(gene_presence_absence_Panaroo_Clarc))
+colnames(gene_presence_absence_Panaroo_Clarc_V2) <- gene_presence_absence_Panaroo_Clarc_V2[1, ]
+gene_presence_absence_Panaroo_Clarc_V2 <- gene_presence_absence_Panaroo_Clarc_V2[-1,]
+gene_presence_absence_Panaroo_Clarc_V2 <-gene_presence_absence_Panaroo_Clarc_V2 |>
+  mutate(Gene = row.names(gene_presence_absence_Panaroo_Clarc_V2))|>
+  select(Gene, everything())
+row.names(gene_presence_absence_Panaroo_Clarc_V2) <- NULL
+gene_presence_absence_Panaroo_Clarc_V1 <- gene_presence_absence_Panaroo_Clarc_V2|>
+  mutate(af = rowSums(across(contains("SRR")) == "1") / ncol(gene_presence_absence_Panaroo_Clarc_V2|>select(contains("SRR")))) |>
+  mutate(Category= ifelse(af<0.95, "accessory", "core"))
+gene_presence_absence_Panaroo_Clarc_V2 <- gene_presence_absence_Panaroo_Clarc_V1 |> filter(af>=0.05)
+gene_presence_absence_Panaroo_Clarc_Accessory <- gene_presence_absence_Panaroo_Clarc_V2|>
+  filter(Category =="accessory")
+gene_presence_absence_Panaroo_Clarc_Core <- gene_presence_absence_Panaroo_Clarc_V2|>
+  filter(Category =="core")
+## Roary + CLARC
+gene_presence_absence_Roary_Clarc_V2 <- as.data.frame(t(gene_presence_absence_Roary_Clarc))
+colnames(gene_presence_absence_Roary_Clarc_V2) <- gene_presence_absence_Roary_Clarc_V2[1, ]
+gene_presence_absence_Roary_Clarc_V2 <- gene_presence_absence_Roary_Clarc_V2[-1,]
+gene_presence_absence_Roary_Clarc_V2 <-gene_presence_absence_Roary_Clarc_V2 |>
+  mutate(Gene = row.names(gene_presence_absence_Roary_Clarc_V2))|>
+  select(Gene, everything())
+row.names(gene_presence_absence_Roary_Clarc_V2) <- NULL
+gene_presence_absence_Roary_Clarc_V1 <- gene_presence_absence_Roary_Clarc_V2|>
+  mutate(af = rowSums(across(contains("SRR")) == "1") / ncol(gene_presence_absence_Roary_Clarc_V2|>select(contains("SRR")))) |>
+  mutate(Category= ifelse(af<0.95, "accessory", "core"))
+gene_presence_absence_Roary_Clarc_V2 <- gene_presence_absence_Roary_Clarc_V1 |> filter(af>=0.05)
+gene_presence_absence_Roary_Clarc_Accessory <- gene_presence_absence_Roary_Clarc_V2|>
+  filter(Category =="accessory")
+gene_presence_absence_Roary_Clarc_Core <- gene_presence_absence_Roary_Clarc_V2|>
+  filter(Category =="core")
+# # Check that there is the sample number of samples across outputs of each tools
+# ncol(gene_presence_absence_Panaroo_V2)
+# ncol(gene_presence_absence_Roary_V2)
+# ncol(gene_presence_absence_Panaroo_Clarc_V2)
+# ncol(gene_presence_absence_Roary_Clarc_V2)
+gene_presence_absence_Panaroo_V2 <- gene_presence_absence_Panaroo_V2 |>  select(colnames(gene_presence_absence_Panaroo_Clarc_V2))
+gene_presence_absence_Roary_V2 <- gene_presence_absence_Roary_V2 |>  select(colnames(gene_presence_absence_Roary_Clarc_V2))
+
+# Join dataframes
+gene_presence_absence_All_Tools <-rbind(gene_presence_absence_Panaroo_V2 |> mutate(Tool = "Panaroo"),
+      gene_presence_absence_Roary_V2 |> mutate(Tool = "Roary"),
+      gene_presence_absence_Panaroo_Clarc_V2 |> mutate(Tool = "Panaroo + CLARC"),
+      gene_presence_absence_Roary_Clarc_V2 |> mutate(Tool = "Roary + CLARC"))
+```
+## 1.1. Plot Accessory and core gene counts across Tools
+```{r}
+# Accessory + Core
+gene_presence_absence_All_Tools |>
+  mutate(Category= factor(Category, levels= c("core", "accessory")))|>
+  group_by(Category, Tool) |>
+  summarise(N=n())|>
+  ggplot(aes(x = Tool, y = N, fill = Tool)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_wrap(Category~., dir = "v")+
+  labs(x = "Tool", y = "Count (N)", title = "Accessory and Core Gene Counts by Tool") +
+  theme_bw() +
+  ylim(0, 2000)+
+  scale_fill_manual(values = c("indianred4", "darkolivegreen", "lightgoldenrod", "darkslategrey"))+
+  theme(legend.position = "none") +
+  geom_text(aes(label = paste0("n=",N)), vjust = -0.5, color = "black", size = 4) 
+
+# # Accessory
+# gene_presence_absence_All_Tools |>
+#   filter(Category =="accessory")|>
+#   group_by(Tool) |>
+#   summarise(N=n())|>
+#   ggplot(aes(x = Tool, y = N, fill = Tool)) +
+#   geom_bar(stat = "identity", position = "dodge") +
+#   labs(x = "Tool", y = "Count (N)", title = "Accessory Gene Counts by Tool and Category") +
+#   theme_bw() +
+#   scale_fill_manual(values = color("light")(6))+
+#   theme(legend.position = "none") +
+#   geom_text(aes(label = paste0("n=",N)), vjust = -0.5, color = "black", size = 4) 
+# 
+# # core
+# gene_presence_absence_All_Tools |>
+#   filter(Category =="core")|>
+#   group_by(Tool) |>
+#   summarise(N=n())|>
+#   ggplot(aes(x = Tool, y = N, fill = Tool)) +
+#   geom_bar(stat = "identity", position = "dodge") +
+#   labs(x = "Tool", y = "Count (N)", title = "Core Gene Counts by Tool and Category") +
+#   theme_bw() +
+#   scale_fill_manual(values = color("light")(6))+
+#   theme(legend.position = "none") +
+#   geom_text(aes(label = paste0("n=",N)), vjust = -0.5, color = "black", size = 4) 
+```
+## 1.2. Compare Panaroo and Roary Outputs
+## 1.2.1. Plot Gene overlap between Panaroo and Roary
+```{r}
+library(circlize)
+df <- data.frame(from = c("Panaroo Core", "Panaroo Core", "Panaroo Core", "Panaroo Accessory", "Panaroo Accessory", "Panaroo Accessory", "No Panaroo" , "No Panaroo"),
+           to = c("Roary Core", "Roary Accessory", "No Roary", "Roary Core", "Roary Accessory", "No Roary",  "Roary Core", "Roary Accessory"),
+           value = c(nrow(gene_presence_absence_Panaroo_Core |> filter(Gene %in% gene_presence_absence_Roary_Core$Gene)),
+                     nrow(gene_presence_absence_Panaroo_Core |> filter(Gene %in% gene_presence_absence_Roary_Accessory$Gene)),
+                     nrow(gene_presence_absence_Panaroo_Core |> filter(! Gene %in% gene_presence_absence_Roary_V2$Gene)),
+                     nrow(gene_presence_absence_Panaroo_Accessory |> filter(Gene %in% gene_presence_absence_Roary_Core$Gene)),
+                     nrow(gene_presence_absence_Panaroo_Accessory |> filter(Gene %in% gene_presence_absence_Roary_Accessory$Gene)),
+                     nrow(gene_presence_absence_Panaroo_Accessory |> filter(! Gene %in% gene_presence_absence_Roary_V2$Gene)),
+                     nrow(gene_presence_absence_Roary_Core |> filter(Gene %in% gene_presence_absence_Panaroo_V2$Gene)),
+                     nrow(gene_presence_absence_Roary_Accessory |> filter(! Gene %in% gene_presence_absence_Panaroo_V2$Gene))))
+
+grid.col = c("Panaroo Core" = "indianred4", "Panaroo Accessory" = "indianred", "Roary Core" = "lightgoldenrod3","Roary Accessory" = "lightgoldenrod",
+    "No Panaroo" =  "#00000000", "No Roary" =  "#00000000")
+
+col_mat = c("steelblue4", "indianred4", "#00000000",  "indianred",  "lightsteelblue4", "#00000000", "#00000000","#00000000")
+
+circos.par(start.degree = -20, clock.wise = T)
+chordDiagram(
+  df, 
+  grid.col = grid.col, 
+  col = col_mat,  
+  annotationTrack =  c("grid"),
+    preAllocateTracks = list(
+        track.height = mm_h(6),
+        track.margin = c( mm_h(1), 0)))
+names <- c("Core", "Accessory", "", "Core", "Accessory", "")
+# Add sector labels with customized text position and styling
+i <- 0
+for(si in get.all.sector.index()) {
+  i= i+1
+    xlim = get.cell.meta.data("xlim", sector.index = si, track.index = 1)
+    ylim = get.cell.meta.data("ylim", sector.index = si, track.index = 1)
+    circos.text(mean(xlim), mean(ylim), names[i], sector.index = si, track.index = 2, 
+      facing = "bending.inside", niceFacing = TRUE, col = "black", cex = 0.8)
+}
+highlight.sector(c("Roary Core" , "Roary Accessory" ), track.index = 1, col = "lemonchiffon", 
+    text = "Roary", cex = 1, text.col = "black", niceFacing = TRUE)
+highlight.sector(c("Panaroo Core" , "Panaroo Accessory" ), track.index = 1, col = "indianred4", 
+    text = "Panaroo", cex = 1, text.col = "white", niceFacing = TRUE)
+circos.clear()
+```
+
+## 1.2.2. Plot the AF of Genes that overlap between Panaroo and Roary
+```{r}
+# prepare data
+Roary_Panaroo_Shared_df <- left_join(gene_presence_absence_Roary_V1|>
+  filter(Gene %in% gene_presence_absence_Panaroo_V1$Gene)|>
+  select(Gene, af)|>
+  rename("Roary_af"="af"),
+  gene_presence_absence_Panaroo_V1 |>
+  select(Gene, af)|>
+  rename("Panaroo_af"="af")) |>
+  mutate(Category= ifelse(Roary_af >= 0.95, 
+                          ifelse(Panaroo_af >= 0.95, "Core Both", "Roary Core"), 
+                          ifelse(Panaroo_af >= 0.95, "Panaroo Core", 
+                                 ifelse(Roary_af < 0.05, 
+                                        ifelse(Panaroo_af < 0.05, "Exclude Both", "Panaroo Accessory"), 
+                                        ifelse(Panaroo_af < 0.05, "Roary Accessory", "Accessory Both")))))|>
+  mutate(Category= factor(Category, levels= c("Core Both", "Roary Core", "Panaroo Core", "Accessory Both", "Roary Accessory", "Panaroo Accessory", "Exclude Both")))
+
+# Plot
+Roary_Panaroo_Shared_df|>
+  ggplot()+
+  geom_point(aes(x=Panaroo_af, y= Roary_af, color = Category))+
+  geom_abline(intercept = 0, slope = 1, color = "grey", linetype = "dashed", size = 1)+
+  theme_classic()+
+  ylab("Roary MAF")+
+  xlab("Panaroo MAF")+
+  ggtitle("MAF of Genes overlapping between Panaroo and Roary")+
+  scale_color_manual(values = c("steelblue4", "lightgoldenrod3", "indianred4", "lightsteelblue4", "lightgoldenrod", "indianred", "grey80"))
+  
+```
+
+
+## 1.3. PLOT AF change among accessory genes refined by CLARC
+### 1.3.1. Panaroo vs Panaroo + CLARC
+```{r}
+# PLOT AF among accessory genes that are NOT re-defined by CLARC
+Panaroo_CLARC_SAME_COGS_df <- left_join(gene_presence_absence_Panaroo_Clarc_Accessory |>
+  mutate(Gene = str_replace_all(Gene, "\\.\\.\\.", "~~~")) |>
+  filter(Gene %in% gene_presence_absence_Panaroo_Accessory$Gene)|>
+  select(Gene, af)|>
+  rename("Panaroo_CLARC_af"="af"),
+  gene_presence_absence_Panaroo_Accessory |>
+  select(Gene, af)|>
+  rename("Panaroo_af"="af"))
+Panaroo_CLARC_SAME_COGS_df|>
+  ggplot()+
+  geom_point(aes(x=Panaroo_af, y= Panaroo_CLARC_af))+
+  theme_classic()+
+  xlab("Panaroo MAF")+
+  ylab("Panaroo + CLARC MAF")
+
+# PLOT AF change from CLARC among accessory genes
+Panaroo_CLARC_reassign_COGS_df <- gene_presence_absence_Panaroo_Clarc_Accessory |>
+  mutate(Gene = str_replace_all(Gene, "\\.\\.\\.", "~~~")) |>
+  filter(! Gene %in% gene_presence_absence_Panaroo_Accessory$Gene)|>
+  select(Gene, af) |> 
+  rename("ID"="Gene")|>
+  mutate(Gene= NA )
+Panaroo_CLARC_reassign_COGS_df <- Panaroo_CLARC_reassign_COGS_df|>
+  mutate(Cluster= as.factor(1:nrow(Panaroo_CLARC_reassign_COGS_df)))
+
+Reassigned_IDs_split <- Panaroo_CLARC_reassign_COGS_df |>
+  separate_rows(ID, sep="\\.")|>
+  pull(ID)
+
+Panaroo_reassign_COGS_df <- left_join(
+gene_presence_absence_Panaroo_Accessory |>
+  mutate(Gene = str_replace_all(Gene, "~~~", "..."))|>
+  filter(! Gene %in% gene_presence_absence_Panaroo_Clarc_Accessory$Gene)|>
+  select(Gene, af)|>
+  mutate(Reassigned_Category = ifelse(Gene %in% Reassigned_IDs_split, "accessory", "core")), Panaroo_CLARC_reassign_COGS_df |>
+  mutate(Original_ID = ID) |>   
+  separate_rows(ID, sep = "\\.")|>
+  select(Original_ID, ID, Cluster)|>
+  rename("Gene"="ID", "ID" = "Original_ID")|>
+  filter(Gene != "")) 
+
+p_df_Panaroo <- rbind(Panaroo_reassign_COGS_df  |> mutate(Type = "Original Panaroo COG"), 
+      Panaroo_CLARC_reassign_COGS_df |> mutate(Type = "CLARC re-defined", Reassigned_Category = "accessory"))
+
+p_df_Panaroo |>
+  filter(Reassigned_Category == "accessory") |>
+  ggplot() +
+  geom_point(aes(x = Cluster, y = af, color = Type)) +
+  geom_text_repel(aes(x = Cluster, y = af, label = Gene), 
+                  size = 2.5, color = "black", 
+                  box.padding = 0.3,  # Adjust padding around labels
+                  point.padding = 0.2, # Adjust padding around points
+                  segment.size = 0.2,  # Line size between point and label
+                  max.overlaps = 10) + # Limits maximum label overlap
+  ylab("Minor Allele Frequency (MAF)") +
+  xlab("COG Cluster") +
+  theme_bw() +
+  scale_color_manual(values = color("light")(6)) +
+  ylim(0, 1)
+
+# Which COGs are redefined by CLARC as core ?
+Panaroo_reassign_COGS_df |> arrange(Reassigned_Category, Cluster)
+```
+### 1.3.2 Roary vs Roary + CLARC
+```{r}
+# PLOT AF among accessory genes that are NOT re-defined by CLARC
+Roary_CLARC_SAME_COGS_df <- left_join(gene_presence_absence_Roary_Clarc_Accessory |>
+  mutate(Gene = str_replace_all(Gene, "\\.\\.\\.", "~~~")) |>
+  filter(Gene %in% gene_presence_absence_Roary_Accessory$Gene)|>
+  select(Gene, af)|>
+  rename("Roary_CLARC_af"="af"),
+  gene_presence_absence_Roary_Accessory |>
+  select(Gene, af)|>
+  rename("Roary_af"="af"))
+Roary_CLARC_SAME_COGS_df|>
+  ggplot()+
+  geom_point(aes(x=Roary_af, y= Roary_CLARC_af))+
+  theme_classic()+
+  xlab("Roary MAF")+
+  ylab("Roary + CLARC MAF")
+
+# PLOT AF change from CLARC among accessory genes
+Roary_CLARC_reassign_COGS_df <- gene_presence_absence_Roary_Clarc_Accessory  |>
+  filter(! Gene %in% (gene_presence_absence_Roary_Accessory |> mutate(Gene = str_replace_all(Gene, "-", ".")) |> mutate(Gene = str_replace_all(Gene, "\\(", ".")) |> mutate(Gene = str_replace_all(Gene, "\\)", ".")) |> pull(Gene)))|>
+  select(Gene, af) |> 
+  rename("ID"="Gene")|>
+  mutate(Gene= NA )
+Roary_CLARC_reassign_COGS_df <- Roary_CLARC_reassign_COGS_df|>
+  mutate(Cluster= as.factor(1:nrow(Roary_CLARC_reassign_COGS_df)))
+
+Reassigned_IDs_split <- Roary_CLARC_reassign_COGS_df |>
+  separate_rows(ID, sep="\\.")|>
+  pull(ID)
+
+Roary_reassign_COGS_df <- left_join(
+gene_presence_absence_Roary_Accessory |>
+  filter(! Gene %in% gene_presence_absence_Roary_Clarc_Accessory$Gene)|>
+  select(Gene, af)|>
+  mutate(Reassigned_Category = ifelse(Gene %in% Reassigned_IDs_split, "accessory", "core")), Roary_CLARC_reassign_COGS_df |>
+  mutate(Original_ID = ID) |>   
+  separate_rows(ID, sep = "\\.")|>
+  select(Original_ID, ID, Cluster)|>
+  rename("Gene"="ID", "ID" = "Original_ID")|>
+  filter(Gene != "")) 
+
+p_df_Roary <- rbind(Roary_reassign_COGS_df  |> mutate(Type = "Original Roary COG"), 
+      Roary_CLARC_reassign_COGS_df |> mutate(Type = "CLARC re-defined", Reassigned_Category = "accessory"))
+
+p_df_Roary |>
+  filter(Reassigned_Category == "accessory") |>
+  ggplot() +
+  geom_point(aes(x = Cluster, y = af, color = Type)) +
+  geom_text_repel(aes(x = Cluster, y = af, label = Gene), 
+                  size = 2.5, color = "black", 
+                  box.padding = 0.3,  # Adjust padding around labels
+                  point.padding = 0.2, # Adjust padding around points
+                  segment.size = 0.2,  # Line size between point and label
+                  max.overlaps = 10) + # Limits maximum label overlap
+  ylab("Minor Allele Frequency (MAF)") +
+  xlab("COG Cluster") +
+  theme_bw() +
+  scale_color_manual(values = color("light")(6)) +
+  ylim(0, 1)
+
+# Which COGs are redefined by CLARC as core ?
+Roary_reassign_COGS_df |> arrange(Reassigned_Category, Cluster)
+Roary_reassign_COGS_df |> filter( Reassigned_Category == "accessory")
+```
+
+
+
+# 2. Compare Pan-GWAS results
+## 2.0. Prepare data
+```{r}
+# Add significance column, with bonferonni correction for multiple testing
+PanGWAS_Panaroo <- PanGWAS_Panaroo |> 
+  mutate(significance = ifelse(lrt.pvalue < 0.05/nrow(PanGWAS_Panaroo), "significant", "not significant"))|>
+  mutate(PanGWAS_Roary = factor(significance, levels= c("significant", "not significant"))) |>
+  filter(af>=0.05)
+PanGWAS_Roary <- PanGWAS_Roary  |> 
+  mutate(significance = ifelse(lrt.pvalue < 0.05/nrow(PanGWAS_Roary), "significant", "not significant"))|> 
+  mutate(significance = factor(significance, levels= c("significant", "not significant")))
+PanGWAS_Panaroo_Clarc <- PanGWAS_Panaroo_Clarc |> 
+  mutate(significance = ifelse(lrt.pvalue < 0.05/nrow(PanGWAS_Panaroo_Clarc), "significant", "not significant"))|> 
+  mutate(significance = factor(significance, levels= c("significant", "not significant")))
+PanGWAS_Roary_Clarc <- PanGWAS_Roary_Clarc |> 
+  mutate(significance = ifelse(lrt.pvalue < 0.05/nrow(PanGWAS_Roary_Clarc), "significant", "not significant"))|> 
+  mutate(significance = factor(significance, levels= c("significant", "not significant")))
+```
+## 2.1. Compare Panaroo and Roary
+```{r}
+## prepare data
+PanGWAS_Panaroo_Shared <- PanGWAS_Panaroo[which(PanGWAS_Panaroo$variant %in% PanGWAS_Roary$variant),]
+PanGWAS_Roary_Shared <- PanGWAS_Roary[which(PanGWAS_Roary$variant %in% PanGWAS_Panaroo$variant),]
+colnames(PanGWAS_Panaroo_Shared) <- c("variant", paste0("Panaroo_",colnames(PanGWAS_Panaroo_Shared)[-1]))
+colnames(PanGWAS_Roary_Shared) <- c("variant", paste0("Roary_",colnames(PanGWAS_Roary_Shared)[-1]))
+PanGWAS_Panaroo_Roary_Shared <- left_join(PanGWAS_Panaroo_Shared, PanGWAS_Roary_Shared)
+nrow(PanGWAS_Panaroo_Roary_Shared)
+## Plot
+### unADJUSTED P-VALUE
+
+cor_test <- cor.test(PanGWAS_Panaroo_Roary_Shared$Roary_filter.pvalue, 
+                     PanGWAS_Panaroo_Roary_Shared$Panaroo_filter.pvalue, 
+                     method = "pearson")
+cor_coef <- cor_test$estimate
+p_value <- cor_test$p.value
+PanGWAS_Panaroo_Roary_Shared |>
+  ggplot()+
+  geom_point(aes(x=Roary_filter.pvalue, y= Panaroo_filter.pvalue))+
+  geom_abline(intercept = 0, slope = 1, color = "grey", linetype = "dashed", size = 1)+
+  geom_hline(yintercept = 0.05/nrow(PanGWAS_Roary), color = "red", linetype = "dashed", size = 1)+
+  geom_vline(xintercept= 0.05/nrow(PanGWAS_Panaroo), color = "red", linetype = "dashed", size = 1)+
+  theme_classic()+
+  xlab("Roary unadjusted p-value")+
+  ylab("Panaroo unadjusted p-value")+
+  annotate(
+    "text",
+    x = 0.9, y = 1, # Adjust position as needed
+    label = paste0("r = ", round(cor_coef, 2), 
+                   "\nP = ", format.pval(p_value, digits = 2)),
+    color = "red",
+    size = 5
+  )+
+  ggtitle("Unadjusted p-value of Genes overlapping between Panaroo and Roary")
+
+### ADJUSTED P-VALUE
+cor_test2 <- cor.test(PanGWAS_Panaroo_Roary_Shared$Roary_lrt.pvalue, 
+                     PanGWAS_Panaroo_Roary_Shared$Panaroo_lrt.pvalue, 
+                     method = "pearson")
+cor_coef2 <- cor_test2$estimate
+p_value2 <- cor_test2$p.value
+PanGWAS_Panaroo_Roary_Shared |>
+  ggplot()+
+  geom_point(aes(x=Roary_lrt.pvalue, y= Panaroo_lrt.pvalue))+
+  geom_abline(intercept = 0, slope = 1, color = "blue", linetype = "dashed", size = 1)+
+  geom_hline(yintercept = 0.05/nrow(PanGWAS_Roary), color = "red", linetype = "dashed", size = 1)+
+  geom_vline(xintercept= 0.05/nrow(PanGWAS_Panaroo), color = "red", linetype = "dashed", size = 1)+
+  theme_classic()+
+  xlab("Roary unadjusted p-value")+
+  ylab("Panaroo unadjusted p-value")+
+  annotate( "text",
+    x = 0.9, y = 1, # Adjust position as needed
+    label = paste0("r = ", round(cor_coef2, 2), 
+                   "\nP = ", format.pval(p_value2, digits = 2)),
+    color = "red",
+    size = 5)+
+  ggtitle("Adjusted p-value of Genes overlapping between Panaroo and Roary")
+```
+## 2.2. Compare Panaroo and Panaroo+CLARC
+### 2.2.1. Compare shared genes
+```{r}
+## prepare data
+PanGWAS_Panaroo_Clarc_Shared_df <- left_join(PanGWAS_Panaroo |>
+  filter(variant %in% PanGWAS_Panaroo_Clarc$variant)|>
+  select(variant, filter.pvalue, lrt.pvalue)|>
+  rename("Panaroo_Clarc_lrt.pvalue"="lrt.pvalue")|>
+  rename("Panaroo_Clarc_filter.pvalue"="filter.pvalue"),
+  PanGWAS_Panaroo_Clarc |>
+  select(variant, filter.pvalue, lrt.pvalue)|>
+  rename("Panaroo_lrt.pvalue"="lrt.pvalue")|>
+  rename("Panaroo_filter.pvalue"="filter.pvalue"))
+## Plot
+# nrow(PanGWAS_Panaroo_Clarc_Shared_df)
+# Unadjusted
+cor_test_Panaroo_Clarc_Unadjusted <- cor.test(PanGWAS_Panaroo_Clarc_Shared_df$Panaroo_filter.pvalue,
+                                             PanGWAS_Panaroo_Clarc_Shared_df$Panaroo_Clarc_filter.pvalue, 
+                     method = "pearson")
+cor_coef_Panaroo_Clarc_Unadjusted <- cor_test_Panaroo_Clarc_Unadjusted$estimate
+p_value_Panaroo_Clarc_Unadjusted <- cor_test_Panaroo_Clarc_Unadjusted$p.value
+PanGWAS_Panaroo_Clarc_Shared_df|>
+  ggplot()+
+  geom_point(aes(x=Panaroo_filter.pvalue, y= Panaroo_Clarc_filter.pvalue))+
+  geom_abline(intercept = 0, slope = 1, color = "blue", linetype = "dashed", size = 1)+
+  theme_classic()+
+  xlab("Panaroo Unadjusted p-value")+
+  ylab("Panaroo + CLARC Unadjusted p-value")+
+  annotate( "text",
+    x = 0.9, y = 1, # Adjust position as needed
+    label = paste0("r = ", round(cor_coef_Panaroo_Clarc_Unadjusted, 2), 
+                   "\nP = ", format.pval(p_value_Panaroo_Clarc_Unadjusted, digits = 2)),
+    color = "red",
+    size = 5)+
+  ggtitle("Unadjusted p-value of Genes overlapping between Panaroo and Panaroo + CLARC")
+# Adjusted
+cor_test_Panaroo_Clarc_Adjusted <- cor.test(PanGWAS_Panaroo_Clarc_Shared_df$Panaroo_lrt.pvalue,
+                                             PanGWAS_Panaroo_Clarc_Shared_df$Panaroo_Clarc_lrt.pvalue, 
+                     method = "pearson")
+cor_coef_Panaroo_Clarc_Adjusted <- cor_test_Panaroo_Clarc_Adjusted$estimate
+p_value_Panaroo_Clarc_Adjusted <- cor_test_Panaroo_Clarc_Adjusted$p.value
+PanGWAS_Panaroo_Clarc_Shared_df|>
+  ggplot()+
+  geom_point(aes(x=Panaroo_lrt.pvalue, y= Panaroo_Clarc_lrt.pvalue))+
+  geom_abline(intercept = 0, slope = 1, color = "blue", linetype = "dashed", size = 1)+
+  theme_classic()+
+  xlab("Panaroo Adjusted p-value")+
+  ylab("Panaroo + CLARC Adjusted p-value")+
+  annotate( "text",
+    x = 0.9, y = 1, # Adjust position as needed
+    label = paste0("r = ", round(cor_coef_Panaroo_Clarc_Adjusted, 2), 
+                   "\nP = ", format.pval(p_value_Panaroo_Clarc_Adjusted, digits = 2)),
+    color = "red",
+    size = 5)+
+  ggtitle("Adjusted p-value of Genes overlapping between Panaroo and Panaroo + CLARC")
+```
+### 2.2.2. Compare re-defined genes
+```{r}
+CLARC_redefined_Panaroo_genes <-  p_df_Panaroo |>
+  filter(Reassigned_Category == "accessory")|>
+  filter(! is.na(Gene))|>
+  mutate(ID = str_replace_all(ID, "\\.", "-"))
+
+df_refined_Panaroo_CLARC_pvalue <- rbind(
+  left_join(PanGWAS_Panaroo |> 
+  filter(variant %in% CLARC_redefined_Panaroo_genes$Gene)|>
+  select(variant, filter.pvalue, lrt.pvalue, significance)|>
+  mutate(Tool= "Panaroo"), 
+   CLARC_redefined_Panaroo_genes |> 
+    select(Gene, Cluster)|> 
+    rename("variant" = "Gene")), 
+  left_join(PanGWAS_Panaroo_Clarc |>
+  filter(variant %in% CLARC_redefined_Panaroo_genes$ID)|>
+  select(variant, filter.pvalue, lrt.pvalue, significance)|>
+  mutate(Tool= "Panaroo+CLARC"), 
+  CLARC_redefined_Panaroo_genes |> 
+    select(ID, Cluster)|> 
+    rename("variant" = "ID")))|>
+  mutate(Gene= ifelse(Tool== "Panaroo", variant, NA))
+# Plot 
+# Unadjusted
+df_refined_Panaroo_CLARC_pvalue |>
+  ggplot() +
+  geom_point(aes(x = Cluster, y = filter.pvalue, color = Tool)) +
+  geom_text_repel(aes(x = Cluster, y = filter.pvalue, label = Gene), 
+                  size = 2.5, color = "black", 
+                  box.padding = 0.3,  # Adjust padding around labels
+                  point.padding = 0.2, # Adjust padding around points
+                  segment.size = 0.2,  # Line size between point and label
+                  max.overlaps = 10) + # Limits maximum label overlap
+  ylab("Unadjusted p-value") +
+  xlab("COG Cluster") +
+  theme_bw() +
+  scale_color_manual(values = color("light")(6))  +
+  geom_hline(yintercept = 0.05/nrow(PanGWAS_Roary), color = "red", linetype = "dashed", size = 1)+
+  geom_hline(yintercept= 0.05/nrow(PanGWAS_Roary_Clarc), color = "red", linetype = "dashed", size = 1)+
+  scale_y_log10()
+
+
+# Adjusted
+df_refined_Panaroo_CLARC_pvalue |>
+  ggplot() +
+  geom_point(aes(x = Cluster, y = lrt.pvalue, color = Tool)) +
+  geom_text_repel(aes(x = Cluster, y = lrt.pvalue, label = Gene), 
+                  size = 2.5, color = "black", 
+                  box.padding = 0.3,  # Adjust padding around labels
+                  point.padding = 0.2, # Adjust padding around points
+                  segment.size = 0.2,  # Line size between point and label
+                  max.overlaps = 10) + # Limits maximum label overlap
+  ylab("Adjusted p-value") +
+  xlab("COG Cluster") +
+  theme_bw() +
+  scale_color_manual(values = color("light")(6))  +
+  geom_hline(yintercept = 0.05/nrow(PanGWAS_Roary), color = "red", linetype = "dashed", size = 1)+
+  geom_hline(yintercept= 0.05/nrow(PanGWAS_Roary_Clarc), color = "red", linetype = "dashed", size = 1)+
+  scale_y_log10()
+
+```
+
+## 2.3. Compare Roary and Roary+CLARC
+### 2.3.1. Compare shared genes
+```{r}
+## prepare data
+PanGWAS_Roary_Clarc_Shared_df <- left_join(PanGWAS_Roary |>
+  filter(variant %in% PanGWAS_Roary_Clarc$variant)|>
+  select(variant, filter.pvalue, lrt.pvalue)|>
+  rename("Roary_Clarc_lrt.pvalue"="lrt.pvalue")|>
+  rename("Roary_Clarc_filter.pvalue"="filter.pvalue"),
+  PanGWAS_Roary_Clarc |>
+  select(variant, filter.pvalue, lrt.pvalue)|>
+  rename("Roary_lrt.pvalue"="lrt.pvalue")|>
+  rename("Roary_filter.pvalue"="filter.pvalue"))
+## Plot
+# nrow(PanGWAS_Roary_Clarc_Shared_df)
+# Unadjusted
+cor_test_Roary_Clarc_Unadjusted <- cor.test(PanGWAS_Roary_Clarc_Shared_df$Roary_filter.pvalue,
+                                             PanGWAS_Roary_Clarc_Shared_df$Roary_Clarc_filter.pvalue, 
+                     method = "pearson")
+cor_coef_Roary_Clarc_Unadjusted <- cor_test_Roary_Clarc_Unadjusted$estimate
+p_value_Roary_Clarc_Unadjusted <- cor_test_Roary_Clarc_Unadjusted$p.value
+PanGWAS_Roary_Clarc_Shared_df|>
+  ggplot()+
+  geom_point(aes(x=Roary_filter.pvalue, y= Roary_Clarc_filter.pvalue))+
+  geom_abline(intercept = 0, slope = 1, color = "blue", linetype = "dashed", size = 1)+
+  theme_classic()+
+  xlab("Roary Unadjusted p-value")+
+  ylab("Roary + CLARC Unadjusted p-value")+
+  annotate( "text",
+    x = 0.9, y = 1, # Adjust position as needed
+    label = paste0("r = ", round(cor_coef_Roary_Clarc_Unadjusted, 2), 
+                   "\nP = ", format.pval(p_value_Roary_Clarc_Unadjusted, digits = 2)),
+    color = "red",
+    size = 5)+
+  ggtitle("Unadjusted p-value of Genes overlapping between Roary and Roary + CLARC")
+# Adjusted
+cor_test_Roary_Clarc_Adjusted <- cor.test(PanGWAS_Roary_Clarc_Shared_df$Roary_lrt.pvalue,
+                                             PanGWAS_Roary_Clarc_Shared_df$Roary_Clarc_lrt.pvalue, 
+                     method = "pearson")
+cor_coef_Roary_Clarc_Adjusted <- cor_test_Roary_Clarc_Adjusted$estimate
+p_value_Roary_Clarc_Adjusted <- cor_test_Roary_Clarc_Adjusted$p.value
+PanGWAS_Roary_Clarc_Shared_df|>
+  ggplot()+
+  geom_point(aes(x=Roary_lrt.pvalue, y= Roary_Clarc_lrt.pvalue))+
+  geom_abline(intercept = 0, slope = 1, color = "blue", linetype = "dashed", size = 1)+
+  theme_classic()+
+  xlab("Roary Adjusted p-value")+
+  ylab("Roary + CLARC Adjusted p-value")+
+  annotate( "text",
+    x = 0.9, y = 1, # Adjust position as needed
+    label = paste0("r = ", round(cor_coef_Roary_Clarc_Adjusted, 2), 
+                   "\nP = ", format.pval(p_value_Roary_Clarc_Adjusted, digits = 2)),
+    color = "red",
+    size = 5)+
+  ggtitle("Adjusted p-value of Genes overlapping between Roary and Roary + CLARC")
+```
+
+### 2.2.2. Compare re-defined genes
+```{r}
+CLARC_redefined_Roary_genes <-  p_df_Roary |>
+  filter(Reassigned_Category == "accessory")|>
+  filter(! is.na(Gene))|>
+  mutate(ID = str_replace_all(ID, "\\.", "-"))
+
+df_refined_Roary_CLARC_pvalue <- rbind(
+  left_join(PanGWAS_Roary |> 
+  filter(variant %in% CLARC_redefined_Roary_genes$Gene)|>
+  select(variant, filter.pvalue, lrt.pvalue, significance)|>
+  mutate(Tool= "Roary"), 
+   CLARC_redefined_Roary_genes |> 
+    select(Gene, Cluster)|> 
+    rename("variant" = "Gene")), 
+  left_join(PanGWAS_Roary_Clarc |>
+  filter(variant %in% CLARC_redefined_Roary_genes$ID)|>
+  select(variant, filter.pvalue, lrt.pvalue, significance)|>
+  mutate(Tool= "Roary+CLARC"), 
+  CLARC_redefined_Roary_genes |> 
+    select(ID, Cluster)|> 
+    rename("variant" = "ID")))|>
+  mutate(Gene= ifelse(Tool== "Roary", variant, NA))
+# Plot 
+# Unadjusted
+df_refined_Roary_CLARC_pvalue |>
+  ggplot() +
+  geom_point(aes(x = Cluster, y = filter.pvalue, color = Tool)) +
+  geom_text_repel(aes(x = Cluster, y = filter.pvalue, label = Gene), 
+                  size = 2.5, color = "black", 
+                  box.padding = 0.3,  # Adjust padding around labels
+                  point.padding = 0.2, # Adjust padding around points
+                  segment.size = 0.2,  # Line size between point and label
+                  max.overlaps = 10) + # Limits maximum label overlap
+  ylab("Unadjusted p-value") +
+  xlab("COG Cluster")  +
+  geom_hline(yintercept = 0.05/nrow(PanGWAS_Roary), color = "red", linetype = "dashed", size = 1)+
+  geom_hline(yintercept= 0.05/nrow(PanGWAS_Roary_Clarc), color = "red", linetype = "dashed", size = 1)+
+  theme_bw() +
+  scale_color_manual(values = color("light")(6))+
+  scale_y_log10()
+  
+
+
+# Adjusted
+df_refined_Roary_CLARC_pvalue |>
+  ggplot() +
+  geom_point(aes(x = Cluster, y = lrt.pvalue, color = Tool)) +
+  geom_text_repel(aes(x = Cluster, y = lrt.pvalue, label = Gene), 
+                  size = 2.5, color = "black", 
+                  box.padding = 0.3,  # Adjust padding around labels
+                  point.padding = 0.2, # Adjust padding around points
+                  segment.size = 0.2,  # Line size between point and label
+                  max.overlaps = 10) + # Limits maximum label overlap
+  ylab("Adjusted p-value") +
+  xlab("COG Cluster") +
+  theme_bw()  +
+  geom_hline(yintercept = -log10(0.05/nrow(PanGWAS_Roary)), color = "red", linetype = "dashed", size = 1)+
+  geom_hline(yintercept= -log10(0.05/nrow(PanGWAS_Roary_Clarc)), color = "red", linetype = "dashed", size = 1)+
+  scale_color_manual(values = color("light")(6)) +
+  scale_y_log10()
+
+```

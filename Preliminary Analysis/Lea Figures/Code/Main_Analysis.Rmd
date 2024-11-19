@@ -1,0 +1,82 @@
+---
+title: "Main-Analysis"
+output: html_document
+date: "2024-11-08"
+---
+
+# 0. Prepare environment and Load data 
+```{r}
+# Clean environment
+rm( list = ls() )
+
+# load necessary libraries
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+
+# load data 
+## SNPGWAS
+SNPGWAS_RAxML <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Preliminary Analysis/Lea Figures/Data/15.Pyseer/15.1.Main_analysis/SNPGWAS_RAxML.txt")
+## DBGWAS
+DBGWAS_RAxML <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Preliminary Analysis/Lea Figures/Data/15.Pyseer/15.1.Main_analysis/DBGWAS_RAxML.txt")
+## PanGWAS
+PanGWAS_RAxML <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Preliminary Analysis/Lea Figures/Data/15.Pyseer/15.1.Main_analysis/PanGWAS_Panaroo_RAxML.txt")
+
+# Add significance column, with bonferonni correction for multiple testing
+SNPGWAS_RAxML <- SNPGWAS_RAxML |> 
+  mutate(significance = ifelse(lrt.pvalue < 0.05/nrow(SNPGWAS_RAxML), "significant", "not significant"))|> 
+  mutate(significance = factor(significance, levels= c("significant", "not significant")))
+DBGWAS_RAxML <- DBGWAS_RAxML  |> 
+  mutate(significance = ifelse(lrt.pvalue < 0.05/nrow(DBGWAS_RAxML), "significant", "not significant"))|> 
+  mutate(significance = factor(significance, levels= c("significant", "not significant")))
+PanGWAS_RAxML <- PanGWAS_RAxML |> mutate(significance = ifelse(lrt.pvalue < 0.05/nrow(PanGWAS_RAxML), 1, 0))|> 
+  mutate(significance = ifelse(lrt.pvalue < 0.05/nrow(PanGWAS_RAxML), "significant", "not significant"))|> 
+  mutate(significance = factor(significance, levels= c("significant", "not significant")))
+```
+
+
+# 1. SNPGWAS
+```{r}
+# Manhattan plot
+SNPGWAS_RAxML |>
+  mutate(Position = as.numeric(str_split(variant, "_", simplify = T)[,2]))|>
+  ggplot()+
+  geom_point(aes(x=Position, y= -log10(lrt.pvalue), color=significance))+
+  geom_hline(yintercept = -log10(0.05 / nrow(SNPGWAS_RAxML)), color = "red", linetype = "dashed", size=1)+
+  ylab("-log10(p-value)") + 
+  xlab("Genomic Position") +
+  scale_color_manual(values = c("steelblue", "skyblue")) +
+  theme_classic() 
+```
+
+# 2. DB-GWAS
+```{r}
+# Manhattan plot
+DBGWAS_RAxML |>
+  mutate(UnitigID = 1:nrow(DBGWAS_RAxML))|>
+  ggplot()+
+  geom_point(aes(x=UnitigID, y= -log10(lrt.pvalue), color=significance))+
+  geom_hline(yintercept = -log10(0.05 / nrow(DBGWAS_RAxML)), color = "red", linetype = "dashed", size=1)+
+  ylab("-log10(p-value)") + 
+  xlab("Unitig ID") +
+  scale_color_manual(values = c("steelblue", "skyblue")) +
+  theme_classic() +
+  theme(axis.text.x = element_blank(), 
+        axis.ticks.x = element_blank())
+```
+
+# 3. Pan-GWAS
+```{r}
+# Manhattan plot
+PanGWAS_RAxML |>
+  mutate(COG_ID = as.factor(1:nrow(PanGWAS_RAxML)))|>
+  ggplot()+
+  geom_point(aes(x=COG_ID, y= -log10(lrt.pvalue), color=significance))+
+  geom_hline(yintercept = -log10(0.05 / nrow(PanGWAS_RAxML)), color = "red", linetype = "dashed", size=1)+
+  ylab("-log10(p-value)") + 
+  xlab("COG ID") +
+  scale_color_manual(values = c("steelblue", "skyblue")) +
+  theme_classic() +
+  theme(axis.text.x = element_blank(), 
+        axis.ticks.x = element_blank())
+```

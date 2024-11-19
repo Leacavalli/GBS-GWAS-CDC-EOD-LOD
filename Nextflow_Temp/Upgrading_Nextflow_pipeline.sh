@@ -20,10 +20,19 @@ sbatch -p test -c 112 -t 0-12:00 --mem=990000 --wrap="nextflow -C nextflow.confi
 
 module load python
 source activate java
+sbatch -p sapphire -c 112 -t 3-00:00 --mem=990000 --wrap="nextflow -C nextflow.config run Test_Main_Analysis.nf --path_nextflow_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade_500_TEST2 --path_conda_envs /n/home02/lcavalli/.conda/envs"
+
+module load python
+source activate java
 sbatch -p test -c 112 -t 0-12:00 --mem=990000 --wrap="nextflow -C nextflow.config run Test.nf --main --sub1 --sub2 --path_nextflow_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade_500 --path_conda_envs /n/home02/lcavalli/.conda/envs"
 sbatch -p test -c 112 -t 0-12:00 --mem=990000 --wrap="nextflow -C nextflow.config run Test2.nf --main --Fasttree --sub2 --path_nextflow_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade_500 --path_conda_envs /n/home02/lcavalli/.conda/envs"
-sbatch -p sapphire -c 112 -t 3-00:00 --mem=990000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline_FINAL.nf --main --sub1 --sub2 --path_nextflow_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade_500_TEST --path_conda_envs /n/home02/lcavalli/.conda/envs"
+module load python
+source activate java
+sbatch -p sapphire -c 112 -t 3-00:00 --mem=990000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline_FINAL.nf --main --sub1 --sub2 --path_nextflow_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade_500_TEST2 --path_conda_envs /n/home02/lcavalli/.conda/envs"
 sbatch -p intermediate -c 112 -t 6-00:00 --mem=990000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline_FINAL.nf --main  --sub1 --sub2 --path_nextflow_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade_500_TEST2 --path_conda_envs /n/home02/lcavalli/.conda/envs"
+
+
+sbatch -p sapphire -c 112 -t 3-00:00 --mem=990000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline_FINAL.nf -resume --main --sub1 --sub2 --path_nextflow_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade_500_TEST2 --path_conda_envs /n/home02/lcavalli/.conda/envs"
 
 module load python
 source activate java
@@ -150,7 +159,7 @@ done
 
 for i in *.fa.gz
 do
-sbatch -p shared -t 0-02:00 --mem=100000 --wrap="gunzip $i"
+sbatch -p shared -t 0-05:00 --mem=100000 --wrap="gunzip $i"
 done
 
 for i in *.fa

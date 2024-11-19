@@ -1,0 +1,258 @@
+---
+title: "Sub-Analysis-1"
+output: html_document
+date: "2024-11-08"
+---
+
+# 0. Prepare environment and Load data 
+```{r}
+# Clean environment
+rm( list = ls() )
+
+# load necessary libraries
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(reshape2)
+```
+
+# 1. Compare Results
+
+## 1.1. SNP-GWAS
+```{r}
+# load data 
+## SNPGWAS
+SNPGWAS_RAxML <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Preliminary Analysis/Lea Figures/Data/15.Pyseer/15.1.Main_analysis/SNPGWAS_RAxML.txt")
+SNPGWAS_FastTree <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Preliminary Analysis/Lea Figures/Data/15.Pyseer/15.2.Subanalysis_1/16.2.1.Fasttree/SNPGWAS_Fasttree.txt")
+SNPGWAS_Mash     <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Preliminary Analysis/Lea Figures/Data/15.Pyseer/15.2.Subanalysis_1/16.2.2.Mash/SNPGWAS_mash.txt")
+SNPGWAS_SC       <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Preliminary Analysis/Lea Figures/Data/15.Pyseer/15.2.Subanalysis_1/16.2.3.SC/SNPGWAS_SC.txt")
+
+# Add significance column, with bonferonni correction for multiple testing
+SNPGWAS_RAxML <- SNPGWAS_RAxML |> mutate(significance = ifelse(lrt.pvalue < 0.05/nrow(SNPGWAS_RAxML), 1, 0))
+SNPGWAS_FastTree <- SNPGWAS_FastTree |> mutate(significance = ifelse(lrt.pvalue < 0.05/nrow(SNPGWAS_FastTree), 1, 0))
+SNPGWAS_Mash <- SNPGWAS_Mash |> mutate(significance = ifelse(lrt.pvalue < 0.05/nrow(SNPGWAS_Mash), 1, 0))
+SNPGWAS_SC <- SNPGWAS_SC |> mutate(significance = ifelse(lrt.pvalue < 0.05/nrow(SNPGWAS_SC), 1, 0))
+
+# Compare tables
+nrow(SNPGWAS_RAxML)
+nrow(SNPGWAS_FastTree)
+nrow(SNPGWAS_Mash)
+nrow(SNPGWAS_SC)
+
+# Compare variants
+length(which(SNPGWAS_RAxML$variant != SNPGWAS_FastTree$variant))
+length(which(SNPGWAS_RAxML$variant != SNPGWAS_Mash$variant))
+length(which(! SNPGWAS_RAxML$variant %in% SNPGWAS_SC$variant))
+length(which(! SNPGWAS_SC$variant %in% SNPGWAS_RAxML$variant))
+# The SNPGWAS with population structure controlled with RAxML,FastTree and Mash have the same variants in the results table. 
+# The SNPGWAS with population structure controlled with Poppunk SC has the same variants but 185 variants are not reported in the results table. 
+# Why ? 
+# At first, I thought it may be because Poppunk SC classification fails for some samples, such that they are not included in the GWAS. But that is not the case... 
+
+# List of variants missing in SNPGWAS_SC
+SNPGWAS_RAxML |> 
+  filter(! variant %in% SNPGWAS_SC$variant)|> 
+  pull(variant)
+
+# Compare unadjusted p-value for shared variants
+length(which(SNPGWAS_RAxML$filter.pvalue != SNPGWAS_FastTree$filter.pvalue))
+length(which(SNPGWAS_RAxML$filter.pvalue != SNPGWAS_Mash$filter.pvalue))
+length(which((SNPGWAS_RAxML |> 
+  filter(variant %in% SNPGWAS_SC$variant)|> 
+  pull(filter.pvalue)) != SNPGWAS_SC$filter.pvalue))
+# CCL: The SNPGWAS with population structure controlled with RAxML, FastTree and SC have the same lrt.pvalue for each variant they have in common.
+
+# However, the lrt p-value are different for the SNPGWAS with population structure controlled with Mash. 
+
+
+# Compare lrt.pvalue for shared variants
+length(which(SNPGWAS_RAxML$lrt.pvalue != SNPGWAS_FastTree$lrt.pvalue))
+length(which(SNPGWAS_RAxML$lrt.pvalue != SNPGWAS_Mash$lrt.pvalue))
+length(which((SNPGWAS_RAxML |> 
+  filter(variant %in% SNPGWAS_SC$variant)|> 
+  pull(lrt.pvalue)) != SNPGWAS_SC$lrt.pvalue))
+length(which((SNPGWAS_Mash |> 
+  filter(variant %in% SNPGWAS_SC$variant)|> 
+  pull(lrt.pvalue)) != SNPGWAS_SC$lrt.pvalue))
+# CCL: The SNPGWAS with population structure controlled with RAxML, and FastTree have the same lrt.pvalue for each variant they have in common.
+# However, the lrt.pvalues are different for the SNPGWAS with population structure controlled with Mash and SC.  
+
+# Compare significance
+table(SNPGWAS_RAxML$significance)
+table(SNPGWAS_FastTree$significance)
+table(SNPGWAS_Mash$significance)
+table(SNPGWAS_SC$significance)
+# Across all SNP-GWAS with different population structure control methods, there were no SNP variants significantly associated with the phenotype of interest (i.e. Disease onset age: EOD vs LOD)
+
+# Compare beta (the effect size/slope of the variant)
+length(which(SNPGWAS_RAxML$beta != SNPGWAS_FastTree$beta))
+length(which(SNPGWAS_RAxML$beta != SNPGWAS_Mash$beta))
+length(which((SNPGWAS_RAxML |> 
+  filter(variant %in% SNPGWAS_SC$variant)|> 
+  pull(beta)) != SNPGWAS_SC$beta))
+
+# Compare variant_h2 (the variance in phenotype explained by the variant.)
+length(which(SNPGWAS_RAxML$variant_h2 != SNPGWAS_FastTree$variant_h2))
+length(which(SNPGWAS_RAxML$variant_h2 != SNPGWAS_Mash$variant_h2))
+length(which((SNPGWAS_RAxML |> 
+  filter(variant %in% SNPGWAS_SC$variant)|> 
+  pull(variant_h2)) != SNPGWAS_SC$variant_h2))
+
+
+# Plot
+SNPGWAS_RAxML_V2 <- SNPGWAS_RAxML
+colnames(SNPGWAS_RAxML_V2) <- c("variant", paste0("RAxML_", colnames(SNPGWAS_RAxML_V2)[-1]))
+SNPGWAS_Mash_V2 <- SNPGWAS_Mash
+colnames(SNPGWAS_Mash_V2) <- c("variant", paste0("Mash_", colnames(SNPGWAS_Mash_V2)[-1]))
+SNPGWAS_SC_V2 <- SNPGWAS_SC
+colnames(SNPGWAS_SC_V2) <- c("variant", paste0("SC_", colnames(SNPGWAS_SC_V2)[-1]))
+SNPGWAS_ALL <- left_join(left_join(SNPGWAS_RAxML_V2, SNPGWAS_Mash_V2),SNPGWAS_SC_V2)
+
+# # Compare p-value unadjusted for population structure
+# SNPGWAS_ALL |>
+#   ggplot()+
+#   geom_point(aes(x=Mash_filter.pvalue, y= RAxML_filter.pvalue))+
+#   geom_abline(intercept = 0, slope = 1, color = "blue", linetype = "dashed", size = 1)+
+#   geom_hline(yintercept = 0.05/nrow(SNPGWAS_ALL), color = "red", linetype = "dotted")+
+#   geom_vline(xintercept = 0.05/nrow(SNPGWAS_ALL), color = "red", linetype = "dotted") +
+#   theme_classic()+
+#   xlab("Mash distances")+
+#   ylab("RAxML phylogeny")+
+#   ggtitle("Unadjusted p-value")
+
+# Compare p-value adjusted for population structure
+SNPGWAS_ALL |>
+  ggplot()+
+  geom_point(aes(x=Mash_lrt.pvalue, y= RAxML_lrt.pvalue))+
+  geom_abline(intercept = 0, slope = 1, color = "blue", linetype = "dashed", size = 1)+
+  geom_hline(yintercept = 0.05/nrow(SNPGWAS_ALL), color = "red", linetype = "dotted")+
+  geom_vline(xintercept = 0.05/nrow(SNPGWAS_ALL), color = "red", linetype = "dotted") +
+  theme_classic()+
+  xlab("Mash distances")+
+  ylab("RAxML phylogeny")+
+  ggtitle("LRT p-value")
+
+# Compare p-value adjusted for population structure
+SNPGWAS_ALL |>
+  ggplot()+
+  geom_point(aes(x=Mash_lrt.pvalue, y= SC_lrt.pvalue))+
+  geom_abline(intercept = 0, slope = 1, color = "blue", linetype = "dashed", size = 1)+
+  geom_hline(yintercept = 0.05/nrow(SNPGWAS_ALL), color = "red", linetype = "dotted")+
+  geom_vline(xintercept = 0.05/nrow(SNPGWAS_ALL), color = "red", linetype = "dotted") +
+  theme_classic()+
+  xlab("p-value adjusted for population structure with Mash distances")+
+  ylab("p-value adjusted for population structure with SC phylogeny")
+
+
+
+# # Heatmap
+# rbind(SNPGWAS_RAxML |> select(variant, lrt.pvalue)|>  mutate(Pop_structure= "RAxML"),
+#       SNPGWAS_Mash |> select(variant, lrt.pvalue)|>  mutate(Pop_structure= "Mash")) |>
+#   ggplot(aes(variant, Pop_structure, fill = lrt.pvalue)) +
+#   geom_tile() +
+#   scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0.5) +
+#   labs(x = "Column", y = "Row", fill = "Value") +
+#   theme_minimal() +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+#   ggtitle("Heatmap Example")
+```
+
+
+## 1.2. DB-GWAS
+```{r}
+# load data 
+## DBGWAS
+DBGWAS_RAxML <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Preliminary Analysis/Lea Figures/Data/15.Pyseer/15.1.Main_analysis/DBGWAS_RAxML.txt")
+DBGWAS_FastTree <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Preliminary Analysis/Lea Figures/Data/15.Pyseer/15.2.Subanalysis_1/16.2.1.Fasttree/DBGWAS_Fasttree.txt")
+DBGWAS_Mash     <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Preliminary Analysis/Lea Figures/Data/15.Pyseer/15.2.Subanalysis_1/16.2.2.Mash/DBGWAS_mash.txt")
+DBGWAS_SC       <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Preliminary Analysis/Lea Figures/Data/15.Pyseer/15.2.Subanalysis_1/16.2.3.SC/DBGWAS_SC.txt")
+
+# Add significance column, with bonferonni correction for multiple testing
+DBGWAS_RAxML <- DBGWAS_RAxML |> mutate(significance = ifelse(lrt.pvalue < 0.05/nrow(DBGWAS_RAxML), 1, 0))
+DBGWAS_FastTree <- DBGWAS_FastTree |> mutate(significance = ifelse(lrt.pvalue < 0.05/nrow(DBGWAS_FastTree), 1, 0))
+DBGWAS_Mash <- DBGWAS_Mash |> mutate(significance = ifelse(lrt.pvalue < 0.05/nrow(DBGWAS_Mash), 1, 0))
+DBGWAS_SC <- DBGWAS_SC |> mutate(significance = ifelse(lrt.pvalue < 0.05/nrow(DBGWAS_SC), 1, 0))
+
+# Compare tables
+nrow(DBGWAS_RAxML)
+nrow(DBGWAS_FastTree)
+nrow(DBGWAS_Mash)
+nrow(DBGWAS_SC)
+
+# Compare variants
+length(which(DBGWAS_RAxML$variant != DBGWAS_FastTree$variant))
+length(which(DBGWAS_RAxML$variant != DBGWAS_Mash$variant))
+length(which(! DBGWAS_RAxML$variant %in% DBGWAS_SC$variant))
+length(which(! DBGWAS_SC$variant %in% DBGWAS_RAxML$variant))
+length(which((DBGWAS_RAxML |> 
+  filter(variant %in% DBGWAS_SC$variant)|> 
+  pull(variant)) != DBGWAS_SC$variant))
+
+# Compare unadjusted p-value for shared variants
+length(which(DBGWAS_RAxML$filter.pvalue != DBGWAS_FastTree$filter.pvalue))
+length(which(DBGWAS_RAxML$filter.pvalue != DBGWAS_Mash$filter.pvalue))
+length(which((DBGWAS_RAxML |> 
+  filter(variant %in% DBGWAS_SC$variant)|> 
+  pull(filter.pvalue)) != DBGWAS_SC$filter.pvalue))
+
+# Compare lrt.pvalue for shared variants
+length(which(DBGWAS_RAxML$lrt.pvalue != DBGWAS_FastTree$lrt.pvalue))
+length(which(DBGWAS_RAxML$lrt.pvalue != DBGWAS_Mash$lrt.pvalue))
+length(which((DBGWAS_RAxML |> 
+  filter(variant %in% DBGWAS_SC$variant)|> 
+  pull(lrt.pvalue)) != DBGWAS_SC$lrt.pvalue))
+length(which((SNPGWAS_Mash |> 
+  filter(variant %in% SNPGWAS_SC$variant)|> 
+  pull(lrt.pvalue)) != SNPGWAS_SC$lrt.pvalue))
+
+# Compare significance
+table(DBGWAS_RAxML$significance)
+table(DBGWAS_FastTree$significance)
+table(DBGWAS_Mash$significance)
+table(DBGWAS_SC$significance)
+
+# Plot
+DBGWAS_RAxML_V2 <- DBGWAS_RAxML
+colnames(DBGWAS_RAxML_V2) <- c("variant", paste0("RAxML_", colnames(DBGWAS_RAxML_V2)[-1]))
+DBGWAS_Mash_V2 <- DBGWAS_Mash
+colnames(DBGWAS_Mash_V2) <- c("variant", paste0("Mash_", colnames(DBGWAS_Mash_V2)[-1]))
+DBGWAS_SC_V2 <- DBGWAS_SC
+colnames(DBGWAS_SC_V2) <- c("variant", paste0("SC_", colnames(DBGWAS_SC_V2)[-1]))
+DBGWAS_ALL <- left_join(left_join(DBGWAS_RAxML_V2, DBGWAS_Mash_V2),DBGWAS_SC_V2)
+
+# Compare p-value adjusted for population structure
+DBGWAS_ALL |>
+  ggplot()+
+  geom_point(aes(x=Mash_lrt.pvalue, y= RAxML_lrt.pvalue))+
+  geom_abline(intercept = 0, slope = 1, color = "blue", linetype = "dashed", size = 1)+
+  geom_hline(yintercept = 0.05/nrow(DBGWAS_ALL), color = "red", linetype = "dotted")+
+  geom_vline(xintercept = 0.05/nrow(DBGWAS_ALL), color = "red", linetype = "dotted") +
+  theme_classic()+
+  xlab("p-value adjusted for population structure with Mash distances")+
+  ylab("p-value adjusted for population structure with RAxML phylogeny")
+
+# Compare p-value adjusted for population structure
+DBGWAS_ALL |>
+  ggplot()+
+  geom_point(aes(x=Mash_lrt.pvalue, y= SC_lrt.pvalue))+
+  geom_abline(intercept = 0, slope = 1, color = "blue", linetype = "dashed", size = 1)+
+  geom_hline(yintercept = 0.05/nrow(DBGWAS_ALL), color = "red", linetype = "dotted")+
+  geom_vline(xintercept = 0.05/nrow(DBGWAS_ALL), color = "red", linetype = "dotted") +
+  theme_classic()+
+  xlab("p-value adjusted for population structure with Mash distances")+
+  ylab("p-value adjusted for population structure with SC phylogeny")
+
+```
+
+## 1.3. PanGWAS
+```{r}
+# load data 
+## PanGWAS
+PanGWAS_RAxML <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Preliminary Analysis/Lea Figures/Data/15.Pyseer/15.1.Main_analysis/PanGWAS_Panaroo_RAxML.txt")
+PanGWAS_FastTree <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Preliminary Analysis/Lea Figures/Data/15.Pyseer/15.2.Subanalysis_1/16.2.1.Fasttree/PanGWAS_Panaroo_phylo_Fasttree.txt")
+PanGWAS_Mash     <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Preliminary Analysis/Lea Figures/Data/15.Pyseer/15.2.Subanalysis_1/16.2.2.Mash/PanGWAS_Panaroo_mash.txt")
+PanGWAS_SC       <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Preliminary Analysis/Lea Figures/Data/15.Pyseer/15.2.Subanalysis_1/16.2.3.SC/PanGWAS_Panaroo_SC.txt")
+
+```
+
+
