@@ -139,6 +139,31 @@ cd standard-RAxML-master/
 make -f Makefile.SSE3.PTHREADS.gcc # parallelized and x86 processor optimized version
 cd ../
 standard-RAxML-master/raxmlHPC-PTHREADS-SSE3 -h
+
+module load python
+conda create -n raxml-ng
+source activate raxml-ng
+conda install -c bioconda raxml-ng
+raxml-ng -h
+raxml-ng --parse --msa clean.full.aln --model GTR+G --prefix T1
+
+# ML search
+sbatch -p shared -c 48 -t 3-00:00 --mem=100000 --wrap="raxml-ng --msa clean.full.aln --model GTR+G --threads 48 --seed 12345 --tree pars{50},rand{50} --prefix /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade_500_TEST2/RAxML-NG_TEST/T1"
+# Bootstrap
+sbatch -p shared -c 48 -t 3-00:00 --mem=100000 --wrap="raxml-ng --bootstrap --msa clean.full.aln--model GTR+G --threads 48 --seed 12345 --bs-trees 250 --prefix /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade_500_TEST2/RAxML-NG_TEST/T2"
+# Computing branch support
+sbatch -p shared -c 48 -t 3-00:00 --mem=100000 --wrap="raxml-ng  --support --tree /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade_500_TEST2/RAxML-NG_TEST/T1.raxml.bestTree --bs-trees /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade_500_TEST2/RAxML-NG_TEST/T2.raxml.bootstraps --threads 48 --prefix /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade_500_TEST2/RAxML-NG_TEST/T3 "
+```
+### 3.5. Install ROARY
+```
+module load python
+conda create -n roary
+source activate roary
+conda config --add channels r
+conda config --add channels defaults
+conda config --add channels conda-forge
+conda config --add channels bioconda
+conda install roary
 ```
 ### 3.5. Install CLARC
 ```
@@ -157,9 +182,6 @@ conda deactivate
 ### 3.6. Install Pyseer Files
 ```
 cd Files
-mkdir pyseer
-cd pyseer
-wget https://github.com/mgalardini/pyseer/blob/4b8d22f43bc5943483d9a54df1e22c6a35cd0121/scripts/phylogeny_distance.py
 git clone https://github.com/mgalardini/pyseer
 ```
 ## 4. Prepare input data
@@ -185,6 +207,10 @@ done
 ```
 ### 4.1. Place your gunzipped raw reads in /NEXTFLOW_PIPELINE/0.RAW_READS/
 ### 4.2. Place your your _phenotypes.txt_ file in /NEXTFLOW_PIPELINE/Files/
+Note: Make sure it has a header.
+```
+sed -i '1i\samples\tbinary' phenotypes.txt
+```
 ### 4.3. Create a copy _phenotypes_filtered.txt_ of your _phenotypes.txt_ file in /NEXTFLOW_PIPELINE/Files/
 
 ## 5. Run Nextflow

@@ -20,7 +20,7 @@ sbatch -p test -c 112 -t 0-12:00 --mem=990000 --wrap="nextflow -C nextflow.confi
 
 module load python
 source activate java
-sbatch -p sapphire -c 112 -t 3-00:00 --mem=990000 --wrap="nextflow -C nextflow.config run Test_Main_Analysis.nf --path_nextflow_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade_500_TEST2 --path_conda_envs /n/home02/lcavalli/.conda/envs"
+sbatch -p intermediate -c 112 -t 14-00:00 --mem=990000 --wrap="nextflow -C nextflow.config run Test_Main_Analysis.nf --path_nextflow_dir /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade_500_TEST2 --path_conda_envs /n/home02/lcavalli/.conda/envs"
 
 module load python
 source activate java
