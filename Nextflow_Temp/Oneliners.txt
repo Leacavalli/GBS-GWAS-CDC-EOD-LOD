@@ -646,3 +646,13 @@ similarity_matrix.to_csv("sc_similarity_matrix.tsv", sep="\t")
 
 pyseer --lmm --phenotypes phenotypes --kmers /n/holylfs05/LABS/hanage_lab/Lab/hsphfs1/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE/9.Post_Pipeline/9.4.Unitig_counter/Unitig_counter/unitigs.txt --similarity sc_similarity_matrix.tsv --output-patterns unitig_patterns.txt --cpu 8 > phenotype_unitigs_mash.txt
 
+17.1 SNP GWAS Continuous Phenotype
+pyseer --lmm --phenotypes ${params.path_nextflow_dir}/Files/age_phenotypes.txt --continuous --vcf ${params.path_nextflow_dir}/11.SNIPPY_MULTI/core.vcf --similarity ${params.path_nextflow_dir}/15.Pyseer/15.1.Main_analysis/FastTree_phylogeny_K.tsv --cpu 8 > ${params.path_nextflow_dir}/15.Pyseer/15.1.Main_analysis/SNPGWAS_FastTree.txt
+
+17.2 DBGWAS Continuous Phenotype
+pyseer --lmm --phenotypes ${params.path_nextflow_dir}/Files/age_phenotypes.txt --continuous --kmers ${params.path_nextflow_dir}/14.UNITIGS/unitigs.txt --uncompressed --similarity ${params.path_nextflow_dir}/15.Pyseer/15.2.Subanalysis_1/15.2.1.Fasttree/FastTree_phylogeny_K.tsv --output-patterns ${params.path_nextflow_dir}/15.Pyseer/15.2.Subanalysis_1/15.2.1.Fasttree/DBGWAS_Fasttree_unitig_patterns.txt --cpu 8 > ${params.path_nextflow_dir}/15.Pyseer/15.2.Subanalysis_1/15.2.1.Fasttree/DBGWAS_Fasttree.txt
+
+17.3 Pan-GWAS Continuous Phenotype
+pyseer --min-af 0.05 --max-af 0.95 --lmm --phenotypes ${params.path_nextflow_dir}/Files/age_phenotypes.txt --continuous --pres ${params.path_nextflow_dir}/13.Pangenome_analysis/13.1.Panaroo/gene_presence_absence.Rtab --similarity ${params.path_nextflow_dir}/15.Pyseer/15.2.Subanalysis_1/15.2.1.Fasttree/FastTree_phylogeny_K.tsv --cpu 8 > ${params.path_nextflow_dir}/15.Pyseer/15.2.Subanalysis_1/15.2.1.Fasttree/PanGWAS_Panaroo_Fasttree.txt
+
+
