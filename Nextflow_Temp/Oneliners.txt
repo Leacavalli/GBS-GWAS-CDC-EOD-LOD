@@ -32,6 +32,10 @@ Steps:
 		16.3.1. RAxML               	In progress
 		16.3.2. Mash Distances          In progress
 		16.3.3. SC classification       In progress
+17. GWAS- Continuous Phenotype 
+     17.1 SNP-based GWAS	
+     17.2 DBGWAS
+     17.3 Pan-GWAS
 
 Main Analysis 
 Question: What are the genetic determinants of time of onset of GBS infection in the US ? (Methods: Pan GWAS, DB GWAS, SNP GWAS 
