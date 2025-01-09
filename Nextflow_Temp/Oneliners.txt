@@ -24,6 +24,7 @@ Steps:
 		16.1.1. RAxML               	In progress
 		16.1.2. Mash Distances          In progress
 		16.1.3. SC classification       In progress
+		16.1.4. FastTree (FE Model) 	In progress
 	16.2. Pan-GWAS 	  	        	In progress
 		16.2.1. RAxML               	In progress
 		16.2.2. Mash Distances          In progress
@@ -505,6 +506,30 @@ pyseer --phenotypes phenotypes --vcf core.vcf --similarity sc_similarity_matrix.
 
 
 ------------------------------------------------------------------------------------------------
+#######################################################
+# Step 16.1.4 : SNP-Based GWAS with FastTree (FE Model) 
+#######################################################
+
+# Tool: Pyseer
+# phenotypes is a file of presence absence (EOD vs LOD) for each isolate
+# core.vcf is a vcf file of snps mapped to our reference of choice (output of snippy-core) 
+#installation
+
+conda -n create pyseer
+source activate pyseer
+conda install bioconda::pyseer
+
+pip install pandas
+pip install dendropy
+
+git clone https://github.com/mgalardini/pyseer 
+
+python scripts/phylogeny_distance.py GBS_GWAS_FastTree_phylo.tre > phylogeny_distances.tsv
+
+pyseer --phenotypes phenotypes --vcf core.vcf --distances phylogeny_distances.tsv > EOD_LOD_SNPs_mash.txt
+
+------------------------------------------------------------------------------------------------
+
 
 ######################################
 # Step 16.2.1 : Pan GWAS  with RAxML #
