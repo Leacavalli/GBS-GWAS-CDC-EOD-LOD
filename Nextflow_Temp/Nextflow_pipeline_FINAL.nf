@@ -341,6 +341,8 @@ conda "${params.path_nextflow_dir}/Files/Snippy_environment.yml"
 }
 
 process RAxML_MLsearch {
+  conda "${params.path_conda_envs}/raxml-ng"
+
   cpus 50
 
   input:
@@ -354,11 +356,15 @@ process RAxML_MLsearch {
   mkdir -p ${params.path_nextflow_dir}/12.Phylogeny
   mkdir -p ${params.path_nextflow_dir}/12.Phylogeny/12.1.RAxML
   # Generate 100 ML trees on distinct starting trees and output the best likelihood tree
-  ${params.path_nextflow_dir}/Files/standard-RAxML-master/raxmlHPC-PTHREADS-SSE3 -T 50 -m GTRGAMMA -p 12345 -# 100 -s ${params.path_nextflow_dir}/11.SNIPPY_MULTI/clean.full.aln -w ${params.path_nextflow_dir}/12.Phylogeny/12.1.RAxML -n T1
+  raxml-ng --msa ${params.path_nextflow_dir}/11.SNIPPY_MULTI/clean.full.aln --model GTR+G --threads 50 --seed 12345 --prefix ${params.path_nextflow_dir}/12.Phylogeny/12.1.RAxML/T1
   """
 }
 
+
+
 process RAxML_bootstrap {
+  conda "${params.path_conda_envs}/raxml-ng"
+
   cpus 50
 
   input:
@@ -372,12 +378,15 @@ process RAxML_bootstrap {
   mkdir -p ${params.path_nextflow_dir}/12.Phylogeny
   mkdir -p ${params.path_nextflow_dir}/12.Phylogeny/12.1.RAxML
   # Generate 250 bootstrap tree to infer statistical support of the branches.
-  ${params.path_nextflow_dir}/Files/standard-RAxML-master/raxmlHPC-PTHREADS-SSE3 -T 50 -m GTRGAMMA -p 12345 -b 12345 -# 250 -s ${params.path_nextflow_dir}/11.SNIPPY_MULTI/clean.full.aln -w ${params.path_nextflow_dir}/12.Phylogeny/12.1.RAxML -n T2
+  raxml-ng  --support --tree ${params.path_nextflow_dir}/12.Phylogeny/12.1.RAxML/T1.raxml.bestTree --bs-trees ${params.path_nextflow_dir}/12.Phylogeny/12.1.RAxML/T2.raxml.bootstraps --threads 48 --prefix ${params.path_nextflow_dir}/12.Phylogeny/12.1.RAxML/T3
   """
 }
 
+
 process RAxML_bipartition {
-  cpus 50
+ conda "${params.path_conda_envs}/raxml-ng"
+
+ cpus 50
 
   input:
   val RAxML_MLsearch_out
@@ -987,30 +996,17 @@ workflow flow3 {
     ROARY_CLARC(ROARY.out[0])
 
     emit:
-    RAxML_bipartition.out[0]
+    FASTTREE.out[0]
     UNITIG.out[0]
     PANAROO.out[0]
     SNIPPY_MULTI.out[0]
     POPPUNK.out[0]
-    FASTTREE.out[0]
+    RAxML_bipartition.out[0]
     PANAROO_CLARC.out[0]
     ROARY_CLARC.out[0]
 }
 
 workflow flow_main {
-    take:
-    raxml_data
-    unitig_data
-    panaroo_data
-
-    main:
-    RAxML_dist(raxml_data, unitig_data, panaroo_data)
-    SNPGWAS_RAxML(RAxML_dist.out[0])
-    DBGWAS_RAxML(RAxML_dist.out[0])
-    PanGWAS_Panaroo_RAxML(RAxML_dist.out[0])
-}
-
-workflow flow_sub1_Fasttree {
     take:
     fasttree_data
     unitig_data
@@ -1021,6 +1017,19 @@ workflow flow_sub1_Fasttree {
     SNPGWAS_Fasttree(Fasttree_dist.out[0])
     DBGWAS_Fasttree(Fasttree_dist.out[0])
     PanGWAS_Panaroo_Fasttree(Fasttree_dist.out[0])
+}
+
+workflow flow_sub1_RAxML {
+    take:
+    raxml_data
+    unitig_data
+    panaroo_data
+
+    main:
+    RAxML_dist(raxml_data, unitig_data, panaroo_data)
+    SNPGWAS_RAxML(RAxML_dist.out[0])
+    DBGWAS_RAxML(RAxML_dist.out[0])
+    PanGWAS_Panaroo_RAxML(RAxML_dist.out[0])
 }
 
 workflow flow_sub1_Mash {
@@ -1051,15 +1060,15 @@ workflow flow_sub1_SC {
 
 workflow flow_sub2 {
     take:
-    raxml_data
+    fasttree_data
     panaroo_clarc_data
     roary_clarc_data
 
     main:
-    RAxML_dist(raxml_data , panaroo_clarc_data, roary_clarc_data)
-    PanGWAS_Roary_RAxML(RAxML_dist.out[0])
-    PanGWAS_Panaroo_CLARC_RAxML(RAxML_dist.out[0])
-    PanGWAS_Roary_CLARC_RAxML(RAxML_dist.out[0])
+    Fasttree_dist(fasttree_data, unitig_data, panaroo_data)
+    PanGWAS_Roary_Fasttree(Fasttree_dist.out[0])
+    PanGWAS_Panaroo_CLARC_Fasttree(Fasttree_dist.out[0])
+    PanGWAS_Roary_CLARC_Fasttree(Fasttree_dist.out[0])
 }
 
 workflow {
@@ -1073,19 +1082,19 @@ flow2(flow1.out)
 
   if( params.main ) {
     flow_main(flow3.out[0], flow3.out[1], flow3.out[2])
-    println "Running the Main Analysis: SNP-GWAS, DB-GWAS and Pan-GWAS, with the population structure controlled using a RAxML phylogeny and the accessory genome defined per Panaroo."
+    println "Running the Main Analysis: SNP-GWAS, DB-GWAS and Pan-GWAS, with the population structure controlled using a Fastree phylogeny and the accessory genome defined per Panaroo."
   } else {
-    println "Skipping the Main Analysis (SNP-GWAS, DB-GWAS and Pan-GWAS, with the population structure controlled using a RAxML phylogeny and the accessory genome defined per Panaroo)."
+    println "Skipping the Main Analysis (SNP-GWAS, DB-GWAS and Pan-GWAS, with the population structure controlled using a Fastree phylogeny and the accessory genome defined per Panaroo)."
   }
   if( params.sub1 ) {
-    flow_sub1_Fasttree(flow3.out[5], flow3.out[1], flow3.out[2])
+    flow_sub1_RAxML(flow3.out[5], flow3.out[1], flow3.out[2])
     flow_sub1_Mash(flow3.out[3], flow3.out[1], flow3.out[2])
     flow_sub1_SC(flow3.out[4], flow3.out[1], flow3.out[2])
-    println "Running the Sub-Analysis #1: SNP-GWAS, DB-GWAS and Pan-GWAS, with the population structure controlled using a Fastree phylogeny, Mash distances and Sequence Cluster (SC) classifications."
+    println "Running the Sub-Analysis #1: SNP-GWAS, DB-GWAS and Pan-GWAS, with the population structure controlled using a RAxML phylogeny, Mash distances and Sequence Cluster (SC) classifications."
   }
-  if( params.Fasttree ) {
-    flow_sub1_Fasttree(flow3.out[5], flow3.out[1], flow3.out[2])
-    println "Running SNP-GWAS, DB-GWAS and Pan-GWAS, with the population structure controlled using a Fastree phylogeny and the accessory genome defined per Panaroo.."
+  if( params.RAxML ) {
+    flow_sub1_RAxML(flow3.out[5], flow3.out[1], flow3.out[2])
+    println "Running SNP-GWAS, DB-GWAS and Pan-GWAS, with the population structure controlled using a RAxML phylogeny and the accessory genome defined per Panaroo.."
   }
   if( params.Mash ) {
     flow_sub1_Mash(flow3.out[3],flow3.out[1], flow3.out[2])

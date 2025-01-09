@@ -2,6 +2,8 @@
 rm( list = ls() )
 
 # load necessary libraries
+library(xlsx)
+library(tidyverse)
 
 # load data
 setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Preliminary Analysis")
@@ -17,13 +19,16 @@ CDC_EOD_LOD <- CDC_metadata |>
 # join SRA Accession 
 phenotypes <- left_join(CDC_EOD_LOD, SraAcclist) |>
   filter(! is.na(BioSample)) |>
-  select(SRA, Age.group)|>
-  mutate(Age.group= ifelse(Age.group =="EOD", 1, 0))
+  rename("samples"="SRA")|>
+  mutate(binary= ifelse(Age.group =="EOD", 1, 0))|>
+  mutate(continuous= sample(1:365, size = nrow(phenotypes), replace = TRUE))|>
+  select(samples, continuous, binary)
+
 
 # Write phenotypes file 
 write.table(phenotypes, "phenotypes.txt", 
             row.names = F, 
-            col.names = F, 
+            col.names = T, 
             quote = F, 
             sep = '\t')
 

@@ -128,31 +128,23 @@ gcc -O3 -finline-functions -funroll-loops -Wall -o FastTree FastTree.c -lm
 chmod +x FastTree
 FastTree -h
 ```
-### 3.4. Install RAxML
+### 3.4. Install RAxML-NG
 ```
 # download
-cd Files
-wget https://github.com/stamatak/standard-RAxML/archive/master.zip
-unzip master.zip
+# cd Files
+# wget https://github.com/stamatak/standard-RAxML/archive/master.zip
+# unzip master.zip
 # compile source code
-cd standard-RAxML-master/
-make -f Makefile.SSE3.PTHREADS.gcc # parallelized and x86 processor optimized version
-cd ../
-standard-RAxML-master/raxmlHPC-PTHREADS-SSE3 -h
-
+# cd standard-RAxML-master/
+# make -f Makefile.SSE3.PTHREADS.gcc # parallelized and x86 processor optimized version
+# cd ../
+# standard-RAxML-master/raxmlHPC-PTHREADS-SSE3 -h
 module load python
 conda create -n raxml-ng
 source activate raxml-ng
 conda install -c bioconda raxml-ng
 raxml-ng -h
 raxml-ng --parse --msa clean.full.aln --model GTR+G --prefix T1
-
-# ML search
-sbatch -p shared -c 48 -t 3-00:00 --mem=100000 --wrap="raxml-ng --msa clean.full.aln --model GTR+G --threads 48 --seed 12345 --tree pars{50},rand{50} --prefix /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade_500_TEST2/RAxML-NG_TEST/T1"
-# Bootstrap
-sbatch -p shared -c 48 -t 3-00:00 --mem=100000 --wrap="raxml-ng --bootstrap --msa clean.full.aln--model GTR+G --threads 48 --seed 12345 --bs-trees 250 --prefix /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade_500_TEST2/RAxML-NG_TEST/T2"
-# Computing branch support
-sbatch -p shared -c 48 -t 3-00:00 --mem=100000 --wrap="raxml-ng  --support --tree /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade_500_TEST2/RAxML-NG_TEST/T1.raxml.bestTree --bs-trees /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade_500_TEST2/RAxML-NG_TEST/T2.raxml.bootstraps --threads 48 --prefix /n/holyscratch01/hanage_lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/NEXTFLOW_PIPELINE_Upgrade_500_TEST2/RAxML-NG_TEST/T3 "
 ```
 ### 3.5. Install ROARY
 ```
@@ -165,7 +157,7 @@ conda config --add channels conda-forge
 conda config --add channels bioconda
 conda install roary
 ```
-### 3.5. Install CLARC
+### 3.6. Install CLARC
 ```
 cd Files
 git clone https://github.com/IndraGonz/CLARC.git
@@ -179,7 +171,7 @@ cd ../
 clarc -h
 conda deactivate
 ```
-### 3.6. Install Pyseer Files
+### 3.7. Install Pyseer Files
 ```
 cd Files
 git clone https://github.com/mgalardini/pyseer

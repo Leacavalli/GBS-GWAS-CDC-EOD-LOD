@@ -1,0 +1,63 @@
+PowerBacGWAS: Power calculations for Bacterial GWAS
+
+https://github.com/francesccoll/powerbacgwas/wiki#usage
+
+# Install
+module load python
+source activate java
+git clone https://github.com/francesccoll/powerbacgwas/
+cd powerbacgwas/nextflow
+nextflow run main.nf --help
+
+# Which pyseer settings do they use?
+Pyseer v1.3.524 was used to run the GWAS using the linear mixed model (LMM) to account for population structure. The kinship matrix for LMM is calculated from the phylogenic tree using PySeer’s script phylogeny_distance.py and thus is kept the same for all GWAS analyses (SNP, burden testing and pan-genome GWAS) applied to the same population.
+
+# Move necessary files
+# Data pre-processing steps
+
+salloc -p test -c 8 -t 00-01:00 --mem=10000
+## SNP-GWAS
+
+nextflow run main.nf --vcf core.vcf --outprefix test.var --run_prepare_vcf -profile farm --num_cores 8
+## PanGWAS
+cp ../../../GBS-GWAS-pipeline/Nextflow_pipeline_100/13.Pangenome_analysis/13.1.Panaroo/gene_presence_absence.Rtab ./
+nextflow run main.nf --pangenome gene_presence_absence.Rtab --outprefix test.pg --run_prepare_pangenome -profile farm --num_cores 8
+
+# Ancestral state reconstruction
+## SNP-GWAS
+cp ../../../GBS-GWAS-pipeline/Nextflow_pipeline_100/12.Phylogeny/12.2.FastTree/GBS_GWAS_FastTree_phylo.tre ./
+nextflow run main.nf --outprefix test.var --tree GBS_GWAS_FastTree_phylo.tre --run_vcf_ast -profile farm --num_cores 8
+## PanGWAS
+nextflow run main.nf --outprefix test.pg --tree GBS_GWAS_FastTree_phylo.tre --run_pangenome_ast -profile farm  --num_cores 8
+
+
+# Running power calculations: phenotype simulation approach
+# The phenotype simulation approach to conduct power calculations is implemented in the PowerBacGWAS toolkit for when a genotype-phenotype relationship is not known in the population, for both binary and quantitative phenotypes. In brief, this approach consists in sampling existing variants from pan-genome or VCF file meeting a predefined allele frequency and degree of homoplasy, to then simulate phenotypes from these variants with a pre-defined effect size and sample size. The wrapper scripts # prepare_gwas_runs.py and prepare_gwas_runs_roary.py implement this approach for VCF variants and the pan-genome, respectively.
+## SNP-GWAS
+nextflow run main.nf --outprefix test.var --tree GBS_GWAS_FastTree_phylo.tre --vcf core.vcf --parameters SNPGWAS_parameters.txt --run_phensim_vcf -profile farm --num_cores 8 --gwas_tmp_dir tmp/gwas_tmp_SNPGWAS_test/
+## PanGWAS
+nextflow run main.nf --outprefix kpn_clade.pg --tree kpn_clade.tree.nwk --pangenome kpn_clade.gene_presence_absence.Rtab --parameters kpn_clade.parameters.binary.efs.txt --run_phensim_pangenome --num_cores 8 --gwas_tmp_dir tmp/gwas_tmp_kpn_clade_pg_efs/
+
+
+
+# Questions:
+* Why do we need ancestral state reconstruction ?
+A requirement to run the phenotype-simulation approach is that the ancestral state of genetic variants can be reconstructed so that these can be selected based on their degree of homoplasy. This prerequisite may not be possible for bacterial populations with high recombination rates. Because one of the goals of the pipeline is to assess the power of detecting causal variants depending on their degree of homoplasy, the ancestral state of variants need to be reconstructed to count how many times they arose in the phylogeny.
+
+* Why do we need to count homoplasies?
+the number of independent variant acquisitions (homoplasies) at the region (e.g. gene) level.
+The successful identification of phenotype-genotype associations in bacteria is influenced by multiple factors which vary strongly between bacterial species such as population structure, gene presence/absence, homoplasy and phenotype heritability.
+The degree of homoplasy of causal SNPs, that is, the number of times SNPs arose independently in the phylogeny, had a big impact on the ability of GWAS to detect them (Fig. 3).
+
+* What is a burden test GWAS ?
+A widely known category is burden test, which collapses all information in a genetic region (e.g. gene) into one genetic burden score that can be used for association analysis. The association is then analyzed between the burden score and a certain phenotype.
+
+* Need to modify parameters file ?
+
+* What do the allele frequency ranges correspond to ?
+Some parameters are indicated with ranges (defined from parameter_from to parameter_to) as it is more likely to find variants (e.g. SNPs) whose parameter values fall within a range (e.g. allele frequency) than having a specific value.
+
+# Comments
+* No power calculations for DBGWAS
+* No power calculations for fixed effect. - Perhaps we can use our manual power calculation with fixed effect model as a lower bound and the PowerBacGWAS lmm calculation as an upper bound of sample size ?
+- [81/e898c8] NOTE: Process `run_gwas_bash_script_phensim_vcf (496)` terminated with an error exit status (1) -- Error is ignored

@@ -20,6 +20,10 @@ library(khroma)
 phenotypes <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Preliminary Analysis/phenotypes.txt")
 ## SNPGWAS
 SNPGWAS_Fasttree <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Preliminary Analysis/Lea Figures/Data/500_Samples/15.2.Subanalysis_1/16.2.1.Fasttree/SNPGWAS_Fasttree.txt")
+## DBGWAS
+DBGWAS_Fasttree <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Preliminary Analysis/Lea Figures/Data/500_Samples/15.2.Subanalysis_1/16.2.1.Fasttree/DBGWAS_Fasttree.txt")
+## PanGWAS
+PanGWAS_Fasttree <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Preliminary Analysis/Lea Figures/Data/500_Samples/15.2.Subanalysis_1/16.2.1.Fasttree/PanGWAS_Panaroo_phylo_Fasttree.txt")
 ```
 
 ```{r}
@@ -46,39 +50,39 @@ power_function <- function(f, b.alt, n_cases, n_controls, n_test, sig = 0.05) {
 f_seq <- seq(0, 0.5, 0.01)
 beta_1.2 <- power_function(f= f_seq,
                         b.alt=log(1.2), 
-                        n_cases = sum(phenotypes$X0), 
-                        n_controls =(nrow(phenotypes)-sum(phenotypes$X0)), 
+                        n_cases = sum(phenotypes$binary), 
+                        n_controls =(nrow(phenotypes)-sum(phenotypes$binary)), 
                         n_test = nrow(SNPGWAS_Fasttree))
 
 beta_1.5 <- power_function(f= f_seq,
                         b.alt=log(1.5), 
-                        n_cases = sum(phenotypes$X0), 
-                        n_controls = (nrow(phenotypes)-sum(phenotypes$X0)), 
+                        n_cases = sum(phenotypes$binary), 
+                        n_controls = (nrow(phenotypes)-sum(phenotypes$binary)), 
                         n_test = nrow(SNPGWAS_Fasttree))
 
 beta_1.7 <- power_function(f= f_seq,
                         b.alt=log(1.7), 
-                        n_cases = sum(phenotypes$X0), 
-                        n_controls = (nrow(phenotypes)-sum(phenotypes$X0)), 
+                        n_cases = sum(phenotypes$binary), 
+                        n_controls = (nrow(phenotypes)-sum(phenotypes$binary)), 
                         n_test = nrow(SNPGWAS_Fasttree))
 
 beta_2 <- power_function(f= f_seq,
                         b.alt=log(2), 
-                        n_cases = sum(phenotypes$X0), 
-                        n_controls = (nrow(phenotypes)-sum(phenotypes$X0)), 
+                        n_cases = sum(phenotypes$binary), 
+                        n_controls = (nrow(phenotypes)-sum(phenotypes$binary)), 
                         n_test = nrow(SNPGWAS_Fasttree))
 
 
 beta_5 <- power_function(f= f_seq,
                         b.alt=log(5), 
-                        n_cases = sum(phenotypes$X0), 
-                        n_controls =(nrow(phenotypes)-sum(phenotypes$X0)), 
+                        n_cases = sum(phenotypes$binary), 
+                        n_controls =(nrow(phenotypes)-sum(phenotypes$binary)), 
                         n_test = nrow(SNPGWAS_Fasttree))
 
 beta_10 <- power_function(f= f_seq,
                         b.alt=log(10), 
-                        n_cases = sum(phenotypes$X0), 
-                        n_controls =(nrow(phenotypes)-sum(phenotypes$X0)), 
+                        n_cases = sum(phenotypes$binary), 
+                        n_controls =(nrow(phenotypes)-sum(phenotypes$binary)), 
                         n_test = nrow(SNPGWAS_Fasttree))
 
 
@@ -102,25 +106,22 @@ pwr_df |>
 
 ```
 
+## PLOT effext size vs MAF
+# Function 
 ```{r}
-# Assuming SNPGWAS_Fasttree is your dataset with columns "af" (MAF) and "beta" (log-odds ratio)
-# Extract MAF and effect size (log-odds ratio)
-SNPGWAS_Fasttree |>
-  mutate(sig= ifelse(lrt.pvalue < 0.05/nrow(SNPGWAS_Fasttree), "sig", "not sig"))|>
-  mutate(MAF= ifelse(af <= 0.5, af, 1-af))|>
-  ggplot()+
-  geom_point(aes(x=MAF, y= abs(beta), colour = sig))+
-  xlab("Minor Allele Frequency (MAF)")+
-  ylab("EFFECT SIZE (in log-odds-ratio)")+
-  theme_bw()
-  
-  
-
 # Loop over each set of cases and controls to calculate and plot power curves
-Effect_size_function <- function(pw.thresh, N_cases, N_controls, f, b_vals, sig, n_tests){
+Effect_size_function <- function(pw.thresh, N_cases, N_controls, f, b_vals, sig, n_tests, correction){
   pw = rep(NA, length(b_vals)) # Power at each candidate b
   b.for.f = rep(NA, length(f)) # For each f, gives the b value that leads to target power
-  p.threshold = sig / n_tests  # Genome-wide significance threshold
+  if(correction =="Bonferonni"){
+    p.threshold = sig / n_tests                # Genome-wide significance threshold w/ Bonferonni correction
+  }else{
+    if(correction =="Sidak"){
+    p.threshold = 1 - (1 - sig)^(1/n_tests)    # Genome-wide significance threshold w/ Sidak correction
+    }else{
+    p.threshold = sig                          # No correction
+    } 
+  } 
   q = qchisq(p.threshold, df = 1, lower = F) # Chi-square value corresponding to significance threshold
   for (i in 1:length(f)){
     pw = pchisq(q, df = 1, ncp = N_cases * N_controls / (N_cases+N_controls) * 2 * f[i] * (1 - f[i]) * b_vals^2, lower = F)
@@ -128,73 +129,677 @@ Effect_size_function <- function(pw.thresh, N_cases, N_controls, f, b_vals, sig,
   }
   b.for.f
 }
+```
 
-
+# SNPGWAS - Bonferonni Correction 
+```{r}
 f_seq <- seq(0.01, 0.5, length = 200)
-
-Effect_size_pwr90 <- Effect_size_function(pw.thresh=0.9, 
-     N_cases= 20*sum(phenotypes$X0 == 1), 
-     N_controls=20*sum(phenotypes$X0 == 0), 
+Effect_size_pwr90_SNPGWAS_Bonf <- Effect_size_function(pw.thresh=0.9, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
      f= f_seq, 
      b_vals =seq(0, 2, length = 1000),
      sig=0.05, 
-     n_tests = nrow(SNPGWAS_Fasttree))
+     n_tests = nrow(SNPGWAS_Fasttree), 
+     correction ="Bonferonni")
 
-Effect_size_pwr80 <- Effect_size_function(pw.thresh=0.8, 
-     N_cases= 20*sum(phenotypes$X0 == 1), 
-     N_controls=20*sum(phenotypes$X0 == 0), 
+Effect_size_pwr80_SNPGWAS_Bonf <- Effect_size_function(pw.thresh=0.8, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
      f= f_seq, 
      b_vals =seq(0, 2, length = 1000),
      sig=0.05, 
-     n_tests = nrow(SNPGWAS_Fasttree))
+     n_tests = nrow(SNPGWAS_Fasttree), 
+     correction ="Bonferonni")
 
-Effect_size_pwr70 <- Effect_size_function(pw.thresh=0.7, 
-     N_cases= 20*sum(phenotypes$X0 == 1), 
-     N_controls=20*sum(phenotypes$X0 == 0), 
+Effect_size_pwr70_SNPGWAS_Bonf <- Effect_size_function(pw.thresh=0.7, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
      f= f_seq, 
      b_vals =seq(0, 2, length = 1000),
      sig=0.05, 
-     n_tests = nrow(SNPGWAS_Fasttree))
+     n_tests = nrow(SNPGWAS_Fasttree), 
+     correction ="Bonferonni")
 
-Effect_size_pwr60 <- Effect_size_function(pw.thresh=0.6, 
-     N_cases= 20*sum(phenotypes$X0 == 1), 
-     N_controls=20*sum(phenotypes$X0 == 0), 
+Effect_size_pwr60_SNPGWAS_Bonf <- Effect_size_function(pw.thresh=0.6, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
      f= f_seq, 
      b_vals =seq(0, 2, length = 1000),
      sig=0.05, 
-     n_tests = nrow(SNPGWAS_Fasttree))
+     n_tests = nrow(SNPGWAS_Fasttree), 
+     correction ="Bonferonni")
 
-Effect_size_pwr50 <- Effect_size_function(pw.thresh=0.5, 
-     N_cases= 20*sum(phenotypes$X0 == 1), 
-     N_controls=20*sum(phenotypes$X0 == 0), 
+Effect_size_pwr50_SNPGWAS_Bonf <- Effect_size_function(pw.thresh=0.5, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
      f= f_seq, 
      b_vals =seq(0, 2, length = 1000),
      sig=0.05, 
-     n_tests = nrow(SNPGWAS_Fasttree))
+     n_tests = nrow(SNPGWAS_Fasttree), 
+     correction ="Bonferonni")
 
-Effect_size_df <- rbind(data.frame(MAF=f_seq, beta= Effect_size_pwr90) |> mutate(power= "90%"),
-                data.frame(MAF=f_seq, beta= Effect_size_pwr80) |> mutate(power= "80%"),
-                data.frame(MAF=f_seq, beta= Effect_size_pwr70) |> mutate(power= "70%"),
-                data.frame(MAF=f_seq, beta= Effect_size_pwr60) |> mutate(power= "60%"),
-                data.frame(MAF=f_seq, beta= Effect_size_pwr50) |> mutate(power= "50%"))
-
+Effect_size_df_SNPGWAS_Bonf <- rbind(data.frame(MAF=f_seq, beta= Effect_size_pwr90_SNPGWAS_Bonf) |> mutate(power= "90%"),
+                data.frame(MAF=f_seq, beta= Effect_size_pwr80_SNPGWAS_Bonf) |> mutate(power= "80%"),
+                data.frame(MAF=f_seq, beta= Effect_size_pwr70_SNPGWAS_Bonf) |> mutate(power= "70%"),
+                data.frame(MAF=f_seq, beta= Effect_size_pwr60_SNPGWAS_Bonf) |> mutate(power= "60%"),
+                data.frame(MAF=f_seq, beta= Effect_size_pwr50_SNPGWAS_Bonf) |> mutate(power= "50%"))
 
 
 # Prepare the data from SNPGWAS_Fasttree
-SNPGWAS_Fasttree_v2 <- SNPGWAS_Fasttree |>
+SNPGWAS_Fasttree_Bonf <- SNPGWAS_Fasttree |>
   mutate(sig = ifelse(lrt.pvalue < 0.05 / nrow(SNPGWAS_Fasttree), "sig", "not sig")) |>
   mutate(MAF = ifelse(af <= 0.5, af, 1 - af))
 
 # PLOT
 ggplot() +
   # Plot points for SNPGWAS_Fasttree
-  geom_point(data = SNPGWAS_Fasttree_v2, aes(x = MAF, y = exp(abs(beta)), colour = sig)) +
+  geom_point(data = SNPGWAS_Fasttree_Bonf, aes(x = MAF, y = exp(abs(beta)))) +
   # Plot lines for Effect_size_df
-  geom_line(data = Effect_size_df, aes(x = MAF, y = exp(beta), colour = power)) +
+  geom_line(data = Effect_size_df_SNPGWAS_Bonf, aes(x = MAF, y = exp(beta), colour = power)) +
   # Customize labels and theme
   xlab("Minor Allele Frequency (MAF)") +
   ylab("EFFECT SIZE (in odds-ratio)") +
-  theme_bw()                                    
+  theme_bw()  
+```
+# SNPGWAS - Sidak Correction 
+```{r}
+f_seq <- seq(0.01, 0.5, length = 200)
+Effect_size_pwr90_SNPGWAS_Sid <- Effect_size_function(pw.thresh=0.9, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(SNPGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_pwr80_SNPGWAS_Sid <- Effect_size_function(pw.thresh=0.8, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(SNPGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_pwr70_SNPGWAS_Sid <- Effect_size_function(pw.thresh=0.7, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(SNPGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_pwr60_SNPGWAS_Sid <- Effect_size_function(pw.thresh=0.6, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(SNPGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_pwr50_SNPGWAS_Sid <- Effect_size_function(pw.thresh=0.5, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(SNPGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_df_SNPGWAS_Sid <- rbind(data.frame(MAF=f_seq, beta= Effect_size_pwr90_SNPGWAS_Sid) |> mutate(power= "90%"),
+                data.frame(MAF=f_seq, beta= Effect_size_pwr80_SNPGWAS_Sid) |> mutate(power= "80%"),
+                data.frame(MAF=f_seq, beta= Effect_size_pwr70_SNPGWAS_Sid) |> mutate(power= "70%"),
+                data.frame(MAF=f_seq, beta= Effect_size_pwr60_SNPGWAS_Sid) |> mutate(power= "60%"),
+                data.frame(MAF=f_seq, beta= Effect_size_pwr50_SNPGWAS_Sid) |> mutate(power= "50%"))
+
+
+# Prepare the data from SNPGWAS_Fasttree
+SNPGWAS_Fasttree_Sid <- SNPGWAS_Fasttree |>
+  mutate(sig = ifelse(lrt.pvalue < 0.05 / nrow(SNPGWAS_Fasttree), "sig", "not sig")) |>
+  mutate(MAF = ifelse(af <= 0.5, af, 1 - af))
+
+# PLOT
+ggplot() +
+  # Plot points for SNPGWAS_Fasttree
+  geom_point(data = SNPGWAS_Fasttree_Sid, aes(x = MAF, y = exp(abs(beta)))) +
+  # Plot lines for Effect_size_df
+  geom_line(data = Effect_size_df_SNPGWAS_Sid, aes(x = MAF, y = exp(beta), colour = power)) +
+  # Customize labels and theme
+  xlab("Minor Allele Frequency (MAF)") +
+  ylab("EFFECT SIZE (in odds-ratio)") +
+  theme_bw()  
 ```
 
 
+
+
+
+# DBGWAS - Bonferonni Correction 
+```{r}
+f_seq <- seq(0.01, 0.5, length = 200)
+Effect_size_pwr90_DBGWAS_Bonf <- Effect_size_function(pw.thresh=0.9, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(DBGWAS_Fasttree), 
+     correction ="Bonferonni")
+
+Effect_size_pwr80_DBGWAS_Bonf <- Effect_size_function(pw.thresh=0.8, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(DBGWAS_Fasttree), 
+     correction ="Bonferonni")
+
+Effect_size_pwr70_DBGWAS_Bonf <- Effect_size_function(pw.thresh=0.7, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(DBGWAS_Fasttree), 
+     correction ="Bonferonni")
+
+Effect_size_pwr60_DBGWAS_Bonf <- Effect_size_function(pw.thresh=0.6, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(DBGWAS_Fasttree), 
+     correction ="Bonferonni")
+
+Effect_size_pwr50_DBGWAS_Bonf <- Effect_size_function(pw.thresh=0.5, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(DBGWAS_Fasttree), 
+     correction ="Bonferonni")
+
+Effect_size_df_DBGWAS_Bonf <- rbind(data.frame(MAF=f_seq, beta= Effect_size_pwr90_DBGWAS_Bonf) |> mutate(power= "90%"),
+                data.frame(MAF=f_seq, beta= Effect_size_pwr80_DBGWAS_Bonf) |> mutate(power= "80%"),
+                data.frame(MAF=f_seq, beta= Effect_size_pwr70_DBGWAS_Bonf) |> mutate(power= "70%"),
+                data.frame(MAF=f_seq, beta= Effect_size_pwr60_DBGWAS_Bonf) |> mutate(power= "60%"),
+                data.frame(MAF=f_seq, beta= Effect_size_pwr50_DBGWAS_Bonf) |> mutate(power= "50%"))
+
+
+# Prepare the data from DBGWAS_Fasttree
+DBGWAS_Fasttree_Bonf <- DBGWAS_Fasttree |>
+  mutate(sig = ifelse(lrt.pvalue < 0.05 / nrow(DBGWAS_Fasttree), "sig", "not sig")) |>
+  mutate(MAF = ifelse(af <= 0.5, af, 1 - af))
+
+# PLOT
+ggplot() +
+  # Plot points for DBGWAS_Fasttree
+  geom_point(data = DBGWAS_Fasttree_Bonf, aes(x = MAF, y = exp(abs(beta)))) +
+  # Plot lines for Effect_size_df
+  geom_line(data = Effect_size_df_DBGWAS_Bonf, aes(x = MAF, y = exp(beta), colour = power)) +
+  # Customize labels and theme
+  xlab("Minor Allele Frequency (MAF)") +
+  ylab("EFFECT SIZE (in odds-ratio)") +
+  theme_bw()  
+```
+
+
+# DBGWAS - Sidak Correction 
+```{r}
+f_seq <- seq(0.01, 0.5, length = 200)
+Effect_size_pwr90_DBGWAS_Sid <- Effect_size_function(pw.thresh=0.9, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(DBGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_pwr80_DBGWAS_Sid <- Effect_size_function(pw.thresh=0.8, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(DBGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_pwr70_DBGWAS_Sid <- Effect_size_function(pw.thresh=0.7, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(DBGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_pwr60_DBGWAS_Sid <- Effect_size_function(pw.thresh=0.6, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(DBGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_pwr50_DBGWAS_Sid <- Effect_size_function(pw.thresh=0.5, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(DBGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_df_DBGWAS_Sid <- rbind(data.frame(MAF=f_seq, beta= Effect_size_pwr90_DBGWAS_Sid) |> mutate(power= "90%"),
+                data.frame(MAF=f_seq, beta= Effect_size_pwr80_DBGWAS_Sid) |> mutate(power= "80%"),
+                data.frame(MAF=f_seq, beta= Effect_size_pwr70_DBGWAS_Sid) |> mutate(power= "70%"),
+                data.frame(MAF=f_seq, beta= Effect_size_pwr60_DBGWAS_Sid) |> mutate(power= "60%"),
+                data.frame(MAF=f_seq, beta= Effect_size_pwr50_DBGWAS_Sid) |> mutate(power= "50%"))
+
+
+# Prepare the data from DBGWAS_Fasttree
+DBGWAS_Fasttree_Sid <- DBGWAS_Fasttree |>
+  mutate(sig = ifelse(lrt.pvalue < 0.05 / nrow(DBGWAS_Fasttree), "sig", "not sig")) |>
+  mutate(MAF = ifelse(af <= 0.5, af, 1 - af))
+
+# PLOT
+ggplot() +
+  # Plot points for DBGWAS_Fasttree
+  geom_point(data = DBGWAS_Fasttree_Sid, aes(x = MAF, y = exp(abs(beta)))) +
+  # Plot lines for Effect_size_df
+  geom_line(data = Effect_size_df_DBGWAS_Sid, aes(x = MAF, y = exp(beta), colour = power)) +
+  # Customize labels and theme
+  xlab("Minor Allele Frequency (MAF)") +
+  ylab("EFFECT SIZE (in odds-ratio)") +
+  theme_bw()  
+```
+
+
+
+
+# PanGWAS - Bonferonni Correction 
+```{r}
+f_seq <- seq(0.01, 0.5, length = 200)
+Effect_size_pwr90_PanGWAS_Bonf <- Effect_size_function(pw.thresh=0.9, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(PanGWAS_Fasttree), 
+     correction ="Bonferonni")
+
+Effect_size_pwr80_PanGWAS_Bonf <- Effect_size_function(pw.thresh=0.8, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(PanGWAS_Fasttree), 
+     correction ="Bonferonni")
+
+Effect_size_pwr70_PanGWAS_Bonf <- Effect_size_function(pw.thresh=0.7, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(PanGWAS_Fasttree), 
+     correction ="Bonferonni")
+
+Effect_size_pwr60_PanGWAS_Bonf <- Effect_size_function(pw.thresh=0.6, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(PanGWAS_Fasttree), 
+     correction ="Bonferonni")
+
+Effect_size_pwr50_PanGWAS_Bonf <- Effect_size_function(pw.thresh=0.5, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(PanGWAS_Fasttree), 
+     correction ="Bonferonni")
+
+Effect_size_df_PanGWAS_Bonf <- rbind(data.frame(MAF=f_seq, beta= Effect_size_pwr90_PanGWAS_Bonf) |> mutate(power= "90%"),
+                data.frame(MAF=f_seq, beta= Effect_size_pwr80_PanGWAS_Bonf) |> mutate(power= "80%"),
+                data.frame(MAF=f_seq, beta= Effect_size_pwr70_PanGWAS_Bonf) |> mutate(power= "70%"),
+                data.frame(MAF=f_seq, beta= Effect_size_pwr60_PanGWAS_Bonf) |> mutate(power= "60%"),
+                data.frame(MAF=f_seq, beta= Effect_size_pwr50_PanGWAS_Bonf) |> mutate(power= "50%"))
+
+
+# Prepare the data from PanGWAS_Fasttree
+PanGWAS_Fasttree_Bonf <- PanGWAS_Fasttree |>
+  mutate(sig = ifelse(lrt.pvalue < 0.05 / nrow(PanGWAS_Fasttree), "sig", "not sig")) |>
+  mutate(MAF = ifelse(af <= 0.5, af, 1 - af))
+
+# PLOT
+ggplot() +
+  # Plot points for PanGWAS_Fasttree
+  geom_point(data = PanGWAS_Fasttree_Bonf, aes(x = MAF, y = exp(abs(beta)))) +
+  # Plot lines for Effect_size_df
+  geom_line(data = Effect_size_df_PanGWAS_Bonf, aes(x = MAF, y = exp(beta), colour = power)) +
+  # Customize labels and theme
+  xlab("Minor Allele Frequency (MAF)") +
+  ylab("EFFECT SIZE (in odds-ratio)") +
+  theme_bw()  
+```
+
+
+# PanGWAS - Sidak Correction 
+```{r}
+f_seq <- seq(0.01, 0.5, length = 200)
+Effect_size_pwr90_PanGWAS_Sid <- Effect_size_function(pw.thresh=0.9, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(PanGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_pwr80_PanGWAS_Sid <- Effect_size_function(pw.thresh=0.8, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(PanGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_pwr70_PanGWAS_Sid <- Effect_size_function(pw.thresh=0.7, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(PanGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_pwr60_PanGWAS_Sid <- Effect_size_function(pw.thresh=0.6, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(PanGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_pwr50_PanGWAS_Sid <- Effect_size_function(pw.thresh=0.5, 
+     N_cases= sum(phenotypes$binary == 1), 
+     N_controls=sum(phenotypes$binary == 0), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(PanGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_df_PanGWAS_Sid <- rbind(data.frame(MAF=f_seq, beta= Effect_size_pwr90_PanGWAS_Sid) |> mutate(power= "90%"),
+                data.frame(MAF=f_seq, beta= Effect_size_pwr80_PanGWAS_Sid) |> mutate(power= "80%"),
+                data.frame(MAF=f_seq, beta= Effect_size_pwr70_PanGWAS_Sid) |> mutate(power= "70%"),
+                data.frame(MAF=f_seq, beta= Effect_size_pwr60_PanGWAS_Sid) |> mutate(power= "60%"),
+                data.frame(MAF=f_seq, beta= Effect_size_pwr50_PanGWAS_Sid) |> mutate(power= "50%"))
+
+
+# Prepare the data from PanGWAS_Fasttree
+PanGWAS_Fasttree_Sid <- PanGWAS_Fasttree |>
+  mutate(sig = ifelse(lrt.pvalue < 0.05 / nrow(PanGWAS_Fasttree), "sig", "not sig")) |>
+  mutate(MAF = ifelse(af <= 0.5, af, 1 - af))
+
+# PLOT
+ggplot() +
+  # Plot points for PanGWAS_Fasttree
+  geom_point(data = PanGWAS_Fasttree_Sid, aes(x = MAF, y = exp(abs(beta)))) +
+  # Plot lines for Effect_size_df
+  geom_line(data = Effect_size_df_PanGWAS_Sid, aes(x = MAF, y = exp(beta), colour = power)) +
+  # Customize labels and theme
+  xlab("Minor Allele Frequency (MAF)") +
+  ylab("EFFECT SIZE (in odds-ratio)") +
+  theme_bw()  
+```
+
+
+
+
+
+
+# Function 
+```{r}
+# Loop over each set of cases and controls to calculate and plot power curves
+Effect_size_function_lin <- function(pw.thresh, N, f, b_vals, sig, n_tests, correction){
+  pw = rep(NA, length(b_vals)) # Power at each candidate b
+  b.for.f = rep(NA, length(f)) # For each f, gives the b value that leads to target power
+  if(correction =="Bonferonni"){
+    p.threshold = sig / n_tests                # Genome-wide significance threshold w/ Bonferonni correction
+  }else{
+    if(correction =="Sidak"){
+    p.threshold = 1 - (1 - sig)^(1/n_tests)    # Genome-wide significance threshold w/ Sidak correction
+    }else{
+    p.threshold = sig                          # No correction
+    } 
+  } 
+  q = qchisq(p.threshold, df = 1, lower = F) # Chi-square value corresponding to significance threshold
+  for (i in 1:length(f)){
+    sigma = sqrt(1 - (2 * f[i] * (1 - f[i]) * (b_vals^2)))
+    pw = pchisq(q, df = 1, ncp =  N * 2 * f[i] * (1 - f[i]) * (b_vals^2) / (sigma^2) , lower = F)
+    b.for.f[i] = b_vals[min(which(pw > pw.thresh))] # Find the effect size that achieves the target power
+  }
+  b.for.f
+}
+
+```
+
+# SNPGWAS - Sidak Correction 
+```{r}
+f_seq <- seq(0.01, 0.5, length = 200)
+Effect_size_lin_pwr90_SNPGWAS_Sid <- Effect_size_function_lin(pw.thresh=0.9, 
+     N = nrow(phenotypes), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(SNPGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_lin_pwr80_SNPGWAS_Sid <- Effect_size_function_lin(pw.thresh=0.8, 
+          N = nrow(phenotypes), 
+          f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(SNPGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_lin_pwr70_SNPGWAS_Sid <- Effect_size_function_lin(pw.thresh=0.7, 
+     N = nrow(phenotypes), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(SNPGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_lin_pwr60_SNPGWAS_Sid <- Effect_size_function_lin(pw.thresh=0.6, 
+     N = nrow(phenotypes), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(SNPGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_lin_pwr50_SNPGWAS_Sid <- Effect_size_function_lin(pw.thresh=0.5, 
+     N = nrow(phenotypes), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(SNPGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_lin_df_SNPGWAS_Sid <- rbind(data.frame(MAF=f_seq, beta= Effect_size_lin_pwr90_SNPGWAS_Sid) |> mutate(power= "90%"),
+                data.frame(MAF=f_seq, beta= Effect_size_lin_pwr80_SNPGWAS_Sid) |> mutate(power= "80%"),
+                data.frame(MAF=f_seq, beta= Effect_size_lin_pwr70_SNPGWAS_Sid) |> mutate(power= "70%"),
+                data.frame(MAF=f_seq, beta= Effect_size_lin_pwr60_SNPGWAS_Sid) |> mutate(power= "60%"),
+                data.frame(MAF=f_seq, beta= Effect_size_lin_pwr50_SNPGWAS_Sid) |> mutate(power= "50%"))
+
+
+# Prepare the data from SNPGWAS_Fasttree
+SNPGWAS_Fasttree_lin_Sid <- SNPGWAS_Fasttree |>
+  mutate(sig = ifelse(lrt.pvalue < 0.05 / nrow(SNPGWAS_Fasttree), "sig", "not sig")) |>
+  mutate(MAF = ifelse(af <= 0.5, af, 1 - af))
+
+# PLOT
+ggplot() +
+  # Plot points for SNPGWAS_Fasttree
+  geom_point(data = SNPGWAS_Fasttree_lin_Sid, aes(x = MAF, y = exp(abs(beta)))) +
+  # Plot lines for Effect_size_df
+  geom_line(data = Effect_size_lin_df_SNPGWAS_Sid, aes(x = MAF, y = exp(beta), colour = power)) +
+  # Customize labels and theme
+  xlab("Minor Allele Frequency (MAF)") +
+  ylab("EFFECT SIZE (in odds-ratio)") +
+  theme_bw()  
+```
+
+# DBGWAS - Sidak Correction 
+```{r}
+f_seq <- seq(0.01, 0.5, length = 200)
+Effect_size_lin_pwr90_DBGWAS_Sid <- Effect_size_function_lin(pw.thresh=0.9, 
+     N = nrow(phenotypes), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(DBGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_lin_pwr80_DBGWAS_Sid <- Effect_size_function_lin(pw.thresh=0.8, 
+          N = nrow(phenotypes), 
+          f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(DBGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_lin_pwr70_DBGWAS_Sid <- Effect_size_function_lin(pw.thresh=0.7, 
+     N = nrow(phenotypes), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(DBGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_lin_pwr60_DBGWAS_Sid <- Effect_size_function_lin(pw.thresh=0.6, 
+     N = nrow(phenotypes), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(DBGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_lin_pwr50_DBGWAS_Sid <- Effect_size_function_lin(pw.thresh=0.5, 
+     N = nrow(phenotypes), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(DBGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_lin_df_DBGWAS_Sid <- rbind(data.frame(MAF=f_seq, beta= Effect_size_lin_pwr90_DBGWAS_Sid) |> mutate(power= "90%"),
+                data.frame(MAF=f_seq, beta= Effect_size_lin_pwr80_DBGWAS_Sid) |> mutate(power= "80%"),
+                data.frame(MAF=f_seq, beta= Effect_size_lin_pwr70_DBGWAS_Sid) |> mutate(power= "70%"),
+                data.frame(MAF=f_seq, beta= Effect_size_lin_pwr60_DBGWAS_Sid) |> mutate(power= "60%"),
+                data.frame(MAF=f_seq, beta= Effect_size_lin_pwr50_DBGWAS_Sid) |> mutate(power= "50%"))
+
+
+# Prepare the data from DBGWAS_Fasttree
+DBGWAS_Fasttree_lin_Sid <- DBGWAS_Fasttree |>
+  mutate(sig = ifelse(lrt.pvalue < 0.05 / nrow(DBGWAS_Fasttree), "sig", "not sig")) |>
+  mutate(MAF = ifelse(af <= 0.5, af, 1 - af))
+
+# PLOT
+ggplot() +
+  # Plot points for DBGWAS_Fasttree
+  geom_point(data = DBGWAS_Fasttree_lin_Sid, aes(x = MAF, y = exp(abs(beta)))) +
+  # Plot lines for Effect_size_df
+  geom_line(data = Effect_size_lin_df_DBGWAS_Sid, aes(x = MAF, y = exp(beta), colour = power)) +
+  # Customize labels and theme
+  xlab("Minor Allele Frequency (MAF)") +
+  ylab("EFFECT SIZE (in odds-ratio)") +
+  theme_bw()  
+```
+
+
+# PanGWAS - Sidak Correction 
+```{r}
+f_seq <- seq(0.01, 0.5, length = 200)
+Effect_size_lin_pwr90_PanGWAS_Sid <- Effect_size_function_lin(pw.thresh=0.9, 
+     N = nrow(phenotypes), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(PanGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_lin_pwr80_PanGWAS_Sid <- Effect_size_function_lin(pw.thresh=0.8, 
+          N = nrow(phenotypes), 
+          f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(PanGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_lin_pwr70_PanGWAS_Sid <- Effect_size_function_lin(pw.thresh=0.7, 
+     N = nrow(phenotypes), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(PanGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_lin_pwr60_PanGWAS_Sid <- Effect_size_function_lin(pw.thresh=0.6, 
+     N = nrow(phenotypes), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(PanGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_lin_pwr50_PanGWAS_Sid <- Effect_size_function_lin(pw.thresh=0.5, 
+     N = nrow(phenotypes), 
+     f= f_seq, 
+     b_vals =seq(0, 2, length = 1000),
+     sig=0.05, 
+     n_tests = nrow(PanGWAS_Fasttree), 
+     correction ="Sidak")
+
+Effect_size_lin_df_PanGWAS_Sid <- rbind(data.frame(MAF=f_seq, beta= Effect_size_lin_pwr90_PanGWAS_Sid) |> mutate(power= "90%"),
+                data.frame(MAF=f_seq, beta= Effect_size_lin_pwr80_PanGWAS_Sid) |> mutate(power= "80%"),
+                data.frame(MAF=f_seq, beta= Effect_size_lin_pwr70_PanGWAS_Sid) |> mutate(power= "70%"),
+                data.frame(MAF=f_seq, beta= Effect_size_lin_pwr60_PanGWAS_Sid) |> mutate(power= "60%"),
+                data.frame(MAF=f_seq, beta= Effect_size_lin_pwr50_PanGWAS_Sid) |> mutate(power= "50%"))
+
+
+# Prepare the data from PanGWAS_Fasttree
+PanGWAS_Fasttree_lin_Sid <- PanGWAS_Fasttree |>
+  mutate(sig = ifelse(lrt.pvalue < 0.05 / nrow(PanGWAS_Fasttree), "sig", "not sig")) |>
+  mutate(MAF = ifelse(af <= 0.5, af, 1 - af))
+
+# PLOT
+ggplot() +
+  # Plot points for PanGWAS_Fasttree
+  geom_point(data = PanGWAS_Fasttree_lin_Sid, aes(x = MAF, y = exp(abs(beta)))) +
+  # Plot lines for Effect_size_df
+  geom_line(data = Effect_size_lin_df_PanGWAS_Sid, aes(x = MAF, y = exp(beta), colour = power)) +
+  # Customize labels and theme
+  xlab("Minor Allele Frequency (MAF)") +
+  ylab("EFFECT SIZE (in odds-ratio)") +
+  theme_bw()  
+```
