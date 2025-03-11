@@ -53,13 +53,13 @@ module load python
 source activate java
 cd /n/netscratch/hanage_lab/Lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/Power_Calculations/powerbacgwas/nextflow/
 ## SNP-GWAS
-nextflow run main.nf --outprefix SNPGWAS_GBS_CDC_NL.var --vcf GBS_CDC_NL.vcf --run_prepare_vcf -profile farm --num_cores 50
-nextflow run main.nf --outprefix SNPGWAS_GBS_CDC_NL.var --tree GBS_CDC_NL_phylo.tre --run_vcf_ast -profile farm --num_cores 50
-nextflow run main.nf --outprefix SNPGWAS_GBS_CDC_NL.var --tree GBS_CDC_NL_phylo.tre --vcf GBS_CDC_NL.vcf --parameters GBS_CDC_NL_parameters.txt --run_phensim_vcf -profile farm --num_cores 50 --gwas_tmp_dir tmp/SNPGWAS_500_GBS_test2/
+nextflow run main.nf --outprefix SNPGWAS_GBS_CDC_NL2.var --vcf GBS_CDC_NL.vcf --run_prepare_vcf -profile farm --num_cores 50
+nextflow run main.nf --outprefix SNPGWAS_GBS_CDC_NL2.var --tree GBS_CDC_NL_phylo.tre --run_vcf_ast -profile farm --num_cores 50
+nextflow run main.nf --outprefix SNPGWAS_GBS_CDC_NL2.var --tree GBS_CDC_NL_phylo.tre --vcf GBS_CDC_NL.vcf --parameters GBS_CDC_NL_parameters.txt --run_phensim_vcf -profile farm --num_cores 50 --gwas_tmp_dir tmp/SNPGWAS_GBS_CDC_NL/
 ## PanGWAS
-nextflow run main.nf --outprefix PanGWAS_GBS_CDC_NL.pg --pangenome GBS_CDC_NL_gene_presence_absence.Rtab --run_prepare_pangenome -profile farm --num_cores 50
-nextflow run main.nf --outprefix PanGWAS_GBS_CDC_NL.pg --tree GBS_CDC_NL_phylo.tre --run_pangenome_ast -profile farm  --num_cores 50
-nextflow run main.nf --outprefix PanGWAS_GBS_CDC_NL.pg --tree GBS_CDC_NL_phylo.tre --pangenome GBS_CDC_NL_gene_presence_absence.Rtab --parameters GBS_CDC_NL_parameters.txt --run_phensim_pangenome -profile farm  --num_cores 50 --gwas_tmp_dir tmp/PanGWAS_500_GBS_test4/
+nextflow run main.nf --outprefix PanGWAS_GBS_CDC_NL2.pg --pangenome GBS_CDC_NL_gene_presence_absence.Rtab --run_prepare_pangenome -profile farm --num_cores 50
+nextflow run main.nf --outprefix PanGWAS_GBS_CDC_NL2.pg --tree GBS_CDC_NL_phylo.tre --run_pangenome_ast -profile farm  --num_cores 50
+nextflow run main.nf --outprefix PanGWAS_GBS_CDC_NL2.pg --tree GBS_CDC_NL_phylo.tre --pangenome GBS_CDC_NL_gene_presence_absence.Rtab --parameters GBS_CDC_NL_parameters.txt --run_phensim_pangenome -profile farm  --num_cores 50 --gwas_tmp_dir tmp/PanGWAS_GBS_CDC_NL/
 
 
 

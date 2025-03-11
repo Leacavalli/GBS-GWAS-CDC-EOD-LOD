@@ -8,7 +8,7 @@ sbatch -p sapphire -c 112 -t 3-00:00 --mem=990000 --wrap="nextflow -C nextflow.c
 
 module load python
 source activate java
-sbatch -p sapphire -c 112 -t 3-00:00 --mem=990000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline_FINAL.nf --main --sub1 --sub2 --sub3 --path_nextflow_dir /n/netscratch/hanage_lab/Lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/GBS-GWAS-pipeline/Nextflow_pipeline_CDC --path_conda_envs /n/home02/lcavalli/.conda/envs"
+sbatch -p sapphire -c 112 -t 3-00:00 --mem=990000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline_FINAL.nf -resume --main --sub1 --sub2 --sub3 --path_nextflow_dir /n/netscratch/hanage_lab/Lab/lcavalli/GBS-GWAS-CDC-EOD-LOD/GBS-GWAS-pipeline/Nextflow_pipeline_CDC --path_conda_envs /n/home02/lcavalli/.conda/envs"
 
 
 module load python
