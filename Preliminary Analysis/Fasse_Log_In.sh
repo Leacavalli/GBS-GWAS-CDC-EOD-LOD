@@ -91,3 +91,19 @@ conda deactivate
 
 cd Files
 git clone https://github.com/mgalardini/pyseer
+
+
+#Download Accessions
+
+#Download netherlands data
+
+while read acc; do sbatch -p fasse -t 0-12:00 --mem=10000 --wrap="prefetch $acc -O . || echo $acc >> ./failed_downloads.txt"; done < /n/hanage_gbs_gwas_l3/Lab/ErrAccList_Netherlands.txt
+
+for i in *RR*
+do
+  sbatch -p fasse -t 0-00:10 --mem=10000 --wrap="fasterq-dump --split-files $i/*sra"
+done
+
+for file in *.fastq; do
+    sbatch -p fasse -t 0-12:00 --mem=10000 --wrap="gzip $file"
+done
