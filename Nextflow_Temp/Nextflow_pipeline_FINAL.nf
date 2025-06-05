@@ -1,4 +1,4 @@
-15.params.OUTGROUP = false
+params.OUTGROUP = false
 params.main = false
 params.sub1 = false
 params.Fasttree = false
