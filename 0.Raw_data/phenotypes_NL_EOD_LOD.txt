@@ -1,4 +1,4 @@
-samples	disease
+samples	binary
 ERR1624733	1
 ERR1624832	1
 ERR1624833	0

@@ -3,14 +3,11 @@
 cd /n/hanage_gbs_gwas_l3/Lab
 
 #Install Nextflow Pipeline
-
 git clone https://github.com/Leacavalli/GBS-GWAS-pipeline.git
 cd GBS-GWAS-pipeline/Nextflow_pipeline/
 
 
 #Install Java
-
-
 module load python
 conda create -n java      # Only run once to set up; All following times, skip this
 source activate java
@@ -101,9 +98,9 @@ while read acc; do sbatch -p fasse -t 0-12:00 --mem=10000 --wrap="prefetch $acc 
 
 for i in *RR*
 do
-  sbatch -p fasse -t 0-00:10 --mem=10000 --wrap="fasterq-dump --split-files $i/*sra"
+  sbatch -p fasse -t 0-01:00:00 --mem=10000 --wrap="fasterq-dump --split-files $i/*sra"
 done
 
 for file in *.fastq; do
-    sbatch -p fasse -t 0-12:00 --mem=10000 --wrap="gzip -f $file"
+    sbatch -p fasse -t 0-01:00:00 --mem=10000 --wrap="gzip -f $file"
 done
