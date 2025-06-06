@@ -14,25 +14,25 @@ cd GBS-GWAS-pipeline/Nextflow_pipeline/
 module load python
 conda create -n java      # Only run once to set up; All following times, skip this
 source activate java
-conda install -c conda-forge openjdk=17 #Updated to java 17 for nextflow compatability 
+conda install -c conda-forge openjdk=17 #Updated to java 17 for nextflow compatability
 java -version             # Check java version
-deactivate java             
+deactivate java
 
 
 #Install Nextflow Executable
 
-cd scripts 
+cd scripts
 
 # Download the executable package:
-wget -qO- https://get.nextflow.io | bash   
-# Make the binary executable on your system by running:  
-chmod +x nextflow  
-# Add executable to $PATH                           
-nano  ~/.bashrc      
+wget -qO- https://get.nextflow.io | bash
+# Make the binary executable on your system by running:
+chmod +x nextflow
+# Add executable to $PATH
+nano  ~/.bashrc
 # add line at the end of file:
-export PATH="/n/hanage_gFs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline/scripts:$PATH"
+export PATH="/n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/:$PATH"
 # exist file with ctlX and Y
-source ~/.bashrc     
+source ~/.bashrc
 
 #Install Trimmomatic
 
@@ -44,7 +44,7 @@ java -jar Trimmomatic-0.39/trimmomatic-0.39.jar -h
 #Install Unicycler
 
 module load python
-conda create -n  unicycler   
+conda create -n  unicycler
 source activate unicycler
 conda install bioconda::unicycler
 
@@ -87,7 +87,7 @@ python setup.py install
 clarc -h
 conda deactivate
 
-#Install Pyseer 
+#Install Pyseer
 
 cd Files
 git clone https://github.com/mgalardini/pyseer
@@ -105,5 +105,5 @@ do
 done
 
 for file in *.fastq; do
-    sbatch -p fasse -t 0-12:00 --mem=10000 --wrap="gzip $file"
+    sbatch -p fasse -t 0-12:00 --mem=10000 --wrap="gzip -f $file"
 done
