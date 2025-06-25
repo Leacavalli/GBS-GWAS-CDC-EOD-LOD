@@ -53,7 +53,7 @@ nextflow run main.nf --outprefix GBS_CDC_EOD_LOD.var --tree GBS_GWAS_FastTree_ph
 
 #PanGWAS
 
-nextflow run main.nf --outprefix GBS_test.pg --tree  GBS_FastTree_phylo.tre --pangenome gene_presence_absence.Rtab --parameters GBS_parameters.txt --run_phensim_pangenome --num_cores 8 --gwas_tmp_dir tmp/gwas_tmp_GBS_PanGWAS_test/
+nextflow run main.nf --outprefix GBS_CDC_EOD_LOD.pg --tree  GBS_FastTree_phylo.tre --pangenome gene_presence_absence.Rtab --parameters GBS_parameters.txt --run_phensim_pangenome --num_cores 8 --gwas_tmp_dir tmp/GBS_CDC_EOD_LOD_PanGWAS_test/
 
 
 
