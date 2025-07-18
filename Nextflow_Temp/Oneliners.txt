@@ -37,6 +37,8 @@ Steps:
      17.1 SNP-based GWAS	
      17.2 DBGWAS
      17.3 Pan-GWAS
+18. Unitig mapper
+
 
 Main Analysis 
 Question: What are the genetic determinants of time of onset of GBS infection in the US ? (Methods: Pan GWAS, DB GWAS, SNP GWAS 
@@ -679,5 +681,18 @@ pyseer --lmm --phenotypes ${params.path_nextflow_dir}/Files/age_phenotypes.txt -
 
 17.3 Pan-GWAS Continuous Phenotype
 pyseer --min-af 0.05 --max-af 0.95 --lmm --phenotypes ${params.path_nextflow_dir}/Files/age_phenotypes.txt --continuous --pres ${params.path_nextflow_dir}/13.Pangenome_analysis/13.1.Panaroo/gene_presence_absence.Rtab --similarity ${params.path_nextflow_dir}/15.Pyseer/15.2.Subanalysis_1/15.2.1.Fasttree/FastTree_phylogeny_K.tsv --cpu 8 > ${params.path_nextflow_dir}/15.Pyseer/15.2.Subanalysis_1/15.2.1.Fasttree/PanGWAS_Panaroo_Fasttree.txt
+
+###############################################
+# Step 18 Map unitigs to reference            #
+###############################################
+
+#Tool: Pyseer in-house scripts
+#Requires as input: unitigs.gfa (produced by unitig caller); unitigs.txt (produced by unitig caller); pheontype_unitigs.txt (produced by pyseer- update this file based on which DBGWAS run, i.e. phenotype_unitigs_mash.txt etc) 
+
+annotate_hits_pyseer.py \
+  --hits phenotype_unitigs.txt \
+  --annotations unitigs.gfa \
+  --unitig-list unitigs.txt \
+  --output phenotype_unitigs_annotated.txt
 
 
