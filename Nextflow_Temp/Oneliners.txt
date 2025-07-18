@@ -687,9 +687,9 @@ pyseer --min-af 0.05 --max-af 0.95 --lmm --phenotypes ${params.path_nextflow_dir
 ###############################################
 
 #Tool: Pyseer in-house scripts
-#Requires as input: unitigs.gfa (produced by unitig caller); unitigs.txt (produced by unitig caller); pheontype_unitigs.txt (produced by pyseer- update this file based on which DBGWAS run, i.e. phenotype_unitigs_mash.txt etc) 
+#Requires as input: unitigs.gfa (produced by unitig caller); unitigs.txt (produced by unitig caller); pheontype_unitigs.txt (produced by pyseer- update this file based on which DBGWAS run, i.e. phenotype_unitigs_mash.txt etc); the annotate_hits_pyseer.py script downloaded from ypyseer
 
-annotate_hits_pyseer.py \
+$path_nextflow_dir/Files/pyseer/annotate_hits_pyseer.py \
   --hits phenotype_unitigs.txt \
   --annotations unitigs.gfa \
   --unitig-list unitigs.txt \
