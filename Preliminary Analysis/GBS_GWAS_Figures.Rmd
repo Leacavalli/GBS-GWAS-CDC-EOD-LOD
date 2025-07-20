@@ -8,16 +8,36 @@ date: "2024-11-06"
 library(qqman)
 library(circilize)
 library(VennDiagram)
-
 ```
 
 ```{r}
-data <- read.table("SNPGWAS_Fasttree.plot", sep = "\t")
-colnames(data) <- c("CHR", "SNP","BP","minLOG10(P)","log10(p)","r^2")
-data$CHR <- 1
+data <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_CDC/15.1.Main_analysis/SNPGWAS_Fasttree_LMM.txt", sep = "\t", header=T)
+
+# Extract "BP" from the first column by splitting at "_"
+positions <- sapply(strsplit(as.character(data[[1]]), "_"), function(x) x[2])
+
+# Extract p-value from the 4th column
+pvals <- data[[4]]
+
+# Calculate -log10(p)
+logp <- -log10(pvals)
+
+# Construct final data frame
+out_df <- data.frame(
+  CHR = 1,
+  SNP = ".",
+  BP = as.numeric(positions),
+  minLOG10P = logp,
+  log10p = logp,
+  r2 = 0
+)
+
+# Add header
+header <- c("CHR", "SNP", "BP", "minLOG10(P)", "log10(p)", "r^2")
+colnames(out_df) <- header
 
 manhattan(
-  data,
+  out_df,
   chr = "CHR",
   bp = "BP",
   p = "minLOG10(P)",  # Use the column with -log10(p-values)
@@ -30,7 +50,8 @@ manhattan(
 ```
 
 ```{r}
-data <- read.table("SNPGWAS_mash.plot", sep = "\t")
+data_sub2_1 <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_CDC/15.2.Subanalysis_1/15.2.1.Fasttree_FEM/SNPGWAS_Fasttree_FEM.txt", sep = "\t", header=T)
+
 colnames(data) <- c("CHR", "SNP","BP","minLOG10(P)","log10(p)","r^2")
 data$CHR <- 1
 data <- data[is.finite(data$`minLOG10(P)`) & is.finite(data$`log10(p)`), ]

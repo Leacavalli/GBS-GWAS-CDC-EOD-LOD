@@ -1,0 +1,97 @@
+---
+title: "Main Analysis"
+output: html_document
+date: "2025-07-17"
+---
+
+# Set up environment
+```{r}
+library(qqman)
+library(circilize)
+library(VennDiagram)
+```
+
+# SNP-GWAS
+```{r}
+data <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_CDC/15.1.Main_analysis/SNPGWAS_Fasttree_LMM.txt", sep = "\t", header=T)
+
+# Extract "BP" from the first column by splitting at "_"
+positions <- sapply(strsplit(as.character(data[[1]]), "_"), function(x) x[2])
+
+# Extract p-value from the 4th column
+pvals <- data[[4]]
+
+# Calculate -log10(p)
+logp <- -log10(pvals)
+
+# Construct final data frame
+out_df <- data.frame(
+  CHR = 1,
+  SNP = ".",
+  BP = as.numeric(positions),
+  minLOG10P = logp,
+  log10p = logp,
+  r2 = 0
+)
+
+# Add header
+header <- c("CHR", "SNP", "BP", "minLOG10(P)", "log10(p)", "r^2")
+colnames(out_df) <- header
+
+manhattan(
+  out_df,
+  chr = "CHR",
+  bp = "BP",
+  p = "minLOG10(P)",  # Use the column with -log10(p-values)
+  snp = "SNP",
+  main = "Manhattan Plot of SNP-GWAS\n Population Structure Controlled w/: FastTree (LMM)",
+  col = c("skyblue", "orange"),  # Customize colors as desired
+  genomewideline = -log10(5e-8),  # Set a genome-wide significance line if desired
+  suggestiveline = -log10(1e-5)   # Set a suggestive significance line if needed
+)
+```
+
+
+# SNP-GWAS
+```{r}
+data_DBGWAS <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_CDC/15.1.Main_analysis/DBGWAS_Fasttree_LMM.txt", sep = "\t", header=T)
+
+# Extract "BP" from the first column by splitting at "_"
+positions_DBGWAS <- sapply(strsplit(as.character(data_DBGWAS[[1]]), "_"), function(x) x[2])
+
+# Extract p-value from the 4th column
+pvals_DBGWAS <- data_DBGWAS[[4]]
+
+# Calculate -log10(p)
+logp_DBGWAS <- -log10(pvals_DBGWAS)
+
+# Get significance threshold
+p_threshold <- 0.05/nrow(data_DBGWAS)
+
+
+# Construct final data frame
+out_df <- data.frame(
+  CHR = 1,
+  SNP = ".",
+  BP = as.numeric(positions),
+  minLOG10P = logp,
+  log10p = logp,
+  r2 = 0
+)
+
+# Add header
+header <- c("CHR", "SNP", "BP", "minLOG10(P)", "log10(p)", "r^2")
+colnames(out_df) <- header
+
+manhattan(
+  out_df,
+  chr = "CHR",
+  bp = "BP",
+  p = "minLOG10(P)",  # Use the column with -log10(p-values)
+  snp = "SNP",
+  main = "Manhattan Plot of SNP-GWAS\n Population Structure Controlled w/: FastTree (LMM)",
+  col = c("skyblue", "orange"),  # Customize colors as desired
+  genomewideline = -log10(5e-8),  # Set a genome-wide significance line if desired
+  suggestiveline = -log10(1e-5)   # Set a suggestive significance line if needed
+)
+```
