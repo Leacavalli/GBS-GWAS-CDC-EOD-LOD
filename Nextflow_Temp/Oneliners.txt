@@ -696,3 +696,20 @@ $path_nextflow_dir/Files/pyseer/annotate_hits_pyseer.py \
   --output phenotype_unitigs_annotated.txt
 
 
+###############################################
+# Step NA IQTree Replacement Step             #
+###############################################
+
+#Tool: IQtree 
+#Requires as input: clean.full.aln from snippy multi
+
+#Installation
+conda create -n iqtree_env -y -c bioconda -c conda-forge iqtree 
+source activate iqtree_env 
+
+iqtree -s ${params.path_nextflow_dir}/11.SNIPPY_MULTI/clean.full.aln -m TEST -nt AUTO -bb 1000 -alrt 1000 -pre GBS_GWAS_Iqtree
+
+
+
+
+
