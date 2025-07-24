@@ -12,8 +12,6 @@ library(VennDiagram)
 ```
 
 
-
-
 ```{r}
 data <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_CDC/15.1.Main_analysis/SNPGWAS_Fasttree_LMM.txt", sep = "\t", header=T)
 

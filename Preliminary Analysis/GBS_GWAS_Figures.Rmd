@@ -71,7 +71,7 @@ manhattan(
 
 
 ```{r}
-data <- read.table("SNPGWAS_SC.plot", sep = "\t")
+data <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_CDC/15.2.Subanalysis_1/15.2.1.Fasttree_FEM/SNPGWAS_Fasttree_FEM.txt", sep = "\t")
 colnames(data) <- c("CHR", "SNP","BP","minLOG10(P)","log10(p)","r^2")
 data$CHR <- 1
 

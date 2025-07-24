@@ -55,6 +55,10 @@ manhattan(
 # SNP-GWAS
 ```{r}
 data_DBGWAS <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_CDC/15.1.Main_analysis/DBGWAS_Fasttree_LMM.txt", sep = "\t", header=T)
+data_DBGWAS_annotations <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_CDC/15.1.Main_analysis/DBGWAS_Fasttree_LMM_annotation.txt", sep = "\t", header=F)
+colnames(data_DBGWAS_annotations) <- colnames(data_DBGWAS)
+data_DBGWAS_annotations_v2 <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_CDC/15.1.Main_analysis/DBGWAS_Fasttree_LMM_annotation_v2.txt", sep = "\t", header=F)
+colnames(data_DBGWAS_annotations_v2) <- colnames(data_DBGWAS)
 
 # Extract "BP" from the first column by splitting at "_"
 positions_DBGWAS <- sapply(strsplit(as.character(data_DBGWAS[[1]]), "_"), function(x) x[2])
@@ -95,3 +99,32 @@ manhattan(
   suggestiveline = -log10(1e-5)   # Set a suggestive significance line if needed
 )
 ```
+
+```{r}
+setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_CDC")
+cl_eggnogg <- read.delim("panaroo_annotation.txt", sep = "\t", header=F, comment.char = "#")
+web_eggnogg <- read.delim("web_panaroo_annotations.txt", sep = "\t", header=F, comment.char = "#")
+
+cl_eggnogg |> filter(! V1 %in% web_eggnogg$V1)
+web_eggnogg |> filter(! V1 %in% cl_eggnogg$V1)
+
+web_eggnogg |> filter(V1  cl_eggnogg$V1)
+
+test<- left_join(cl_eggnogg |> select(V1, V7, V8) |> rename("gene"="V1", "cl_COG"="V7", "cl_class"="V8"), 
+          web_eggnogg |> select(V1, V7, V8) |> rename("gene"="V1", "web_COG"="V7", "web_class"="V8"))
+test  |> 
+  select(gene, cl_COG, web_COG)|> 
+  filter(cl_COG != web_COG)
+
+test  |> 
+  mutate(cl_COG = ifelse(cl_COG =="-", "S", cl_COG))|> 
+  mutate(web_COG = ifelse(web_COG =="-", "S", web_COG))|> 
+  filter(cl_COG != web_COG)
+
+web_eggnogg$V8 != cl_eggnogg$V8
+
+nrow(cl_eggnogg)
+nrow(web_eggnogg)+267
+
+```
+
