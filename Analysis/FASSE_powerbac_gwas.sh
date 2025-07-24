@@ -25,18 +25,18 @@ cp /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_CDC/12.
 cp /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_CDC/13.Pangenome_analysis/13.1.Panaroo/gene_presence_absence.Rtab ./
 
 #SNP GWAS (Done)
-nextflow run main.nf --vcf core.vcf --outprefix GBS_CDC_EOD_LOD.var --run_prepare_vcf -profile farm  --num_cores 8
+nextflow run main.nf --vcf core.vcf --outprefix GBS_CDC_NL_EOD_LOD.var --run_prepare_vcf -profile farm  --num_cores 8
 
 #Pan GWAS (Done)
-nextflow run main.nf --pangenome gene_presence_absence.Rtab --outprefix BS_CDC_EOD_LOD.pg --run_prepare_pangenome -profile farm --num_cores 8
+nextflow run main.nf --pangenome gene_presence_absence.Rtab --outprefix GBS_NL_CDC_EOD_LOD.pg --run_prepare_pangenome -profile farm --num_cores 8
 
 #Ancestral state reconsruction 
 
 #SNP GWAS (Done)
-nextflow run main.nf --outprefix GBS_test.var --tree GBS_FastTree_phylo.tre --run_vcf_ast -profile farm --num_cores 8
+nextflow run main.nf --outprefix GBS_CDC_NL_EOD_LOD.var --tree GBS_GWAS_FastTree_phylo.tre --run_vcf_ast -profile farm --num_cores 8
 
 #PanGWAS (Done)
-nextflow run main.nf --outprefix GBS_test.pg --tree GBS_FastTree_phylo.tre --run_pangenome_ast -profile farm --num_cores 8
+nextflow run main.nf --outprefix GBS_CDC_NL_EOD_LOD.pg --tree GBS_GWAS_FastTree_phylo.tre --run_pangenome_ast -profile farm --num_cores 8
 
 
 
@@ -47,11 +47,11 @@ nextflow run main.nf --outprefix GBS_test.pg --tree GBS_FastTree_phylo.tre --run
 #Phenotype simulation approach: # do we specify new vcf files and new tree file? 
 
 #SNP GWAS 
-nextflow run main.nf --outprefix GBS_test.var --tree GBS_FastTree_phylo.tre --vcf core.vcf --parameters GBS_parameters.txt --run_phensim_vcf -profile farm --num_cores 8 --gwas_tmp_dir tmp/gwas_tmp_GBS_SNPGWAS_test/
+nextflow run main.nf --outprefix GBS_CDC_NL_EOD_LOD.var --tree  GBS_GWAS_FastTree_phylo.tre --vcf core.vcf --parameters GBS_parameters.txt --run_phensim_vcf -profile farm --num_cores 8 --gwas_tmp_dir tmp/GBS_CDC_NL_EOD_LOD_SNPGwas/
 
 #PanGWAS
 
-nextflow run main.nf --outprefix GBS_test.pg --tree  GBS_FastTree_phylo.tre --pangenome gene_presence_absence.Rtab --parameters GBS_parameters.txt --run_phensim_pangenome --num_cores 8 --gwas_tmp_dir tmp/gwas_tmp_GBS_PanGWAS_test/
+nextflow run main.nf --outprefix GBS_CDC_NL_EOD_LOD.pg --tree   GBS_GWAS_FastTree_phylo.tre --pangenome gene_presence_absence.Rtab --parameters GBS_parameters.txt --run_phensim_pangenome --num_cores 8 --gwas_tmp_dir tmp/GBS_CDC_NL_EOD_LOD_PanGWAS/
 
 
 
