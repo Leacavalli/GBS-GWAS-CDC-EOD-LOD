@@ -895,7 +895,7 @@ process PanGWAS_Roary_Fasttree {
   mkdir -p ${params.path_nextflow_dir}/15.Pyseer/15.3.Subanalysis_2
 
   # Run Pyseer
-  pyseer --min-af 0.05 --max-af 0.95 --lmm --phenotypes ${params.path_nextflow_dir}/Files/phenotypes_filtered.txt --pres ${params.path_nextflow_dir}/13.Pangenome_analysis/13.2.ROARY/gene_presence_absence.Rtab --similarity ${params.path_nextflow_dir}/15.Pyseer/15.1.Main_analysis/FastTree_phylogeny_K.tsv --cpu 8 > ${params.path_nextflow_dir}/15.Pyseer/15.3.Subanalysis_2/PanGWAS_Panaroo_Fasttree_LMM.txt
+  pyseer --min-af 0.05 --max-af 0.95 --lmm --phenotypes ${params.path_nextflow_dir}/Files/phenotypes_filtered.txt --pres ${params.path_nextflow_dir}/13.Pangenome_analysis/13.2.ROARY/gene_presence_absence.Rtab --similarity ${params.path_nextflow_dir}/15.Pyseer/15.1.Main_analysis/FastTree_phylogeny_K.tsv --cpu 8 > ${params.path_nextflow_dir}/15.Pyseer/15.3.Subanalysis_2/PanGWAS_Roary_Fasttree_LMM.txt
 
   """
 }

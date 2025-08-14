@@ -1,0 +1,114 @@
+---
+title: "Untitled"
+output: html_document
+date: "2025-08-08"
+---
+
+```{r}
+# DB-GWAS - EOD vs LOD CDC
+data_DBGWAS <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_CDC/15.1.Main_analysis/DBGWAS_Fasttree_LMM.txt", sep = "\t", header=T) |> filter(af >=0.05, af <0.95)
+data_DBGWAS_annotations <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_CDC/15.1.Main_analysis/DBGWAS_Fasttree_LMM_annotation.txt", sep = "\t", header=F)
+colnames(data_DBGWAS_annotations) <- colnames(data_DBGWAS)
+data_DBGWAS_annotations <- data_DBGWAS_annotations |> filter(af >=0.05, af <0.95)
+
+
+# DB-GWAS - EOD vs (LOD+VLOD) CDC
+data_DBGWAS_VLOD <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/DBGWAS_Fasttree_LMM.txt", sep = "\t", header=T)|> filter(af >=0.05, af <0.95)
+data_DBGWAS_VLOD_annotations <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/DBGWAS_Fasttree_LMM_annotation.txt", sep = "\t", header=F)
+colnames(data_DBGWAS_VLOD_annotations) <- colnames(data_DBGWAS)
+data_DBGWAS_VLOD_annotations <- data_DBGWAS_VLOD_annotations |> filter(af >=0.05, af <0.95)
+
+
+# Compare length 
+nrow(data_DBGWAS)
+nrow(data_DBGWAS_annotations)
+nrow(data_DBGWAS_VLOD)
+nrow(data_DBGWAS_VLOD_annotations)
+
+
+# Which variants are not annotated ?
+data_DBGWAS |> filter(! variant %in% data_DBGWAS_annotations$variant)
+data_DBGWAS_VLOD |> filter(! variant %in% data_DBGWAS_VLOD_annotations$variant)
+
+# Which variants are in one dataset but not the other?
+nrow(data_DBGWAS |> filter(! variant %in% data_DBGWAS_VLOD$variant))
+nrow(data_DBGWAS_VLOD |> filter(! variant %in% data_DBGWAS$variant))
+
+# List Significant Hits
+data_DBGWAS_sig_hits <- data_DBGWAS |> filter(lrt.pvalue < 0.05/nrow(data_DBGWAS))
+data_DBGWAS_VLOD_sig_hits <- data_DBGWAS_VLOD |> filter(lrt.pvalue < 0.05/nrow(data_DBGWAS_VLOD))
+
+# Its not the multiple testing correction: 
+# When I use the EOD vs LOD threshold to determine significance in the EOD vs (LOD+VLOD) outputs, nothing comes out significant either...
+data_DBGWAS_VLOD |> filter(lrt.pvalue < 0.05/nrow(data_DBGWAS))
+# Although many (78% of significant hits appear in that dataset)
+data_DBGWAS_sig_hits |> filter(variant %in% data_DBGWAS_VLOD$variant)
+data_DBGWAS_VLOD_sig_hits |> filter(variant %in% data_DBGWAS_sig_hits$variant)
+
+# Join those that overlapping variant and see how their lrt.values and beta values correlation  
+data_DBGWAS_VLOD_join <- full_join (data_DBGWAS |> 
+  select(variant, filter.pvalue, lrt.pvalue, beta), 
+  data_DBGWAS_VLOD |> 
+  select(variant, filter.pvalue, lrt.pvalue, beta)|> 
+  rename(lrt.pvalue_VLOD = lrt.pvalue, 
+         beta_VLOD = beta, 
+         filter.pvalue_VLOD = filter.pvalue))|> 
+    mutate(sig= ifelse(lrt.pvalue < 0.05/nrow(data_DBGWAS), "sig", ifelse(lrt.pvalue_VLOD < 0.05/nrow(data_DBGWAS_VLOD), "sig_VLOD", "no")))
+
+nrow(data_DBGWAS_VLOD_join |> filter(is.na(lrt.pvalue)))
+nrow(data_DBGWAS_VLOD_join |> filter(is.na(lrt.pvalue_VLOD)))
+nrow(data_DBGWAS_VLOD_join |> filter(! is.na(lrt.pvalue_VLOD), ! is.na(lrt.pvalue)))
+
+# Compare the adjusted p-values between both datasets
+data_DBGWAS_VLOD_join |> 
+  ggplot()+
+  geom_point(aes(x=-log10(lrt.pvalue), y=-log10(lrt.pvalue_VLOD), colour = sig))+
+  theme_bw() +
+  labs(
+    x = "EOD vs LOD p-value",
+    y = "EOD vs (LOD+VLOD) p-value",
+    title = "Adjusted p-values"
+  )+
+  xlim(0, 12)+
+  ylim(0, 12)+
+  geom_hline(yintercept = -log10(0.05/ nrow(data_DBGWAS_VLOD)), colour="red", lty="dashed")+
+  geom_hline(yintercept = -log10(0.05/ nrow(data_DBGWAS)), colour="blue", lty="dashed")+
+  geom_vline(xintercept = -log10(0.05/ nrow(data_DBGWAS_VLOD)), colour="red", lty="dashed")+
+  geom_vline(xintercept = -log10(0.05/ nrow(data_DBGWAS)), colour="blue", lty="dashed")
+
+# Compare the unadjusted p-values between both datasets
+data_DBGWAS_VLOD_join |> 
+  ggplot()+
+  geom_point(aes(x=-log10(filter.pvalue), y=-log10(filter.pvalue_VLOD), colour = sig))+
+  theme_bw() +
+  labs(
+    x = "EOD vs LOD p-value",
+    y = "EOD vs (LOD+VLOD) p-value",
+    title = "Unadjusted p-values"
+  )+
+  xlim(0, 40)+
+  ylim(0, 40)
+
+# Compare the adjusted p-values between both datasets
+data_DBGWAS_VLOD_join |> 
+  ggplot()+
+  geom_point(aes(x=beta, y=beta_VLOD))+
+  xlim(-30, 30)+
+  ylim(-30, 30)+
+  theme_bw()
+  
+
+
+
+
+
+
+# Hey ! So I was looking at the DBGWAS outputs in an effort to understand why significant DBGWAS hits are lost when we add VLOD samples to the CDC-only analysis.
+I have several notes
+  1. The DBGWAS outputs contains unitigs with af  between 1-99% (pyseer's default fitlering). For the panGWAS, we use the options "--min-af 0.05 --max-af 0.95" in pyseer to specify that we only want to test those genes that appear between 5-95% of samples. We don't do it in the DBGWAS but I think we should. In Krispin's paper they do it ("Similarly, the unitigs with minor allele frequency <5% were filtered out using PLINK before the GWAS"). I am unsure whether it makes a difference to filter out before pyseer (like they do with PLINK), in pyseer (like we do for the PanGWAS), or if I can just filter the pyseer output ? I think that would be easy to check - I can just run the DBGWAS once again for the main EOD vs LOD CDC analysis with the "--min-af 0.05 --max-af 0.95" options in pyseer and see how the output compares. For now, I have regenerated the DBGWAS plots for the main analysis for EOD vs LOD CDC and EOD vs (LOD+VLOD) CDC and they look quite similar to the previous ones- the filtering removed a lot of data points (E.g. we go from 182,864 to 135,533 for theEOD vs LOD CDC), but it doesn't impact the significance threshold. Attaching the new plots and will update plots for all other analyses later.
+  
+2. The unitids called depend somewhat on the dataset: the EOD vs LOD CDC DBGWAS output contains 135,532 while the +VLOD one has 138,340. They have 110,469 variants (~80%) in common - I think this is pretty intuitive, it's just like how the pangenome depends on the dataset. Importantly, then EOD+ LOD dataset has 138 significant hits, while the EOD+LOD+VLOD dataset on has 2. and this is not due to the more stringent sig threshold after multiple testing correction in the later... the p-values and beta value are just quite different )
+
+```
+
+

@@ -146,6 +146,7 @@ java -version
 sbatch -p fasse -c 48 -t 7-00:00:00 --mem=180000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline_FINAL.nf --main --sub1 --sub2 --path_nextflow_dir /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW --path_conda_envs /n/home_fasse/lcavalli/.conda/envs"
 sbatch -p fasse -c 48 -t 7-00:00:00 --mem=180000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline_FINAL.nf -resume --main --sub1 --sub2 --path_nextflow_dir /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW --path_conda_envs /n/home_fasse/lcavalli/.conda/envs"
 
+sbatch -p fasse_bigmem -c 48 -t 7-00:00:00 --mem=450000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline_FINAL.nf -resume --main --sub1 --sub2 --path_nextflow_dir /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW --path_conda_envs /n/home_fasse/lcavalli/.conda/envs"
 
 # Run Pyseer
 mkdir 15.Pyseer/15.4.Subanalysis_3
@@ -176,6 +177,9 @@ cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_CDC/15.
 sbatch -p fasse -c 1 -t 1-00:00:00 --mem=50000 --wrap="annotate_hits_pyseer DBGWAS_continuous_Fasttree.txt ../../Files/DBGWAS_references.txt DBGWAS_continuous_Fasttree_annotation.txt"
 
 
+
+cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL/15.Pyseer/15.1.Main_analysis
+sbatch -p fasse -c 1 -t 1-00:00:00 --mem=50000 --wrap="annotate_hits_pyseer DBGWAS_Fasttree_LMM.txt ../../Files/DBGWAS_references.txt DBGWAS_Fasttree_LMM_annotation.txt"
 
 
 

@@ -1,0 +1,92 @@
+---
+title: "Main Analysis"
+output: html_document
+date: "2025-07-17"
+---
+
+# Set up environment
+```{r}
+# Clean environment
+rm( list = ls() )
+
+# load libraries
+library(qqman)
+library(circlize)
+library(VennDiagram)
+library(stringr)
+library(tidyverse)
+library(ggrepel)
+```
+
+
+# DB-GWAS continuous
+```{r}
+data_DBGWAS_cont <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_CDC/15.4.Subanalysis_3/DBGWAS_continuous_Fasttree.txt", sep = "\t", header=T)
+data_DBGWAS_cont_annotations <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_CDC/15.4.Subanalysis_3/DBGWAS_continuous_Fasttree_annotation.txt", sep = "\t", header=F)
+colnames(data_DBGWAS_cont_annotations) <- colnames(data_DBGWAS_cont)
+
+# Split the annotation column
+# Extract contig/chromosome
+data_DBGWAS_cont_annotations <- data_DBGWAS_cont_annotations |>
+  mutate(coord_range = str_extract(notes, "(?<=:)[0-9]+-[0-9]+"),
+         start = as.integer(str_extract(coord_range, "^[0-9]+")),
+         end = as.integer(str_extract(coord_range, "(?<=-)[0-9]+")), 
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1")) 
+
+
+
+# Extract "BP" from the first column by splitting at "_"
+positions_DBGWAS_start <- data_DBGWAS_cont_annotations$start
+
+# Get significance threshold
+p_threshold_DBGWAS <- 0.05/nrow(data_DBGWAS_cont)
+
+# Construct final data frame
+out_df_DBGWAS_cont <- data.frame(
+  CHR = 1,
+  SNP = ".",
+  BP = as.numeric(positions_DBGWAS_start),
+  P= data_DBGWAS_cont_annotations$lrt.pvalue,
+  r2 = 0
+)
+
+ann_sub_cont <- data_DBGWAS_cont_annotations %>%
+  filter(lrt.pvalue < p_threshold_DBGWAS) %>%
+  separate(
+    notes, 
+    into = c("contig_position", "upstream", "gene_in", "downstream"), 
+    sep = ";", 
+    remove = FALSE, 
+    fill = "right"
+  ) %>%
+  group_by(gene_in) %>%
+  slice_min(lrt.pvalue, n = 1, with_ties = FALSE) %>%  
+  ungroup()
+
+# Manhattan Plot
+DBGWAS_cont_manplot <- ggplot(data_DBGWAS_cont_annotations, aes(x=start, y=-log10(lrt.pvalue))) +
+    # Show all points
+  geom_point(aes(color=OR_pos), alpha=0.8, size=1.3) +
+  scale_color_manual(values= c("skyblue", "orange"))+
+    # custom X axis:
+    scale_y_continuous(expand = c(0, 0) ) +
+  theme_bw()+
+  theme(
+    legend.title = element_blank(), 
+    panel.border = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    plot.title = element_text(face = "bold", hjust = 0.5)
+  ) +
+  labs(
+    x = "Genomic Position (Start)",
+    y = expression(-log[10](italic(p))),
+    title = "DBGWAS Manhattan Plot with Significant Hits Annotated"
+  ) +
+  geom_hline(yintercept = -log10(p_threshold_DBGWAS), color="red", lty="dashed") +
+    geom_label_repel(data=ann_sub_cont, aes(label=gene_in), size=2,min.segment.length = 0.5) 
+
+# QQ plot 
+DBGWAS_cont_qqplot <- qq(out_df_DBGWAS_cont$P)
+```
