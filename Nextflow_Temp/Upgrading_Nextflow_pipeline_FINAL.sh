@@ -50,30 +50,6 @@ sbatch -p fasse -c 8 -t 0-12:00 --mem=100000 --wrap="pyseer --lmm --phenotypes .
 
 
 
-
-
-
-
-# Fix FastTree
-## test with gtr+gamma
-cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_CDC/
-sbatch -p fasse -t 0-12:00 --mem=100000 --wrap="Files/FastTree -gtr -gamma -nt 11.SNIPPY_MULTI/clean.full.aln > Test_FastTree.tre"
-sbatch -p fasse -t 3-00:00:00 --mem=180000 --wrap="Files/FastTree -nt -gtr -gamma 11.SNIPPY_MULTI/clean.full.aln > Test_FastTree.tre"
-# slurm-5887974.out
-
-## Try installing with -DUSE_DOUBLE
-cd Files
-curl -O http://www.microbesonline.org/fasttree/FastTree.c
-gcc -DUSE_DOUBLE -O3 -finline-functions -funroll-loops -Wall -o FastTre_DUSE_DOUBLE FastTree.c -lm
-chmod +x FastTre_DUSE_DOUBLE
-./FastTre_DUSE_DOUBLE -h
-cd ../
-sbatch -p fasse_bigmem -t 3-00:00:00 --mem=400000 --wrap="Files/FastTre_DUSE_DOUBLE -nt -gtr -gamma 11.SNIPPY_MULTI/clean.full.aln > Test_FastTree_DUSE_DOUBLE.tre"
-# slurm-5890238.out
-
-
-
-
 # Run Main analysis for CDC_EOD_LOD with IQTREE population correction
 cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_CDC/TEST_IQTree
 cp /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Iqtree_CDC_EOD_LOD/core_tree.treefile ./
@@ -96,6 +72,24 @@ sbatch -p fasse -c 1 -t 1-00:00:00 --mem=50000 --wrap="annotate_hits_pyseer DBGW
 # slurm-5869814.out
 # DONE
 # /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_CDC/15.Pyseer/15.1.Main_analysis/DBGWAS_Fasttree_LMM_5_95.txt
+
+
+# Fix FastTree
+## test with gtr+gamma
+cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_CDC/
+sbatch -p fasse -t 0-12:00 --mem=100000 --wrap="Files/FastTree -gtr -gamma -nt 11.SNIPPY_MULTI/clean.full.aln > Test_FastTree.tre"
+sbatch -p fasse -t 3-00:00:00 --mem=180000 --wrap="Files/FastTree -nt -gtr -gamma 11.SNIPPY_MULTI/clean.full.aln > Test_FastTree.tre"
+# slurm-5887974.out
+
+## Try installing with -DUSE_DOUBLE
+cd Files
+curl -O http://www.microbesonline.org/fasttree/FastTree.c
+gcc -DUSE_DOUBLE -O3 -finline-functions -funroll-loops -Wall -o FastTre_DUSE_DOUBLE FastTree.c -lm
+chmod +x FastTre_DUSE_DOUBLE
+./FastTre_DUSE_DOUBLE -h
+cd ../
+sbatch -p fasse_bigmem -t 3-00:00:00 --mem=400000 --wrap="Files/FastTre_DUSE_DOUBLE -nt -gtr -gamma 11.SNIPPY_MULTI/clean.full.aln > Test_FastTree_DUSE_DOUBLE.tre"
+# slurm-5890238.out
 
 
 
