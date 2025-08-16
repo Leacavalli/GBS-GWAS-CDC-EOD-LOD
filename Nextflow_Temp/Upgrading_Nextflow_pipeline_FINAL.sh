@@ -68,8 +68,8 @@ gcc -DUSE_DOUBLE -O3 -finline-functions -funroll-loops -Wall -o FastTre_DUSE_DOU
 chmod +x FastTre_DUSE_DOUBLE
 ./FastTre_DUSE_DOUBLE -h
 cd ../
-sbatch -p fasse -t 3-00:00:00 --mem=100000 --wrap="Files/FastTre_DUSE_DOUBLE  -nt -gtr -gamma 11.SNIPPY_MULTI/clean.full.aln > Test_FastTree_DUSE_DOUBLE.tre"
-# slurm-5887975.out
+sbatch -p fasse_bigmem -t 3-00:00:00 --mem=400000 --wrap="Files/FastTre_DUSE_DOUBLE -nt -gtr -gamma 11.SNIPPY_MULTI/clean.full.aln > Test_FastTree_DUSE_DOUBLE.tre"
+# slurm-5890238.out
 
 
 
@@ -139,5 +139,5 @@ sbatch -p fasse -c 2 -t 3-00:00:00 --mem=100000 --wrap="raxml-ng --support --tre
 
 
 
-awk '(NR == 1) || (FNR > 1)' *__genes__GBS-SBG__results.txt | head > 
+awk '(NR == 1) || (FNR > 1)' *__genes__GBS-SBG__results.txt | head >
 cut -f1,2 ${params.path_nextflow_dir}/3.SEROTYPE_MLST/combined_results.txt | tail -n +2 | sed 's/\t/,/g' | sort -t',' -k2,2 | sed  's/\\*//g'  > ${params.path_nextflow_dir}/10.ASSIGN_CC/STs.txt

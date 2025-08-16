@@ -148,6 +148,37 @@ sbatch -p fasse -c 48 -t 7-00:00:00 --mem=180000 --wrap="nextflow -C nextflow.co
 
 sbatch -p fasse_bigmem -c 48 -t 7-00:00:00 --mem=450000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline_FINAL.nf -resume --main --sub1 --sub2 --path_nextflow_dir /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW --path_conda_envs /n/home_fasse/lcavalli/.conda/envs"
 
+
+
+# 5. Run Nextflow pipeline for EOD vs LOD - NL samples only
+## Make a Nextflow Pipeline directory
+cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline
+mkdir Nextflow_pipeline_EOD_LOD_NL
+cd Nextflow_pipeline_EOD_LOD_NL
+## Make phenotypes files
+mkdir Files
+cd Files
+cp ../../../phenotypes_NL_EOD_LOD.txt phenotypes.txt
+cp ../../../phenotypes_NL_EOD_LOD.txt phenotypes_filtered.txt
+## Move those samples to the test pipeline directory
+cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_NL/
+mkdir 0.RAW_READS
+awk -F'\t' 'NR>1{print $1}' Files/phenotypes.txt > samples.txt
+ln -s /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline/0.RAW_READS_Netherlands/*.fastq.gz 0.RAW_READS/
+## Run pipeline
+mkdir scripts
+cd scripts
+cp ../../Nextflow_pipeline_EOD_LOD_CDC/scripts/nextflow.config ./
+cp ../../Nextflow_pipeline_EOD_LOD_CDC/scripts/Nextflow_pipeline_FINAL.nf ./
+module load python
+source activate java
+java -version
+sbatch -p fasse -c 48 -t 7-00:00:00 --mem=180000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline_FINAL.nf --main --sub1 --sub2 --path_nextflow_dir /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_NL --path_conda_envs /n/home_fasse/lcavalli/.conda/envs"
+sbatch -p fasse -c 48 -t 7-00:00:00 --mem=180000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline_FINAL.nf -resume --main --sub1 --sub2 --path_nextflow_dir /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_NL --path_conda_envs /n/home_fasse/lcavalli/.conda/envs"
+
+
+
+
 # Run Pyseer
 mkdir 15.Pyseer/15.4.Subanalysis_3
 sbatch -p fasse -t 0-10:00:00 --mem=100000 --wrap="pyseer --lmm --phenotypes Files/phenotypes_filtered.txt --continuous --phenotype-column continuous --vcf 11.SNIPPY_MULTI/core.vcf --similarity 15.Pyseer/15.1.Main_analysis/FastTree_phylogeny_K.tsv --cpu 8 > 15.Pyseer/15.4.Subanalysis_3/SNPGWAS_continuous_Fasttree.txt"
@@ -163,6 +194,7 @@ source activate pyseer
 
 cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_CDC/15.Pyseer/15.1.Main_analysis
 sbatch -p fasse -c 1 -t 1-00:00:00 --mem=50000 --wrap="annotate_hits_pyseer DBGWAS_Fasttree_LMM.txt ../../Files/DBGWAS_references_v2.txt DBGWAS_Fasttree_LMM_annotation.txt"
+python summarise_annotations.py DBGWAS_Fasttree_LMM_annotation.txt > gene_hits.txt
 
 cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_CDC/15.Pyseer/15.2.Subanalysis_1/15.2.1.Fasttree_FEM
 sbatch -p fasse -c 1 -t 1-00:00:00 --mem=50000 --wrap="annotate_hits_pyseer DBGWAS_Fasttree_FEM.txt ../../../Files/DBGWAS_references.txt DBGWAS_Fasttree_FEM_annotation.txt"
