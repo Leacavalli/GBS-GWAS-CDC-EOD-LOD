@@ -89,3 +89,7 @@ EOS
 done < /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/SNPEFF_TEST/vcf_list.txt
 
 
+#Summarize across results
+
+cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/SNPEFF_TEST
+for f in /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/SNPEFF_TEST/*.ann.vcf.gz; do sample=$(basename "$f" .ann.vcf.gz); zgrep -h "ANN=" "$f" | sed 's/.*ANN=//' | sed 's/;.*//' | tr ',' '\n' | awk -F'|' 'NF>1 {print $2}' | sed '/^$/d' | sort | uniq -c | awk -v s="$sample" '{print s "\t" $2 "\t" $1}'; done > /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/SNPEFF_TEST/snpeff_effect_counts_per_sample.tsv
