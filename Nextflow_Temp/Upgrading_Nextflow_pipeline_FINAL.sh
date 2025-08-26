@@ -49,26 +49,12 @@ sbatch -p fasse -c 8 -t 0-12:00 --mem=100000 --wrap="pyseer --phenotypes ../File
 sbatch -p fasse -c 8 -t 0-12:00 --mem=100000 --wrap="pyseer --lmm --phenotypes ../Files/phenotypes_filtered.txt --continuous --phenotype-column continuous --vcf merged_max5missing.vcf --similarity ../15.Pyseer/15.1.Main_analysis/FastTree_phylogeny_K.tsv --cpu 8 > ../15.Pyseer/15.4.Subanalysis_3/SNPGWAS_continuous_Fasttree_max5missing.txt"
 
 
-
-# Run Main analysis for CDC_EOD_LOD with IQTREE population correction
-cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_CDC/TEST_IQTree
-cp /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Iqtree_CDC_EOD_LOD/core_tree.treefile ./
-module load python
-source activate pyseer
-sbatch -p fasse -t 0-12:00 --mem=50000 --wrap="python ../Files/pyseer/scripts/phylogeny_distance.py --lmm core_tree.treefile > IQTree_phylogeny_K.tsv"
-sbatch -p fasse -t 0-12:00 --mem=50000 --wrap="pyseer --lmm --phenotypes ../Files/phenotypes_filtered.txt --kmers ../14.UNITIGS/unitigs.txt --uncompressed --similarity IQTree_phylogeny_K.tsv --output-patterns DBGWAS_RAxML_unitig_patterns.txt --cpu 8 > DBGWAS_IQtree_LMM.txt"
-sbatch -p fasse -t 0-12:00 --mem=50000 --wrap="pyseer --min-af 0.05 --max-af 0.95 --lmm --phenotypes ../Files/phenotypes_filtered.txt --pres ../13.Pangenome_analysis/13.1.Panaroo/gene_presence_absence.Rtab --similarity IQTree_phylogeny_K.tsv --cpu 8 > PanGWAS_Panaroo_IQtree_LMM.txt"
-sbatch -p fasse -c 1 -t 1-00:00:00 --mem=50000 --wrap="annotate_hits_pyseer DBGWAS_IQtree_LMM.txt ../../Files/DBGWAS_references.txt DBGWAS_IQtree_LMM_annotation.txt"
-# DONE
-
-
-
 # Run DBGWAS Main analysis for CDC_EOD_LOD with  --min-af 0.05 --max-af 0.95 options
 module load python
 source activate pyseer
-cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_CDC/
+cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_CDC/TEST_Fasttree
 sbatch -p fasse -t 0-12:00 --mem=50000 --wrap="pyseer --lmm --phenotypes Files/phenotypes_filtered.txt --kmers 14.UNITIGS/unitigs.txt --uncompressed --similarity 15.Pyseer/15.1.Main_analysis/FastTree_phylogeny_K.tsv --output-patterns 15.Pyseer/15.1.Main_analysis/DBGWAS_RAxML_unitig_patterns_5_95.txt --cpu 8 >  15.Pyseer/15.1.Main_analysis/DBGWAS_Fasttree_LMM_5_95.txt"
-sbatch -p fasse -c 1 -t 1-00:00:00 --mem=50000 --wrap="annotate_hits_pyseer DBGWAS_Fasttree_LMM_5_95.txt ../../Files/DBGWAS_references.txt DBGWAS_Fasttree_LMM_5_95_annotation.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="annotate_hits_pyseer DBGWAS_Fasttree_LMM_5_95.txt ../../Files/DBGWAS_references.txt DBGWAS_Fasttree_LMM_5_95_annotation.txt"
 # slurm-5869814.out
 # DONE
 # /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_CDC/15.Pyseer/15.1.Main_analysis/DBGWAS_Fasttree_LMM_5_95.txt
@@ -76,10 +62,15 @@ sbatch -p fasse -c 1 -t 1-00:00:00 --mem=50000 --wrap="annotate_hits_pyseer DBGW
 
 # Fix FastTree
 ## test with gtr+gamma
-cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_CDC/
-sbatch -p fasse -t 0-12:00 --mem=100000 --wrap="Files/FastTree -gtr -gamma -nt 11.SNIPPY_MULTI/clean.full.aln > Test_FastTree.tre"
-sbatch -p fasse -t 3-00:00:00 --mem=180000 --wrap="Files/FastTree -nt -gtr -gamma 11.SNIPPY_MULTI/clean.full.aln > Test_FastTree.tre"
-# slurm-5887974.out
+cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_CDC/TEST_Fasttree/FastTree_GTR_GAMMA_SP
+sbatch -p fasse -t 3-00:00:00 --mem=180000 --wrap="../Files/FastTree -nt -gtr -gamma ../11.SNIPPY_MULTI/clean.full.aln > Test_FastTree.tre"
+# slurm-5887974.out - DONE
+# Pyseer
+sbatch -p fasse -t 0-12:00 --mem=100000 --wrap="python ../../Files/pyseer/scripts/phylogeny_distance.py --lmm Test_FastTree.tre > FastTree_GAMMA_K.tsv"
+sbatch -p fasse -t 0-12:00 --mem=100000 --wrap="pyseer --lmm --phenotypes ../../Files/phenotypes_filtered.txt --phenotype-column binary --vcf ../../11.SNIPPY_MULTI/merged_max5missing.vcf --similarity FastTree_GAMMA_K.tsv --cpu 8 > SNPGWAS_FastTree_GAMMA_LMM_max5missing.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="pyseer --lmm --phenotypes ../../Files/phenotypes_filtered.txt  --phenotype-column binary --kmers ../../14.UNITIGS/unitigs.txt --uncompressed --similarity FastTree_GAMMA_K.tsv > DBGWAS_FastTree_GAMMA_LMM_max5missing.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="annotate_hits_pyseer DBGWAS_FastTree_GAMMA_LMM_max5missing.txt ../../Files/DBGWAS_references.txt DBGWAS_FastTree_GAMMA_LMM_max5missing_annotation.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="pyseer --min-af 0.05 --max-af 0.95 --lmm --phenotypes ../../Files/phenotypes_filtered.txt --phenotype-column binary --pres ../../13.Pangenome_analysis/13.1.Panaroo/gene_presence_absence.Rtab --similarity FastTree_GAMMA_K.tsv > PanGWAS_FastTree_GAMMA_LMM_max5missing.txt"
 
 ## Try installing with -DUSE_DOUBLE
 cd Files
@@ -87,11 +78,24 @@ curl -O http://www.microbesonline.org/fasttree/FastTree.c
 gcc -DUSE_DOUBLE -O3 -finline-functions -funroll-loops -Wall -o FastTre_DUSE_DOUBLE FastTree.c -lm
 chmod +x FastTre_DUSE_DOUBLE
 ./FastTre_DUSE_DOUBLE -h
-cd ../
-sbatch -p fasse_bigmem -t 3-00:00:00 --mem=400000 --wrap="Files/FastTre_DUSE_DOUBLE -nt -gtr -gamma 11.SNIPPY_MULTI/clean.full.aln > Test_FastTree_DUSE_DOUBLE.tre"
-# slurm-5890238.out
+cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_CDC/TEST_Fasttree/FastTree_GTR_GAMMA_DP
+sbatch -p fasse_bigmem -t 3-00:00:00 --mem=400000 --wrap="../Files/FastTre_DUSE_DOUBLE -nt -gtr -gamma ../11.SNIPPY_MULTI/clean.full.aln > Test_FastTree_DUSE_DOUBLE.tre"
+# slurm-5890238.out - DONE
+# Pyseer
+sbatch -p fasse -t 0-12:00 --mem=100000 --wrap="python ../../Files/pyseer/scripts/phylogeny_distance.py --lmm Test_FastTree_DUSE_DOUBLE.tre > FastTree_DUSE_DOUBLE_K.tsv"
+sbatch -p fasse -t 0-12:00 --mem=100000 --wrap="pyseer --lmm --phenotypes ../../Files/phenotypes_filtered.txt --phenotype-column binary --vcf ../../11.SNIPPY_MULTI/merged_max5missing.vcf --similarity FastTree_DUSE_DOUBLE_K.tsv --cpu 8 > SNPGWAS_FastTree_DUSE_DOUBLE_LMM_max5missing.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="pyseer --lmm --phenotypes ../../Files/phenotypes_filtered.txt  --phenotype-column binary --kmers ../../14.UNITIGS/unitigs.txt --uncompressed --similarity FastTree_DUSE_DOUBLE_K.tsv > DBGWAS_FastTree_DUSE_DOUBLE_LMM_max5missing.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="annotate_hits_pyseer DBGWAS_FastTree_DUSE_DOUBLE_LMM_max5missing.txt ../../Files/DBGWAS_references.txt DBGWAS_FastTree_DUSE_DOUBLE_LMM_max5missing_annotation.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="pyseer --min-af 0.05 --max-af 0.95 --lmm --phenotypes ../../Files/phenotypes_filtered.txt --phenotype-column binary --pres ../../13.Pangenome_analysis/13.1.Panaroo/gene_presence_absence.Rtab --similarity FastTree_DUSE_DOUBLE_K.tsv > PanGWAS_FastTree_DUSE_DOUBLE_LMM_max5missing.txt"
 
-
+# MAke FastTree Double Precision for EOD
+cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC/TEST_Fasttree
+curl -O http://www.microbesonline.org/fasttree/FastTree.c
+gcc -DUSE_DOUBLE -O3 -finline-functions -funroll-loops -Wall -o FastTre_DUSE_DOUBLE FastTree.c -lm
+chmod +x FastTre_DUSE_DOUBLE
+./FastTre_DUSE_DOUBLE -h
+sbatch -p fasse_bigmem -t 3-00:00:00 --mem=400000 --wrap="./FastTre_DUSE_DOUBLE -nt -gtr -gamma ../11.SNIPPY_MULTI/clean.full.aln > EOD_LOD_VLOD_CDC_FastTree_DP.tre"
+# slurm-5915339.out
 
 # Test RAxML outside of Pipeline
 cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_CDC/TEST_RAxML
@@ -106,7 +110,7 @@ sbatch -p hsph -t 0-10:00:00 --mem=50000 --wrap="raxml-ng --parse --msa clean.fu
 
 ## RAxML_MLsearch
 sbatch -p fasse_bigmem -c 64 -t 7-00:00:00 --mem=400000 --wrap="raxml-ng --msa ../11.SNIPPY_MULTI/clean.full.aln --model GTR+G --threads 64 --seed 12345 --prefix fullaln_T1"
-# slurm-5887985.out
+# slurm-5898843.out - RUNNING
 ## RAxML_bootstrap
 sbatch -p fasse -t 3-00:00:00 --mem=100000 --wrap="raxml-ng --bootstrap --msa ../11.SNIPPY_MULTI/clean.full.aln --model GTR+G --threads 64 --seed 12345 --prefix fullaln_T2"
 ## RAxML_bipartition
@@ -124,14 +128,34 @@ awk '/^>/ {if(s){print length(s); exit} } {if(!/^>/) s=s $0} END{if(s) print len
 # 2231314 - 634 = 2230680
 ## RAxML_MLsearch
 sbatch -p fasse -c 2 -t 3-00:00:00 --mem=100000 --wrap="raxml-ng --msa ../11.SNIPPY_MULTI/core.aln --model GTR+G+ASC_FELS{2230680} --threads 2 --seed 12345 --prefix core_T1"
-# slurm-5887983.out
+# slurm-5887983.out - DONE
 ## RAxML_bootstrap
 sbatch -p fasse -c 2 -t 3-00:00:00 --mem=100000 --wrap="raxml-ng --bootstrap --msa ../11.SNIPPY_MULTI/core.aln --model GTR+G+ASC_FELS{2230680} --threads 2  --seed 12345 --prefix core_T2"
-# slurm-5887984.out
+# slurm-5887984.out - DONE
 ## RAxML_bipartition
 sbatch -p fasse -c 2 -t 3-00:00:00 --mem=100000 --wrap="raxml-ng --support --tree T1.raxml.bestTree --bs-trees T2.raxml.bootstraps --threads auto{48} --prefix core_T3"
+# Pyseer
+sbatch -p fasse -t 0-12:00 --mem=100000 --wrap="python ../Files/pyseer/scripts/phylogeny_distance.py --lmm core_T1.raxml.bestTree > core_raxml_K.tsv"
+sbatch -p fasse -t 0-12:00 --mem=100000 --wrap="pyseer --lmm --phenotypes ../Files/phenotypes_filtered.txt --phenotype-column binary --vcf ../11.SNIPPY_MULTI/merged_max5missing.vcf --similarity core_raxml_K.tsv > SNPGWAS_core_raxml_LMM_max5missing.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="pyseer --lmm --phenotypes ../Files/phenotypes_filtered.txt  --phenotype-column binary --kmers ../14.UNITIGS/unitigs.txt --uncompressed --similarity core_raxml_K.tsv > DBGWAS_core_raxml_LMM_max5missing.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="annotate_hits_pyseer DBGWAS_core_raxml_LMM_max5missing.txt ../Files/DBGWAS_references.txt DBGWAS_core_raxml_LMM_max5missing_annotation.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="pyseer --min-af 0.05 --max-af 0.95 --lmm --phenotypes ../Files/phenotypes_filtered.txt --phenotype-column binary --pres ../13.Pangenome_analysis/13.1.Panaroo/gene_presence_absence.Rtab --similarity core_raxml_K.tsv > PanGWAS_core_raxml_LMM_max5missing.txt"
+
+
+# Run Main analysis for CDC_EOD_LOD with IQTREE population correction
+cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_CDC/TEST_IQTree
+cp /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Iqtree_CDC_EOD_LOD/core_tree.treefile ./
+module load python
+source activate pyseer
+sbatch -p fasse -t 0-12:00 --mem=50000 --wrap="python ../Files/pyseer/scripts/phylogeny_distance.py --lmm core_tree.treefile > IQTree_phylogeny_K.tsv"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="pyseer --min-af 0.05 --max-af 0.95 --lmm --phenotypes ../Files/phenotypes_filtered.txt --phenotype-column binary --vcf ../11.SNIPPY_MULTI/merged_max5missing.vcf --uncompressed --similarity IQTree_phylogeny_K.tsv --output-patterns DBGWAS_RAxML_unitig_patterns.txt > SNPGWAS_IQtree_core_LMM.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="pyseer --min-af 0.05 --max-af 0.95 --lmm --phenotypes ../Files/phenotypes_filtered.txt --phenotype-column binary --kmers ../14.UNITIGS/unitigs.txt --uncompressed --similarity IQTree_phylogeny_K.tsv --output-patterns DBGWAS_IQTree_unitig_patterns.txt > DBGWAS_IQtree_core_LMM.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="pyseer --min-af 0.05 --max-af 0.95 --lmm --phenotypes ../Files/phenotypes_filtered.txt --phenotype-column binary --pres ../13.Pangenome_analysis/13.1.Panaroo/gene_presence_absence.Rtab --similarity IQTree_phylogeny_K.tsv > PanGWAS_Panaroo_IQtree_core_LMM.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="annotate_hits_pyseer DBGWAS_IQtree_core_LMM.txt ../../Files/DBGWAS_references.txt DBGWAS_IQtree_core_LMM_annotation.txt"
+# DONE
 
 
 
-awk '(NR == 1) || (FNR > 1)' *__genes__GBS-SBG__results.txt | head >
-cut -f1,2 ${params.path_nextflow_dir}/3.SEROTYPE_MLST/combined_results.txt | tail -n +2 | sed 's/\t/,/g' | sort -t',' -k2,2 | sed  's/\\*//g'  > ${params.path_nextflow_dir}/10.ASSIGN_CC/STs.txt
+# CC population structure-correction
+cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_CDC/TEST_CC_pop_correction
+sbatch -p fasse -t 0-12:00 --mem=100000 --wrap="pyseer --min-af 0.05 --max-af 0.95 --phenotypes ../Files/phenotypes_filtered.txt --phenotype-column binary --vcf ../11.SNIPPY_MULTI/merged_max5missing.vcf --covariates CC_clusters.txt --use-covariates 2 --no-distances --cpu 8 > SNPGWAS_CC_max5missing.txt"
