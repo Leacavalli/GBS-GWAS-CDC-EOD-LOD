@@ -110,7 +110,7 @@ sbatch -p hsph -t 0-10:00:00 --mem=50000 --wrap="raxml-ng --parse --msa clean.fu
 
 ## RAxML_MLsearch
 sbatch -p fasse_bigmem -c 64 -t 7-00:00:00 --mem=400000 --wrap="raxml-ng --msa ../11.SNIPPY_MULTI/clean.full.aln --model GTR+G --threads 64 --seed 12345 --prefix fullaln_T1"
-# slurm-5898843.out - RUNNING
+# slurm-5920004.out - RUNNING
 ## RAxML_bootstrap
 sbatch -p fasse -t 3-00:00:00 --mem=100000 --wrap="raxml-ng --bootstrap --msa ../11.SNIPPY_MULTI/clean.full.aln --model GTR+G --threads 64 --seed 12345 --prefix fullaln_T2"
 ## RAxML_bipartition

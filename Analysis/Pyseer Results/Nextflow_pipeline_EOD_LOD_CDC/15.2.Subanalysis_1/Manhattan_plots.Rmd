@@ -52,8 +52,8 @@ QQ_plot <- function(data, type){
     title = paste0(type," QQ plot")
   ) +
   theme_minimal()+
-  xlim(0, max(c(df$expected, df$observed))) +
-  ylim(0, max(c(df$expected, df$observed))) 
+  xlim(0, 10) +
+  ylim(0, 10)
 }
 
 ```
