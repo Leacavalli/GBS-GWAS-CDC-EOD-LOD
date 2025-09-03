@@ -88,7 +88,7 @@ sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="pyseer --lmm --phenotypes ../../F
 sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="annotate_hits_pyseer DBGWAS_FastTree_DUSE_DOUBLE_LMM_max5missing.txt ../../Files/DBGWAS_references.txt DBGWAS_FastTree_DUSE_DOUBLE_LMM_max5missing_annotation.txt"
 sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="pyseer --min-af 0.05 --max-af 0.95 --lmm --phenotypes ../../Files/phenotypes_filtered.txt --phenotype-column binary --pres ../../13.Pangenome_analysis/13.1.Panaroo/gene_presence_absence.Rtab --similarity FastTree_DUSE_DOUBLE_K.tsv > PanGWAS_FastTree_DUSE_DOUBLE_LMM_max5missing.txt"
 
-# MAke FastTree Double Precision for EOD
+# MAke FastTree Double Precision for EOD vs (LOD+VLOD)
 cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC/TEST_Fasttree
 curl -O http://www.microbesonline.org/fasttree/FastTree.c
 gcc -DUSE_DOUBLE -O3 -finline-functions -funroll-loops -Wall -o FastTre_DUSE_DOUBLE FastTree.c -lm
@@ -96,6 +96,32 @@ chmod +x FastTre_DUSE_DOUBLE
 ./FastTre_DUSE_DOUBLE -h
 sbatch -p fasse_bigmem -t 3-00:00:00 --mem=400000 --wrap="./FastTre_DUSE_DOUBLE -nt -gtr -gamma ../11.SNIPPY_MULTI/clean.full.aln > EOD_LOD_VLOD_CDC_FastTree_DP.tre"
 # slurm-5915339.out
+# generate SNP Files
+module load python
+source activate bcftools
+cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC/11.SNIPPY_MULTI
+for i in ../4.SNIPPY/SRR*; do
+  sbatch -p fasse -t 0-12:00 --mem=50000 --wrap="bcftools norm -a --atom-overlaps . $i/snps.vcf.gz | bcftools view --min-af 0.95 --types snps -o $i/snps_norm_filter.vcf.gz"
+done
+for i in ../4.SNIPPY/SRR*; do
+  sbatch -p fasse -t 0-12:00 --mem=50000 --wrap="tabix -p vcf $i/snps_norm_filter.vcf.gz"
+done
+sbatch -p fasse -t 0-12:00 --mem=100000 --wrap="bcftools merge -m none -0 -O z ../4.SNIPPY/SRR*/snps_norm_filter.vcf.gz > merged.vcf.gz"
+## Find the position that have <5% missingness
+sbatch -p fasse -t 0-12:00 --mem=50000 --wrap="bash -c 'awk '\''/^>/ {if (seq) print name \"\n\" seq; name=\$0; seq=\"\"; next} {seq=seq \$0} END{if (seq) print name \"\n\" seq}'\'' clean.full.aln | grep -v '\''^>'\'' | tail -n +2 | sed '\''s/./&\t/g; s/\t$//'\'' | awk '\''{for(i=1;i<=NF;i++) if(\$i==\"-\" || \$i==\"N\") col[i]++;n++}END {for(i=1;i<=NF;i++) printf \"%d %.5f\n\", i, (col[i]?col[i]:0)/n}'\'' > Missingness_Prop.txt'"
+awk '$2 < 0.05 {print "AP018935.1\t" $1}' Missingness_Prop.txt > Keep_Pos_max5missing.txt
+# Filter only positions with <5% missingness
+zcat merged.vcf.gz | awk 'BEGIN { while ((getline < "Keep_Pos_max5missing.txt") > 0) s[$1":"$2]=1 } /^#/ {print; next} (s[$1":"$2])' > merged_max5missing.vcf
+# Pyseer
+cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC/TEST_Fasttree
+module load python
+source activate pyseer
+sbatch -p fasse -t 0-12:00 --mem=50000 --wrap="python ../Files/pyseer/scripts/phylogeny_distance.py --lmm EOD_LOD_VLOD_CDC_FastTree_DP.tre > EOD_LOD_VLOD_CDC_FastTree_DP_K.tsv"
+sbatch -p fasse -t 0-12:00 --mem=100000 --wrap="pyseer --lmm --phenotypes ../Files/phenotypes_filtered.txt --phenotype-column binary --vcf ../11.SNIPPY_MULTI/merged_max5missing.vcf --similarity EOD_LOD_VLOD_CDC_FastTree_DP_K.tsv > SNPGWAS_FastTree_DP_LMM.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="pyseer --lmm --phenotypes ../Files/phenotypes_filtered.txt  --phenotype-column binary --kmers ../14.UNITIGS/unitigs.txt --uncompressed --similarity EOD_LOD_VLOD_CDC_FastTree_DP_K.tsv > DBGWAS_FastTree_DP_LMM.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="annotate_hits_pyseer DBGWAS_FastTree_DP_LMM.txt ../Files/DBGWAS_references.txt DBGWAS_FastTree_DP_LMM_annotation.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="pyseer --min-af 0.05 --max-af 0.95 --lmm --phenotypes ../Files/phenotypes_filtered.txt --phenotype-column binary --pres ../13.Pangenome_analysis/13.1.Panaroo/gene_presence_absence.Rtab --similarity EOD_LOD_VLOD_CDC_FastTree_DP_K.tsv > PanGWAS_FastTree_DP_LMM.txt"
+
 
 # Test RAxML outside of Pipeline
 cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_CDC/TEST_RAxML
@@ -135,7 +161,7 @@ sbatch -p fasse -c 2 -t 3-00:00:00 --mem=100000 --wrap="raxml-ng --bootstrap --m
 ## RAxML_bipartition
 sbatch -p fasse -c 2 -t 3-00:00:00 --mem=100000 --wrap="raxml-ng --support --tree T1.raxml.bestTree --bs-trees T2.raxml.bootstraps --threads auto{48} --prefix core_T3"
 # Pyseer
-sbatch -p fasse -t 0-12:00 --mem=100000 --wrap="python ../Files/pyseer/scripts/phylogeny_distance.py --lmm core_T1.raxml.bestTree > core_raxml_K.tsv"
+sbatch -p fasse -t 0-12:00 --mem=50000 --wrap="python ../Files/pyseer/scripts/phylogeny_distance.py --lmm core_T1.raxml.bestTree > core_raxml_K.tsv"
 sbatch -p fasse -t 0-12:00 --mem=100000 --wrap="pyseer --lmm --phenotypes ../Files/phenotypes_filtered.txt --phenotype-column binary --vcf ../11.SNIPPY_MULTI/merged_max5missing.vcf --similarity core_raxml_K.tsv > SNPGWAS_core_raxml_LMM_max5missing.txt"
 sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="pyseer --lmm --phenotypes ../Files/phenotypes_filtered.txt  --phenotype-column binary --kmers ../14.UNITIGS/unitigs.txt --uncompressed --similarity core_raxml_K.tsv > DBGWAS_core_raxml_LMM_max5missing.txt"
 sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="annotate_hits_pyseer DBGWAS_core_raxml_LMM_max5missing.txt ../Files/DBGWAS_references.txt DBGWAS_core_raxml_LMM_max5missing_annotation.txt"
@@ -158,4 +184,50 @@ sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="annotate_hits_pyseer DBGWAS_IQtre
 
 # CC population structure-correction
 cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_CDC/TEST_CC_pop_correction
-sbatch -p fasse -t 0-12:00 --mem=100000 --wrap="pyseer --min-af 0.05 --max-af 0.95 --phenotypes ../Files/phenotypes_filtered.txt --phenotype-column binary --vcf ../11.SNIPPY_MULTI/merged_max5missing.vcf --covariates CC_clusters.txt --use-covariates 2 --no-distances --cpu 8 > SNPGWAS_CC_max5missing.txt"
+awk -F',' 'NR==1 {print "Taxon\tclonal_complex"; next} {sub(/^cc/, "", $3); if ($3 != "NA") print $2 "\t" $3 }' ../10.ASSIGN_CC/combined_results_with_cc.txt > CC_clusters.txt
+head -1 ../Files/phenotypes_filtered.txt > phenotypes_filtered_CC.txt
+awk 'NR==FNR { if (NR>1) s[$1]=1; next } NR==1 || $1 in s' CC_clusters.txt ../Files/phenotypes_filtered.txt >> phenotypes_filtered_CC.txt
+awk 'NR==FNR { if (NR>1) s[$1]=1; next } NR==1 || $1 in s' ../Files/phenotypes_filtered.txt CC_clusters.txt > CC_clusters_filtered.txt
+module load python
+source activate pyseer
+sbatch -p fasse -t 0-12:00 --mem=100000 --wrap="pyseer --min-af 0.05 --max-af 0.95 --phenotypes phenotypes_filtered_CC.txt --phenotype-column binary --vcf ../11.SNIPPY_MULTI/merged_max5missing.vcf --covariates CC_clusters_filtered.txt --use-covariates 2 --no-distances > SNPGWAS_CC_max5missing.txt"
+
+# 1. Filter CCs by phenotype
+awk 'NR>1{s[$1]=1} END{for(k in s)print k}' ../Files/phenotypes_filtered.txt > IDs.txt
+echo -e "Sample\tclonal_complex" > CC_clusters.txt
+awk -F',' 'NR==1{next} {sub(/^cc/,"",$3); if($3!="NA") print $2 "\t" $3}' ../10.ASSIGN_CC/combined_results_with_cc.txt | awk 'NR==FNR{s[$1]=1;next}($1 in s)' IDs.txt - >> CC_clusters.txt
+
+# 2. Now, filter phenos by new CC_clusters
+awk 'NR>1{s[$1]=1} END{for(k in s)print k}' CC_clusters.txt > IDs2.txt
+head -1 ../Files/phenotypes_filtered.txt > phenotypes_filtered_CC.txt
+awk 'NR==FNR{s[$1]=1;next}NR>1&&($1 in s)' IDs2.txt ../Files/phenotypes_filtered.txt >> phenotypes_filtered_CC.txt
+module load python
+source activate pyseer
+sbatch -p fasse -t 0-12:00 --mem=100000 --wrap="pyseer --min-af 0.05 --max-af 0.95 --phenotypes phenotypes_filtered_CC.txt --phenotype-column binary --vcf ../11.SNIPPY_MULTI/merged_max5missing.vcf --covariates CC_clusters.txt --use-covariates 2 --no-distances > SNPGWAS_CC_max5missing.txt"
+
+sbatch -p fasse -t 0-12:00 --mem=100000 --wrap="pyseer --min-af 0.05 --max-af 0.95 --phenotypes phenotypes_filtered_SC.txt --phenotype-column binary --vcf ../11.SNIPPY_MULTI/merged_max5missing.vcf --covariates ../15.Pyseer/15.2.Subanalysis_1/15.2.4.SC/SC_clusters.txt --use-covariates 2 --no-distances > SNPGWAS_SC_max5missing.txt"
+
+
+head -1 ../Files/phenotypes_filtered.txt > phenotypes_filtered_SC.txt
+cat ../Files/phenotypes_filtered_SC.txt >> phenotypes_filtered_SC.txt
+
+
+# Run SnpEff
+cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC/TEST_SnpEff
+module load python
+# conda create -n snpeff
+source activate snpeff
+# conda install bioconda::snpeff
+snpEff -h
+
+sbatch -p fasse -t 0-12:00 --mem=50000 --wrap="snpEff -nodownload -c ../Files/snpEff.config -v AP018935.1 ../4.SNIPPY/SRR29475941/snps.vcf | gzip -c > test2.ann.vcf.gz"
+sbatch -p fasse -t 0-12:00 --mem=50000 --wrap="snpEff -nodownload -c ../Files/snpEff.config -v AP018935.1 ../4.SNIPPY/SRR29475941/snps_norm_filter.vcf.gz | gzip -c > test3.ann.vcf.gz"
+
+
+
+
+# Run pipeline with NL-opnly data
+cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_NL/scripts
+module load python
+source activate java
+sbatch -p fasse -c 48 -t 7-00:00:00 --mem=180000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline.nf --main --sub1 --sub2 --path_nextflow_dir /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_NL --path_conda_envs /n/home_fasse/lcavalli/.conda/envs"
