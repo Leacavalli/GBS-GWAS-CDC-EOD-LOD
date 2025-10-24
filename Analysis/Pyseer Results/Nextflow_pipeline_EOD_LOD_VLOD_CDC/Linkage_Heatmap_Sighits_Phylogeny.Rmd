@@ -1,0 +1,754 @@
+---
+title: "Linkage Investigation"
+output: html_document
+date: "2025-10-06"
+---
+
+# 0 Set up environment
+```{r}
+# Clean environment
+rm( list = ls() )
+
+# load libraries
+library(stringr)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(phytools)
+library(ape)
+library(treeio)
+library(ggtree)
+library(ggnewscale)
+library(RColorBrewer)
+library(cartography)
+library(khroma)
+```
+
+# PLot phylogeny 
+```{r}
+# Import tree
+setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Phylogenies/EOD_LOD_VLOD_CDC")
+Fasttree_VLOD_DP <- read.tree("Fastree_DP.tre")
+Fasttree_VLOD_DP_mid <- midpoint.root(Fasttree_VLOD_DP)
+
+# Load metadata
+setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC")
+serotypes <- read.table("Serotypes.txt", header=T)
+CCs <- read.csv("combined_results_with_cc.txt")
+SCs <- read.csv("GBS_GWAS_db_core_clusters.csv") |> rename(Sample=Taxon, SC=Cluster)
+
+# Load phenotypes
+setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC")
+phenotypes <- read.table("phenotypes.txt", header=T)
+phenotypes <- phenotypes |>
+  rename(Sample =samples ) |> 
+  mutate(Age_cat = ifelse(continuous<=7, "EOD", 
+                          ifelse(continuous<=89, "LOD", "VLOD")))
+# Prep metadata for tree
+typing_data <- left_join(left_join(left_join(serotypes, CCs), SCs), phenotypes)
+fewer5_SC <- which(table(typing_data$SC)<=5)
+metadata_tree_v0 <- typing_data |>
+  mutate(SC2= ifelse(SC %in% fewer5_SC, "other", SC))|>
+  mutate(SC2= factor(SC2, level=c(1:12, "other")))|>
+  mutate(Serotype2 = str_remove(str_remove(GBS.SBG,"\\*"),"\\?"))|>
+  mutate(Serotype2 = ifelse(grepl("III-", Serotype2), "III", Serotype2))|>
+  mutate(Serotype2 = factor(Serotype2, levels=c("Ia", "Ib","II", "III", "IV", "V","VI", "VIII")))|> 
+  rename("label" = "Sample")|> 
+  filter(label %in% Fasttree_VLOD_DP_mid$tip.label)
+
+# Join metadata and tree 
+Fasttree_VLOD_DP_mid_metadata <- full_join(keep.tip(Fasttree_VLOD_DP_mid, metadata_tree_v0$label), metadata_tree_v0 , by = 'label')
+
+
+# Prepare heatmap data for phylo
+## Serotype
+Metadata_Serotype = metadata_tree_v0 |> select(Serotype2)
+row.names(Metadata_Serotype) <-  metadata_tree_v0$label
+colnames(Metadata_Serotype)= c("1")
+## CC
+Metadata_CC= metadata_tree_v0 |> select(clonal_complex)
+row.names(Metadata_CC) <-  metadata_tree_v0$label
+colnames(Metadata_CC)= c("2")
+## Age category
+Metadata_Age_cat= metadata_tree_v0 |> select(Age_cat)
+row.names(Metadata_Age_cat) <-  metadata_tree_v0$label
+colnames(Metadata_Age_cat)= c("3")
+
+# Prepare colors for phylo
+SC_colors <- c("#dbdb8d", "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd","#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf", "#f7b6d2",  "#c5b0d5", "#c49c94", "black")
+Serotype_colors <- c(color("muted")(9),"#D55E00" , "grey")
+names(Serotype_colors) <- levels(Metadata_Serotype[,1])
+CC_colors <- carto.pal(pal1 = "pastel.pal" ,n1 = 12)
+Age_cat_colors <- c("#004488", "#DDAA33", "#BB5566")
+
+# SC tips
+Fasttre_p1 <- ggtree(Fasttree_VLOD_DP_mid_metadata, ladderize = T, lwd=0.1) + 
+  geom_tippoint(aes(color=as.factor(SC2)),size=1.5)+
+  scale_colour_manual(name="SC", values=SC_colors)+ 
+  ggtree::vexpand(.15, -1)
+# WITHOUT LEGEND
+Fasttre_p1_noleg <-  ggtree(Fasttree_VLOD_DP_mid_metadata, ladderize = T, lwd=0.1) 
+
+# Serotype
+Fasttre_p2 <- gheatmap(Fasttre_p1 + new_scale_fill(), Metadata_Serotype ,  width=0.15, offset=0.0005, 
+               font.size = 5, colnames_offset_y = -50, color=NA)+
+  scale_fill_manual(values = Serotype_colors, name="1: Serotype")
+Fasttre_p2_leg <- gheatmap(Fasttre_p1_noleg + new_scale_fill(), Metadata_Serotype ,  width=0.15, offset=0.0005, 
+               font.size = 5, colnames_offset_y = -10, color=NA)+
+  scale_fill_manual(values = Serotype_colors, name="1: Serotype")
+
+# CCs
+Fasttre_p3 <- gheatmap(Fasttre_p2 + new_scale_fill(), Metadata_CC,  width=0.15, offset=0.005,
+               font.size = 5, colnames_offset_y = -50, color=NA)+
+  scale_fill_manual(values = CC_colors, name="2: CC")
+Fasttre_p3_leg <- gheatmap(Fasttre_p1_noleg + new_scale_fill(), Metadata_CC,  width=0.15, offset=0.005,
+               font.size = 5, colnames_offset_y = -10, color=NA)+
+  scale_fill_manual(values = CC_colors, name="2: CC")
+
+#  Age category
+Fasttre_p4 <- gheatmap(Fasttre_p3 + new_scale_fill(), Metadata_Age_cat,  width=0.15, offset=0.01,
+               font.size = 5, colnames_offset_y = -50, color=NA)+
+  scale_fill_manual(values = Age_cat_colors, name="3: Age of Onset")
+Fasttre_p4
+Fasttre_p4_leg <- gheatmap(Fasttre_p1_noleg + new_scale_fill(), Metadata_Age_cat,  width=0.15, offset=0.01,
+               font.size = 5, colnames_offset_y = -10, color=NA)+
+  scale_fill_manual(values = Age_cat_colors, name="3: Age of Onset")
+
+
+```
+
+
+# 1. Main Analysis
+# 1.1. SNP-GWAS (Fastree DP LMM, Panaroo, Binary)
+```{r}
+# Load GWAS results
+SNPGWAS_data_Fasttree_LMM <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/SNPGWAS_Fasttree_DP_LMM.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)|> 
+  mutate(POS=as.integer(str_split(as.character(variant), "_", simplify = T)[,2]), 
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))
+SNPGWAS_sig <-SNPGWAS_data_Fasttree_LMM |> 
+  filter(lrt.pvalue < 0.05 /nrow(SNPGWAS_data_Fasttree_LMM))
+
+# Load SNP distribution across samples
+sig_SNPs <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/Sig_SNP.txt")
+sig_SNPs_df <- sig_SNPs  |> 
+  select(- X.CHROM, -ID, -QUAL, -FILTER, -INFO, -FORMAT)|>
+  mutate(across(4:1543, ~ ifelse(grepl("1/1", .), 1, 0)))|>
+  mutate(Sum = rowSums(across(4:1543), na.rm = TRUE),
+         Proportion = round(Sum / 1540, 3))|>
+  mutate(across(4:1543, ~ ifelse(grepl("1", .), "present", "absent")))|>
+  mutate(MUT= paste0(REF, POS, ALT), .before = 1)|> 
+  select(-POS, -REF, -ALT)
+df_t <- as.data.frame(t(sig_SNPs_df[,-1]))
+colnames(df_t) <- sig_SNPs_df[[1]]
+
+# Prepare heatmap data for phylo
+## T1206469C
+Metadata_T1206469C = df_t |> select(T1206469C)
+Metadata_T1206469C$T1206469C <- as.factor(Metadata_T1206469C$T1206469C)
+row.names(Metadata_T1206469C) <-  row.names(df_t)
+colnames(Metadata_T1206469C)= c("T1206469C")
+## T1216249C
+Metadata_T1216249C = df_t |> select(T1216249C)
+Metadata_T1216249C$T1216249C <- as.factor(Metadata_T1216249C$T1216249C)
+row.names(Metadata_T1216249C) <-  row.names(df_t)
+colnames(Metadata_T1216249C)= c("T1216249C")
+## C1249780T
+Metadata_C1249780T= df_t |> select(C1249780T)
+Metadata_C1249780T$C1249780T <- as.factor(Metadata_C1249780T$C1249780T)
+row.names(Metadata_C1249780T) <-  row.names(df_t)
+colnames(Metadata_C1249780T)= c("C1249780T")
+## C1250385A
+Metadata_C1250385A = df_t |> select(C1250385A)
+Metadata_C1250385A$C1250385A <- as.factor(Metadata_C1250385A$C1250385A)
+row.names(Metadata_C1250385A) <-  row.names(df_t)
+colnames(Metadata_C1250385A)= c("C1250385A")
+## A1250938G
+Metadata_A1250938G= df_t |> select(A1250938G)
+Metadata_A1250938G$A1250938G <- as.factor(Metadata_A1250938G$A1250938G)
+row.names(Metadata_A1250938G) <-  row.names(df_t)
+colnames(Metadata_A1250938G)= c("A1250938G")
+
+# T1206469C
+Fasttree_p5 <- gheatmap(Fasttre_p4 + new_scale_fill(), Metadata_T1206469C ,  width=0.05, offset=0.018, 
+               font.size = 5, colnames_offset_x = -0.003, colnames_offset_y = -150, color=NA, colnames_angle = 60)+
+  scale_fill_manual(values = c("white", "darkblue"), name="SNP") +
+  theme(legend.position = "none") 
+
+# T1216249C
+Fasttree_p6 <- gheatmap(Fasttree_p5 + new_scale_fill(), Metadata_T1216249C,  width=0.05, offset=0.02,
+               font.size = 5, colnames_offset_x = -0.003, colnames_offset_y = -150, color=NA, colnames_angle = 60)+
+  scale_fill_manual(values = c("white", "darkblue"), name="T1216249C")+
+  theme(legend.position = "none") 
+
+# C1249780T
+Fasttree_p7 <- gheatmap(Fasttree_p6 + new_scale_fill(), Metadata_C1249780T,  width=0.05, offset=0.022,
+               font.size = 5, colnames_offset_x = -0.003, colnames_offset_y = -150, color=NA, colnames_angle = 60)+
+  scale_fill_manual(values = c("white", "darkblue"), name="C1249780T")+
+  theme(legend.position = "none") 
+
+# C1250385A
+Fasttree_p8 <- gheatmap(Fasttree_p7 + new_scale_fill(), Metadata_C1250385A,  width=0.05, offset=0.024,
+               font.size = 5, colnames_offset_x = -0.003, colnames_offset_y = -150, color=NA, colnames_angle = 60)+
+  scale_fill_manual(values = c("white", "darkblue"), name="C1250385A")+
+  theme(legend.position = "none") 
+
+# A1250938G
+Fasttree_p9 <- gheatmap(Fasttree_p8 + new_scale_fill(), Metadata_A1250938G,  width=0.05, offset=0.026,
+               font.size = 5, colnames_offset_x = -0.003, colnames_offset_y = -150, color=NA, colnames_angle = 60)+
+  scale_fill_manual(values = c("white", "darkblue"), name="A1250938G")+
+  theme(legend.position = "none") 
+
+# legend plot:
+Fasttree_SNP_leg <- gheatmap(Fasttre_p1_noleg + new_scale_fill(), Metadata_T1206469C ,  width=0.05, offset=0.028, 
+               font.size = 5, colnames_offset_x = -0.0015, colnames_offset_y = -150, color=NA, colnames_angle = 60)+
+  scale_fill_manual(values = c("white", "darkblue"), name="SNP") 
+
+```
+# 1.2. DB-GWAS (Fastree DP LMM, Panaroo, Binary)
+```{r}
+# Load GWAS results
+DBGWAS_FastTree <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/DBGWAS_Fasttree_DP_LMM.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+DBGWAS_FastTree_annotations <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/DBGWAS_Fasttree_DP_LMM_annotation.txt", sep = "\t", header=F) |> filter(V2 >=0.05, V2 <0.95)
+colnames(DBGWAS_FastTree_annotations) <- colnames(DBGWAS_FastTree)
+DBGWAS_FastTree_sig <- DBGWAS_FastTree_annotations |>  
+  filter(lrt.pvalue < 0.05 /nrow(DBGWAS_FastTree_annotations)) |>
+  mutate(contig = str_extract(notes, "^[^:]+"),
+         coord_range = str_extract(notes, "(?<=:)[0-9]+-[0-9]+"), 
+         start= str_split(coord_range, "-", simplify = T)[,1], 
+         end= str_split(coord_range, "-", simplify = T)[,2])|>
+  select(variant, contig, start, end)
+
+# Load Unitig distribution across samples
+Sig_Unitig <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/Sig_Unitig.txt", sep=" ", header=F)|>
+  select(-V2)
+Sig_Unitig[] <- lapply(Sig_Unitig, function(x) gsub(":1", "", x)) 
+order_unitigs <- c("ATCTTTTAAAATAGAAACTGTTATTTTTTGCA", "TTGTTGATCATTATGTCCTAGACCTAAAGCATGTCCTAA", "AATATTTCGTTTAACAAAAAAAATACTTTGCGAGGTCTCCATGCAGA", "AGCGACGTTTATGAATGCAGTTTCTAAAGGAAAAAAA", "TTTATGAATGCAGTTTCTAAAGGAAAAAAAACTATTGTGG", "TGTAGATATTGAAAGGTTACAAAATGTAGTCTATGAGGG", "TCGGTTCGAATGTGGGATAACACATTCGTCCAC", "GACGAATGTGTTATCCCACATTCGAACCGACCTGTT", "AAAAATGTTTGAATTAGGTAGTAATATTGACA", "TGATAATAGTGGAGAAATTTGTGATAATTTATCTCA", "AAATTATCACAAATTTCTCCACTATTATCAGTGGATCCATCAT", "TTTAGAAACTGCATTCATAAACGTCGCTGGGCCGCCATGTGTGAT" )
+Sig_Unitig <- Sig_Unitig |>
+  filter(V1 %in% order_unitigs) |>
+  mutate(V1 = factor(V1, levels = order_unitigs)) |>
+  arrange(V1)
+
+Unitig_sig_t <- metadata_tree_v0 %>% select(label)
+for(i in 1:nrow(Sig_Unitig)){
+  present_samples <- as.vector(unlist(Sig_Unitig[i, -1]))
+  new_var <- ifelse(Unitig_sig_t$label %in% present_samples, 1, 0)
+  Unitig_sig_t[[paste0("Unitig_", i)]] <- new_var
+}
+row.names(Unitig_sig_t) <- Unitig_sig_t$label
+Unitig_sig_t <- Unitig_sig_t[,-1]
+round(colMeans(Unitig_sig_t %>% select(starts_with("Unitig_"))),3)
+
+# Prepare heatmap data for phylo
+unitig_cols <- grep("^Unitig_", colnames(Unitig_sig_t), value = TRUE)
+metadata_unitig_list <- lapply(unitig_cols, function(u_col) {
+  df <- Unitig_sig_t |> select(all_of(u_col))
+  df[[u_col]] <- as.factor(df[[u_col]])      # convert column to factor
+  row.names(df) <- row.names(Unitig_sig_t)   # set rownames
+  colnames(df) <- u_col                     # ensure column name matches
+  df
+})
+names(metadata_unitig_list) <- unitig_cols
+##
+Metadata_Unitig_1 <- metadata_unitig_list[["Unitig_1"]]
+Metadata_Unitig_2 <- metadata_unitig_list[["Unitig_2"]]
+Metadata_Unitig_3 <- metadata_unitig_list[["Unitig_3"]]
+Metadata_Unitig_4 <- metadata_unitig_list[["Unitig_4"]]
+Metadata_Unitig_5 <- metadata_unitig_list[["Unitig_5"]]
+Metadata_Unitig_6 <- metadata_unitig_list[["Unitig_6"]]
+Metadata_Unitig_7 <- metadata_unitig_list[["Unitig_7"]]
+Metadata_Unitig_8 <- metadata_unitig_list[["Unitig_8"]]
+Metadata_Unitig_9 <- metadata_unitig_list[["Unitig_9"]]
+Metadata_Unitig_10 <- metadata_unitig_list[["Unitig_10"]]
+Metadata_Unitig_11 <- metadata_unitig_list[["Unitig_11"]]
+Metadata_Unitig_12 <- metadata_unitig_list[["Unitig_12"]]
+
+# Unitig_1
+Fasttree_p10 <- gheatmap(Fasttree_p9 + new_scale_fill(), Metadata_Unitig_1, 
+                        width = 0.05, offset = 0.028, 
+                        font.size = 5, colnames_offset_x = -0.002, 
+                        colnames_offset_y = -100, color = NA, colnames_angle = 60) +
+  scale_fill_manual(values = c("white", "darkgreen"), name = "Unitig") 
+
+# Unitig_2
+Fasttree_p11 <- gheatmap(Fasttree_p10 + new_scale_fill(), Metadata_Unitig_2, 
+                        width = 0.05, offset = 0.03, 
+                        font.size = 5, colnames_offset_x = -0.002, 
+                        colnames_offset_y = -100, color = NA, colnames_angle = 60) +
+  scale_fill_manual(values = c("white", "darkgreen"), name = "Unitig")
+
+# Unitig_3
+Fasttree_p12 <- gheatmap(Fasttree_p11 + new_scale_fill(), Metadata_Unitig_3, 
+                        width = 0.05, offset = 0.032, 
+                        font.size = 5, colnames_offset_x = -0.002, 
+                        colnames_offset_y = -100, color = NA, colnames_angle = 60) +
+  scale_fill_manual(values = c("white", "darkgreen"), name = "Unitig")
+
+# Unitig_4
+Fasttree_p13 <- gheatmap(Fasttree_p12 + new_scale_fill(), Metadata_Unitig_4, 
+                         width = 0.05, offset = 0.034, 
+                         font.size = 5, colnames_offset_x = -0.002, 
+                         colnames_offset_y = -100, color = NA, colnames_angle = 60) +
+  scale_fill_manual(values = c("white", "darkgreen"), name = "Unitig")
+
+# Unitig_5
+Fasttree_p14 <- gheatmap(Fasttree_p13 + new_scale_fill(), Metadata_Unitig_5, 
+                         width = 0.05, offset = 0.036, 
+                         font.size = 5, colnames_offset_x = -0.002, 
+                         colnames_offset_y = -100, color = NA, colnames_angle = 60) +
+  scale_fill_manual(values = c("white", "darkgreen"), name = "Unitig")
+
+# Unitig_6
+Fasttree_p15 <- gheatmap(Fasttree_p14 + new_scale_fill(), Metadata_Unitig_6, 
+                         width = 0.05, offset = 0.038, 
+                         font.size = 5, colnames_offset_x = -0.002, 
+                         colnames_offset_y = -100, color = NA, colnames_angle = 60) +
+  scale_fill_manual(values = c("white", "darkgreen"), name = "Unitig")
+
+# Unitig_7
+Fasttree_p16 <- gheatmap(Fasttree_p15 + new_scale_fill(), Metadata_Unitig_7, 
+                         width = 0.05, offset = 0.04, 
+                         font.size = 5, colnames_offset_x = -0.002, 
+                         colnames_offset_y = -100, color = NA, colnames_angle = 60) +
+  scale_fill_manual(values = c("white", "darkgreen"), name = "Unitig")
+
+# Unitig_8
+Fasttree_p17 <- gheatmap(Fasttree_p16 + new_scale_fill(), Metadata_Unitig_8, 
+                         width = 0.05, offset = 0.042, 
+                         font.size = 5, colnames_offset_x = -0.002, 
+                         colnames_offset_y = -100, color = NA, colnames_angle = 60) +
+  scale_fill_manual(values = c("white", "darkgreen"), name = "Unitig")
+
+# Unitig_9
+Fasttree_p18 <- gheatmap(Fasttree_p17 + new_scale_fill(), Metadata_Unitig_9, 
+                         width = 0.05, offset = 0.044, 
+                         font.size = 5, colnames_offset_x = -0.002, 
+                         colnames_offset_y = -100, color = NA, colnames_angle = 60) +
+  scale_fill_manual(values = c("white", "darkgreen"), name = "Unitig")
+
+# Unitig_10
+Fasttree_p19 <- gheatmap(Fasttree_p18 + new_scale_fill(), Metadata_Unitig_10, 
+                         width = 0.05, offset = 0.046, 
+                         font.size = 5, colnames_offset_x = -0.002, 
+                         colnames_offset_y = -100, color = NA, colnames_angle = 60) +
+  scale_fill_manual(values = c("white", "darkgreen"), name = "Unitig")
+
+# Unitig_11
+Fasttree_p20 <- gheatmap(Fasttree_p19 + new_scale_fill(), Metadata_Unitig_11, 
+                         width = 0.05, offset = 0.048, 
+                         font.size = 5, colnames_offset_x = -0.002, 
+                         colnames_offset_y = -100, color = NA, colnames_angle = 60) +
+  scale_fill_manual(values = c("white", "darkgreen"), name = "Unitig")
+
+# Unitig_12
+Fasttree_p21 <- gheatmap(Fasttree_p20 + new_scale_fill(), Metadata_Unitig_12, 
+                         width = 0.05, offset = 0.05, 
+                         font.size = 5, colnames_offset_x = -0.002, 
+                         colnames_offset_y = -100, color = NA, colnames_angle = 60) +
+  scale_fill_manual(values = c("white", "darkgreen"), name = "Unitig")
+
+
+# legend plot:
+Fasttree_Unitig_leg <-gheatmap(Fasttre_p1_noleg + new_scale_fill(), Metadata_Unitig_12, 
+                         width = 0.05, offset = 0.032, 
+                         font.size = 5, colnames_offset_x = -0.001, 
+                         colnames_offset_y = -100, color = NA, colnames_angle = 60) +
+  scale_fill_manual(values = c("white", "darkgreen"), name = "Unitig")
+```
+# 1.3. Pan-GWAS (Fastree DP LMM, Panaroo, Binary)
+```{r}
+# Load GWAS results
+PanGWAS_FastTree <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/PanGWAS_FastTree_DP_LMM.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+ PanGWAS_FastTree_sig <- PanGWAS_FastTree |> filter(lrt.pvalue < 0.05 / nrow(PanGWAS_FastTree))
+ 
+# Load Gene distribution across samples
+gene_presence_absence <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/gene_presence_absence.Rtab", header=T)
+gene_sig <- gene_presence_absence |> 
+  filter(Gene %in% PanGWAS_FastTree_sig$variant)
+gene_sig_Sum_prop <- gene_sig|>
+  mutate(Sum = rowSums(across(2:ncol(gene_sig)), na.rm = TRUE),
+         Proportion = round(Sum / (ncol(gene_sig)-1), 3))|>
+  select(Gene, Sum, Proportion)
+gene_sig_Sum_prop
+gene_sig <- gene_sig |>
+  mutate(across(2:1541, ~ ifelse(grepl("1", .), "present", "absent")))
+gene_sig_t <- as.data.frame(t(gene_sig[,-1]))
+colnames(gene_sig_t) <- gene_sig[[1]]
+
+# Prepare heatmap data for phylo
+## arnC
+Metadata_arnC = gene_sig_t |> select(arnC)
+Metadata_arnC$arnC <- as.factor(Metadata_arnC$arnC)
+row.names(Metadata_arnC) <-  row.names(gene_sig_t)
+colnames(Metadata_arnC)= c("arnC")
+## group_1981
+Metadata_group_1981 = gene_sig_t |> select(group_1981)
+Metadata_group_1981$group_1981 <- as.factor(Metadata_group_1981$group_1981)
+row.names(Metadata_group_1981) <-  row.names(gene_sig_t)
+colnames(Metadata_group_1981)= c("group_1981")
+
+# arnC
+Fasttree_p22 <- gheatmap(Fasttree_p21 + new_scale_fill(), Metadata_arnC ,  width=0.05, offset=0.052, 
+               font.size = 5, colnames_offset_x = -0.002, colnames_offset_y = -100, color=NA, colnames_angle = 60)+
+  scale_fill_manual(values = c("white", "darkred"), name="Gene") +
+  theme(legend.position = "none") 
+
+# group_1981
+Fasttree_p23 <- gheatmap(Fasttree_p22 + new_scale_fill(), Metadata_group_1981,  width=0.05, offset=0.054,
+               font.size = 5, colnames_offset_x = -0.002, colnames_offset_y = -150, color=NA, colnames_angle = 60)+
+  scale_fill_manual(values = c("white", "darkred"), name="group_1981")+
+  theme(legend.position = "none") 
+
+# legend plot:
+Fasttree_PanGWAS_leg <- gheatmap(Fasttre_p1_noleg + new_scale_fill(), Metadata_group_1981,  width=0.05, offset=0.056,
+               font.size = 5, colnames_offset_x = -0.002, colnames_offset_y = -150, color=NA, colnames_angle = 60)+
+  scale_fill_manual(values = c("white", "darkred"), name="Gene")
+```
+# Phylogeny with SNP, Unitig, and Accessory gene Heatmaps
+```{r}
+# Extract legends
+library(cowplot)
+library(patchwork)
+leg_SC <- get_legend(Fasttre_p1)          
+leg_cps <- get_legend(Fasttre_p2_leg)          
+leg_CC <- get_legend(Fasttre_p3_leg)          
+leg_agecat <- get_legend(Fasttre_p4_leg)          
+leg_SNPs <- get_legend(Fasttree_SNP_leg)
+leg_Unitigs <- get_legend(Fasttree_Unitig_leg)
+leg_PanGWAS <- get_legend(Fasttree_PanGWAS_leg)
+
+# Arrange legends together
+leg_SC_agecat <- plot_grid(
+  leg_SC, plot_spacer(), leg_agecat,
+  ncol = 1, 
+  align = "v", 
+  axis = "tb", 
+  rel_heights = c(1, 0.01, 1)
+)
+
+leg_cps_CC <- plot_grid(
+  leg_cps, plot_spacer(), leg_CC,
+  ncol = 1, 
+  align = "v", 
+  axis = "tb", 
+  rel_heights = c(1, 0.01, 1)
+)
+
+leg_GWAS <- plot_grid(
+  leg_SNPs, plot_spacer(), leg_Unitigs, plot_spacer(), leg_PanGWAS, 
+  ncol = 1, 
+  align = "v", 
+  axis = "tb", 
+  rel_heights = c(1, 0.01, 1, 0.01, 1)
+)
+
+
+legend_combined <- plot_grid(leg_SC_agecat, leg_cps_CC, leg_GWAS,  ncol = 3)
+
+final_plot <- plot_grid(
+  Fasttree_p23,
+  legend_combined,
+  ncol = 2,
+  rel_widths = c(3, 1)
+)
+
+# To display or save
+print(final_plot)
+# 1206469_T_C and 1216249_T_C appear similarly distributed
+# 1249780_C_T, 1250385_C_A and 1250938_A_G appear similarly distributed
+```
+
+# What proportion of samples carrying one significant hit also carries another ? 
+```{r}
+df_complete <- left_join(left_join(left_join(metadata_tree_v0 , 
+                          df_t |> mutate(label=rownames(df_t))) , 
+                          Unitig_sig_t |> mutate(label=rownames(Unitig_sig_t))), 
+                          gene_sig_t |> mutate(label=rownames(gene_sig_t))) |>
+  mutate(across(11:29, ~replace(., . == "absent", 0))) |>
+  mutate(across(11:29, ~replace(., . == "present", 1)))
+
+
+df_complete_V2 <- df_complete[, 11:29] 
+
+# Suppose `line` is your data.frame or matrix
+sim_matrix <- matrix(NA, ncol(df_complete_V2), ncol(df_complete_V2),
+                     dimnames = list(colnames(df_complete_V2), colnames(df_complete_V2)))
+
+for (i in 1:ncol(df_complete_V2)) {
+  for (j in 1:ncol(df_complete_V2)) {
+    sim_matrix[i, j] <- mean(df_complete_V2[, i] == df_complete_V2[, j])
+  }
+}
+
+sim_matrix
+
+# Heatmap
+library(reshape2)
+sim_long <- melt(sim_matrix)
+colnames(sim_long) <- c("Var1", "Var2", "value")
+sym_palette <- c(viridis::plasma(100), rev(viridis::plasma(100)))
+sim_long_tri <- sim_long[as.numeric(sim_long$Var2) <= as.numeric(sim_long$Var1), ]
+library(ggplot2)
+ggplot(sim_long_tri, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient2(
+    low = "blue",       # Color for 0
+    mid = "white",     # Color for 0.5
+    high = "red",      # Color for 1
+    midpoint = 0.5,    # Where the "mid" color should be
+    limits = c(0, 1)
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(
+    x = "", y = "", 
+    title = "Pairwise Similarity Heatmap",
+    fill = "Genotype Similarity\nin Population"
+  )
+
+
+
+# Suppose `line` is your data.frame or matrix
+chisq_matrix_stat <- matrix(NA, ncol(df_complete_V2), ncol(df_complete_V2),
+                     dimnames = list(colnames(df_complete_V2), colnames(df_complete_V2)))
+chisq_matrix_p <- chisq_matrix_stat
+
+n_pairs <- ncol(df_complete_V2)*((ncol(df_complete_V2))-1)/2
+sig_threshold <- 
+
+for (i in 1:ncol(df_complete_V2)) {
+  for (j in 1:ncol(df_complete_V2)) {
+    chisq_test <- chisq.test(df_complete_V2[, i], df_complete_V2[, j])
+    chisq_matrix_stat[i, j] <- chisq_test$statistic
+    chisq_matrix_p[i, j] <- chisq_test$p.value
+  }
+}
+
+chisq_matrix_stat
+chisq_matrix_p
+
+# Heatmap
+chisq_matrix_stat_long <- melt(chisq_matrix_stat)
+colnames(chisq_matrix_stat_long) <- c("Var1", "Var2", "value")
+chisq_matrix_stat_long_tri <- chisq_matrix_stat_long[as.numeric(chisq_matrix_stat_long$Var2) <= as.numeric(chisq_matrix_stat_long$Var1), ]
+ggplot(chisq_matrix_stat_long_tri, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient2(
+    low = "blue",       
+    mid = "white",     
+    high = "red",      
+    midpoint = 0.05) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(
+    x = "Genetic Variant / GWAS Signal 1", 
+    y = "Genetic Variant / GWAS Signal 2", 
+    title = "Pairwise Association Strength Heatmap",
+    fill = "Chi-square Statistic\n(Association Strength)"
+  )
+
+
+
+# Heatmap
+chisq_matrix_p_long <- melt(chisq_matrix_p)
+colnames(chisq_matrix_p_long) <- c("Var1", "Var2", "value")
+chisq_matrix_p_long_tri <- chisq_matrix_p_long[as.numeric(chisq_matrix_p_long$Var2) <= as.numeric(chisq_matrix_p_long$Var1), ]
+chisq_matrix_p_long_tri$p_bonf <- p.adjust(chisq_matrix_p_long_tri$value, method = "bonferroni")
+
+ggplot(chisq_matrix_p_long_tri, aes(x = Var1, y = Var2, fill = p_bonf)) +
+  geom_tile() +
+  scale_fill_gradient2(
+    low = "red",       
+    mid = "white",     
+    high = "blue",      
+    midpoint = 0.05) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(
+    x = "Genetic Variant / GWAS Signal 1", 
+    y = "Genetic Variant / GWAS Signal 2", 
+    title = "Pairwise Association Strength Heatmap",
+    fill = "chi-square p-value \n(bonferonni corrected)"
+  )
+
+ggplot(chisq_matrix_p_long_tri, aes(x = Var1, y = Var2, fill = -log10(p_bonf))) +
+  geom_tile() +
+  scale_fill_gradient2(
+    low = "blue",       
+    mid = "white",     
+    high = "red",      
+    midpoint = 10) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(
+    x = "Genetic Variant / GWAS Signal 1", 
+    y = "Genetic Variant / GWAS Signal 2", 
+    title = "Pairwise Association Strength Heatmap",
+    fill = "-log10(chi-square p-value)"
+  )
+
+
+# Linkage BLock 1
+table(df_complete$T1206469C, df_complete$T1216249C)
+chisq.test(df_complete$T1206469C, df_complete$T1216249C)
+
+table(df_complete$T1206469C, df_complete$Unitig_1)
+chisq.test(df_complete$T1206469C, df_complete$Unitig_1)
+
+table(df_complete$T1216249C, df_complete$Unitig_2)
+chisq.test(df_complete$T1216249C, df_complete$Unitig_2)
+
+# Linkage BLock 2
+block2_df <- df_complete |>
+  mutate(block2= paste0(C1249780T,C1250385A,A1250938G))
+table(block2_df$block2)
+table(df_complete$C1249780T, df_complete$C1250385A)
+chisq.test(df_complete$C1249780T, df_complete$C1250385A)
+
+table(df_complete$C1249780T, df_complete$A1250938G)
+chisq.test(df_complete$C1249780T, df_complete$A1250938G)
+
+# Linkage BLock 3
+table(df_complete$Unitig_4, df_complete$Unitig_5)
+chisq.test(df_complete$Unitig_4, df_complete$Unitig_5)
+
+chisq.test(df_complete$Unitig_4, df_complete$Unitig_12)
+chisq.test(df_complete$Unitig_5, df_complete$Unitig_12)
+
+table(df_complete$Unitig_7, df_complete$Unitig_8)
+chisq.test(df_complete$Unitig_7, df_complete$Unitig_8)
+
+table(df_complete$Unitig_7, df_complete$Unitig_4)
+chisq.test(df_complete$Unitig_7, df_complete$Unitig_8)
+
+table(df_complete$Unitig_8, df_complete$Unitig_4)
+
+
+block3_df <- df_complete |>
+  mutate(block3= paste0(Unitig_4,Unitig_5,Unitig_12, Unitig_7, Unitig_8))
+table(block3_df$block3)
+
+# Linkage BLock 4
+table(df_complete$Unitig_10, df_complete$Unitig_11)
+chisq.test(df_complete$Unitig_10, df_complete$Unitig_11)
+
+table(df_complete$Unitig_10, df_complete$Unitig_9)
+table(df_complete$Unitig_11, df_complete$Unitig_9)
+
+table(df_complete$Unitig_11, df_complete$arnC)
+table(df_complete$Unitig_10, df_complete$arnC)
+table(df_complete$Unitig_9, df_complete$arnC)
+
+
+table(df_complete$Unitig_9, df_complete$Unitig_6)
+table(df_complete$Unitig_10, df_complete$Unitig_6)
+table(df_complete$Unitig_11, df_complete$Unitig_6)
+
+block4_df <- df_complete |>
+  mutate(block4= paste0(Unitig_6, Unitig_9,Unitig_10,Unitig_11, arnC))
+table(block4_df$block4)
+
+
+# Singletons ? 
+table(df_complete$Unitig_3, df_complete$T1206469C)
+chisq.test(df_complete$Unitig_3, df_complete$T1206469C)
+
+table(df_complete$Unitig_3, df_complete$C1249780T)
+chisq.test(df_complete$Unitig_3, df_complete$T1206469C)
+
+```
+
+# Pairwise distances
+```{r}
+# SNPs
+as.matrix(dist(sig_SNPs$POS, method = "manhattan")) 
+
+# Unitigs 
+DBGWAS_FastTree_sig |>
+  filter(variant %in% order_unitigs) |>
+  mutate(variant = factor(variant, levels = order_unitigs)) |>
+  arrange(variant)  |>
+  mutate(Unitig= paste0("Unitig_", 1:12))|>
+  arrange(contig, start) |>
+  group_by(contig) |>
+  mutate(
+    start = as.numeric(start),
+    end = as.numeric(end),
+    distance_from_prev = start - lag(end)
+  ) |>
+  ungroup()
+         
+DBGWAS_FastTree_sig |>
+  filter(variant %in% order_unitigs) |>
+  mutate(variant = factor(variant, levels = order_unitigs)) |>
+  arrange(variant)  |>
+  mutate(Unitig= paste0("Unitig_", 1:12))|>
+  arrange(start)|>
+  mutate(y = factor(1:nrow(DBGWAS_FastTree_sig), levels = rev(1:nrow(DBGWAS_FastTree_sig)))) |>
+  ggplot(aes(x = (start), xend = end, y = y, yend = y, color= Unitig)) +
+  facet_grid(. ~ contig, scales = "free") +
+  geom_segment(linewidth = 2) +
+  labs(x = "Position", y = "Variant") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  scale_color_manual(values=SC_colors)
+
+```
+
+
+# Is any significant hit significantly associated with the Serotype ?
+```{r}
+df_complete <- left_join(left_join(left_join(metadata_tree_v0 , 
+                          df_t |> mutate(label=rownames(df_t))) , 
+                          Unitig_sig_t |> mutate(label=rownames(Unitig_sig_t))), 
+                          gene_sig_t |> mutate(label=rownames(gene_sig_t))) |>
+  mutate(across(11:29, ~replace(., . == "absent", 0))) |>
+  mutate(across(11:29, ~replace(., . == "present", 1)))
+
+# Block 1
+chisq.test(df_complete$T1206469C, df_complete$Serotype2, simulate.p.value = T)
+summary(glm(as.numeric(T1206469C) ~ Serotype2, family = binomial, data = df_complete))
+# positively associated with II and V, negatively associated with Ia and III
+chisq.test(df_complete$T1216249C, df_complete$Serotype2, simulate.p.value = T)
+summary(glm(as.numeric(T1216249C) ~ Serotype2, family = binomial, data = df_complete))
+# positively associated with V, negatively associated with Ia and III
+chisq.test(df_complete$Unitig_1, df_complete$Serotype2, simulate.p.value = T)
+summary(glm(as.numeric(Unitig_1) ~ Serotype2, family = binomial, data = df_complete))
+
+chisq.test(df_complete$Unitig_2, df_complete$Serotype2, simulate.p.value = T)
+summary(glm(as.numeric(Unitig_2) ~ Serotype2, family = binomial, data = df_complete))
+
+
+chisq.test(df_complete$C1249780T, df_complete$Serotype2, simulate.p.value = T)
+summary(glm(as.numeric(C1249780T) ~ Serotype2, family = binomial, data = df_complete))
+# positively associated with II and V, negatively associated with Ia and III
+summary(glm(as.numeric(C1250385A) ~ Serotype2, family = binomial, data = df_complete))
+# positively associated with II and V, negatively associated with Ia and III
+summary(glm(as.numeric(A1250938G) ~ Serotype2, family = binomial, data = df_complete))
+# positively associated with II and V, negatively associated with Ia and III
+
+
+# Unitigs 
+summary(glm(as.numeric(Unitig_1) ~ Serotype2, family = binomial, data = df_complete))
+summary(glm(as.numeric(Unitig_2) ~ Serotype2, family = binomial, data = df_complete))
+summary(glm(as.numeric(Unitig_3) ~ Serotype2, family = binomial, data = df_complete))
+summary(glm(as.numeric(Unitig_4) ~ Serotype2, family = binomial, data = df_complete))
+summary(glm(as.numeric(Unitig_5) ~ Serotype2, family = binomial, data = df_complete))
+summary(glm(as.numeric(Unitig_6) ~ Serotype2, family = binomial, data = df_complete))
+summary(glm(as.numeric(Unitig_7) ~ Serotype2, family = binomial, data = df_complete))
+summary(glm(as.numeric(Unitig_8) ~ Serotype2, family = binomial, data = df_complete))
+summary(glm(as.numeric(Unitig_9) ~ Serotype2, family = binomial, data = df_complete))
+summary(glm(as.numeric(Unitig_10) ~ Serotype2, family = binomial, data = df_complete))
+summary(glm(as.numeric(Unitig_11) ~ Serotype2, family = binomial, data = df_complete))
+summary(glm(as.numeric(Unitig_12) ~ Serotype2, family = binomial, data = df_complete))
+
+# Unitigs 
+chisq.test(df_complete$arnC, df_complete$Serotype2)
+summary(glm(as.numeric(arnC) ~ Serotype2, family = binomial, data = df_complete))
+chisq.test(df_complete$group_1981, df_complete$Serotype2, simulate.p.value = T)
+summary(glm(as.numeric(group_1981) ~ Serotype2, family = binomial, data = df_complete))
+```
+

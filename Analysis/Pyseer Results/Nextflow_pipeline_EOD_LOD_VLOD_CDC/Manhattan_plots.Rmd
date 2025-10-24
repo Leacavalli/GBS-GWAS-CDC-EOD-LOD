@@ -1,0 +1,1017 @@
+---
+title: "Main Analysis"
+output: html_document
+date: "2025-07-17"
+---
+
+# 0 Set up environment
+```{r}
+# Clean environment
+rm( list = ls() )
+
+# load libraries
+library(qqman)
+library(circlize)
+library(VennDiagram)
+library(stringr)
+library(tidyverse)
+library(ggrepel)
+library(ggplot2)
+
+# Prepare Plotting functions 
+manhattan_plot <- function(data, data_full, type, ann=T) {
+  # Compute significance threshold
+  threshold <- -log10(0.05 / nrow(data_full))
+  
+  # Subset for significant hits (above threshold and not NA in label)
+  ann_sub <- data[ -log10(data$lrt.pvalue) > threshold & !is.na(data[["gene"]]), ]
+  
+  # Calculate expanded y limits
+   y_max <- max(-log10(data$lrt.pvalue), na.rm = TRUE)
+   y_lim <- c(0, max(y_max,threshold) * 1.10)
+  
+  plot <- ggplot(data, aes(x=POS, y=-log10(lrt.pvalue))) +
+    geom_point(aes(color=OR_pos), alpha=0.8, size=1.3) +
+    scale_color_manual(values= c("skyblue", "orange")) +
+    scale_y_continuous(expand = c(0, 0), limits = y_lim) +
+    theme_bw()+
+    theme(
+      legend.title = element_blank(), 
+      panel.border = element_blank(),
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.x = element_blank(),
+      plot.title = element_text(face = "bold", hjust = 0.5)
+    ) +
+    labs(
+      x = "Genomic Position (Start)",
+      y = expression(-log[10](italic(p))),
+      title = paste0(type, " Manhattan Plot with Significant Hits Annotated")
+    ) +
+    geom_hline(yintercept = threshold, color="red", lty="dashed") 
+  
+  if(ann==F){
+   plot
+  }else{
+    plot +
+    geom_label_repel(
+      data = ann_sub,
+      aes(label = .data[["gene"]]),
+      size = 2,
+      min.segment.length = 0.5,
+      show.legend = FALSE,
+      na.rm = TRUE, 
+      max.overlaps = Inf)
+  }
+}
+
+QQ_plot <- function(data, type){
+  df <- data.frame(expected= (-log10(ppoints(length(data |> pull(lrt.pvalue))))), 
+                             observed=(-log10(sort(data |> pull(lrt.pvalue))))) 
+  df |>
+    ggplot(aes(x = expected, y = observed)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, color="red", lty="dashed")  +      
+  labs(
+    x = "-log10(Expected P)",
+    y = "-log10(Observed P)",
+    title = paste0(type," QQ plot")
+  ) +
+  theme_minimal()+
+  xlim(0, 10) +
+  ylim(0, 10)
+}
+
+```
+
+# 1. Main Analysis
+# 1.1. SNP-GWAS (Fastree DP LMM, Panaroo, Binary)
+```{r}
+# Load GWAS results
+SNPGWAS_data_Fasttree_LMM <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/SNPGWAS_Fasttree_DP_LMM.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)|> 
+  mutate(POS=as.integer(str_split(as.character(variant), "_", simplify = T)[,2]), 
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))
+
+# Load Annotations
+SNPGWAS_data_Fasttree_LMM_ann <- read.csv("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/SNP_annotations.csv", header=F)
+colnames(SNPGWAS_data_Fasttree_LMM_ann) <- c("POS", "REF", "ALT", "FUNCLASS", "IMPACT", "gene", "nt_change", "aa_change")
+SNPGWAS_data_Fasttree_LMM_ann_df <- left_join(SNPGWAS_data_Fasttree_LMM,
+  SNPGWAS_data_Fasttree_LMM_ann |>
+  mutate(variant = paste("AP018935.1", POS, REF, ALT, sep="_")))
+
+# Manhattan Plot
+SNPGWAS_data_Fasttree_LMM_manplot <- manhattan_plot(SNPGWAS_data_Fasttree_LMM_ann_df, SNPGWAS_data_Fasttree_LMM_ann_df, "SNPGWAS")
+SNPGWAS_data_Fasttree_LMM_manplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/SNPGWAS_manplot.png", plot = SNPGWAS_data_Fasttree_LMM_manplot, width = 9, height = 6, dpi = 300, units = "in")
+
+SNPGWAS_data_Fasttree_LMM_ann_df |> 
+  filter(lrt.pvalue < 0.05 /nrow(SNPGWAS_data_Fasttree_LMM_ann_df)) |>
+  mutate(
+    OR = exp(beta),
+    OR_lower = exp(beta - 1.96 * beta.std.err),
+    OR_upper = exp(beta + 1.96 * beta.std.err),
+    OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+    P_value = formatC(lrt.pvalue, format = "e", digits = 2)
+  ) |> 
+  select(POS, REF, ALT, af, OR_CI, P_value, FUNCLASS, gene, aa_change)
+
+# QQ plot 
+SNPGWAS_data_Fasttree_LMM_qqplot <- QQ_plot(SNPGWAS_data_Fasttree_LMM, "SNPGWAS") 
+SNPGWAS_data_Fasttree_LMM_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/SNPGWAS_QQplot.png", plot = SNPGWAS_data_Fasttree_LMM_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+```
+
+# 1.2. DB-GWAS (Fastree DP LMM, Panaroo, Binary)
+```{r}
+# Load GWAS results
+DBGWAS_FastTree <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/DBGWAS_Fasttree_DP_LMM.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+
+# Load Annotations
+DBGWAS_FastTree_annotations <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/DBGWAS_Fasttree_DP_LMM_annotation.txt", sep = "\t", header=F) 
+colnames(DBGWAS_FastTree_annotations) <- colnames(DBGWAS_FastTree)
+DBGWAS_FastTree_annotations <- DBGWAS_FastTree_annotations |> 
+  filter(af >=0.05, af <0.95)|>
+  mutate(core_accessory = ifelse(str_extract(notes, "^[^:]+")=="AP018935.1", "ref", "accessory"),
+         coord_range = str_extract(notes, "(?<=:)[0-9]+-[0-9]+"), 
+         start= str_split(coord_range, "-", simplify = T)[,1], 
+         end= str_split(coord_range, "-", simplify = T)[,2],
+         POS = as.integer(str_extract(coord_range, "^[0-9]+")),
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))  |>
+  separate(
+    notes, 
+    into = c("contig_position", "upstream", "gene", "downstream"), 
+    sep = ";", 
+    remove = FALSE, 
+    fill = "right"
+  )
+
+# Manhattan Plot
+DBGWAS_FastTree_manplot <- manhattan_plot(DBGWAS_FastTree_annotations |> filter(core_accessory=="core"), DBGWAS_FastTree_annotations, "DBGWAS")
+DBGWAS_FastTree_manplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/DBGWAS_manplot.png", plot = DBGWAS_FastTree_manplot, width = 9, height = 6, dpi = 300, units = "in")
+
+DBGWAS_FastTree_annotations_sig <- DBGWAS_FastTree_annotations |> 
+  filter(lrt.pvalue < 0.05 /nrow(DBGWAS_FastTree_annotations))  
+DBGWAS_FastTree_annotations_sig_acc <- DBGWAS_FastTree_annotations_sig |> 
+  filter(core_accessory =="accessory")   |> 
+  arrange(POS)
+DBGWAS_FastTree_annotations_sig_ref <- DBGWAS_FastTree_annotations_sig |> 
+  filter(core_accessory =="ref")   |> 
+  arrange(POS)
+
+# Which are in accessory regions ? 
+# Load table
+setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC")
+Missingness_Prop <- read.delim("Missingness_Prop.txt", header=F, sep=" ")
+colnames(Missingness_Prop) <- c("POS", "Missingness_Proportion")
+for (i in 1:nrow(DBGWAS_FastTree_annotations_sig_ref)){
+  length_unitig <- length((DBGWAS_FastTree_annotations_sig_ref$start[i]:DBGWAS_FastTree_annotations_sig_ref$end[i])) 
+  N_region_missing <- nrow(Missingness_Prop |> filter(Missingness_Proportion>=0.05, POS %in%  (DBGWAS_FastTree_annotations_sig_ref$start[i]:DBGWAS_FastTree_annotations_sig_ref$end[i])))
+  DBGWAS_FastTree_annotations_sig_ref$core_accessory[i] <- ifelse(100*N_region_missing/length_unitig ==100, "accessory", "core")
+  print(100*N_region_missing/length_unitig)
+}
+
+# rejoin 
+DBGWAS_final <- rbind(DBGWAS_FastTree_annotations_sig_acc, DBGWAS_FastTree_annotations_sig_ref)
+DBGWAS_final
+
+DBGWAS_final |>
+  mutate(core_accessory = factor(core_accessory, levels= c("core", "accessory")))|>
+  arrange(core_accessory, as.numeric(start))|>
+  mutate(
+    OR = exp(beta),
+    OR_lower = exp(beta - 1.96 * beta.std.err),
+    OR_upper = exp(beta + 1.96 * beta.std.err),
+    OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+    P_value = formatC(lrt.pvalue, format = "e", digits = 2)
+  ) |>
+  mutate(Number= 1:12)|> 
+  select(Number, variant, core_accessory, coord_range, af, OR_CI, P_value, gene) 
+
+
+# QQ plot 
+DBGWAS_FastTree_qqplot <- QQ_plot(DBGWAS_FastTree_annotations, "DBGWAS")
+DBGWAS_FastTree_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/DBGWAS_QQplot.png", plot = DBGWAS_FastTree_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+```
+# 1.3. Pan-GWAS (Fastree DP LMM, Panaroo, Binary)
+```{r}
+# Load GWAS results
+PanGWAS_FastTree <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/PanGWAS_FastTree_DP_LMM.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+
+# Get significant hits
+PanGWAS_FastTree_sig <- PanGWAS_FastTree |>
+  filter(lrt.pvalue < 0.05 / nrow(PanGWAS_FastTree)) |>
+  mutate(
+    OR = exp(beta),
+    OR_lower = exp(beta - 1.96 * beta.std.err),
+    OR_upper = exp(beta + 1.96 * beta.std.err),
+    OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+    P_value = formatC(lrt.pvalue, format = "e", digits = 2)
+  ) |>
+  select(variant, af, OR_CI, P_value)
+PanGWAS_FastTree_sig
+
+# QQ plot 
+PanGWAS_FastTree_qqplot <- QQ_plot(PanGWAS_FastTree, "PanGWAS")
+PanGWAS_FastTree_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/PanGWAS_QQplot.png", plot = PanGWAS_FastTree_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+```
+
+
+
+# 2. Sub Analysis 3 : CONTINUOUS PHENOTYPE
+# 2.1. SNP-GWAS (Fastree DP LMM, Panaroo, *Continuous*)
+```{r}
+# Load GWAS results
+SNPGWAS_data_Fasttree_LMM_cont <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.4.Subanalysis_3/SNPGWAS_Fasttree_DP_LMM.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)|> 
+  mutate(POS=as.integer(str_split(as.character(variant), "_", simplify = T)[,2]), 
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))
+
+# Load Annotations
+SNPGWAS_data_Fasttree_LMM_cont_ann_df <- left_join(SNPGWAS_data_Fasttree_LMM_cont,
+  SNPGWAS_data_Fasttree_LMM_ann |>
+  mutate(variant = paste("AP018935.1", POS, REF, ALT, sep="_")))
+
+
+# Manhattan Plot
+SNPGWAS_data_Fasttree_LMM_cont_manplot <- manhattan_plot(SNPGWAS_data_Fasttree_LMM_cont_ann_df, SNPGWAS_data_Fasttree_LMM_cont_ann_df, "SNPGWAS")
+SNPGWAS_data_Fasttree_LMM_cont_manplot
+SNPGWAS_data_Fasttree_LMM_cont_ann_df |>
+  filter(lrt.pvalue < 0.05 /nrow(SNPGWAS_data_Fasttree_LMM_cont_ann_df))|>
+  select(POS, REF, ALT, FUNCLASS, gene, aa_change)
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.4.Subanalysis_3/SNPGWAS_manplot.png", plot = SNPGWAS_data_Fasttree_LMM_cont_manplot, width = 9, height = 6, dpi = 300, units = "in")
+
+# QQ plot 
+SNPGWAS_data_Fasttree_LMM_cont_qqplot <- QQ_plot(SNPGWAS_data_Fasttree_LMM_cont, "SNPGWAS") 
+SNPGWAS_data_Fasttree_LMM_cont_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.4.Subanalysis_3/SNPGWAS_QQplot.png", plot = SNPGWAS_data_Fasttree_LMM_cont_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+```
+
+# 2.2. DB-GWAS (Fastree DP LMM, Panaroo, *Continuous*)
+```{r}
+# Load GWAS results
+DBGWAS_FastTree_cont <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.4.Subanalysis_3/DBGWAS_Fasttree_DP_LMM.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+
+# Load Annotations
+DBGWAS_FastTree_cont_ann <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.4.Subanalysis_3/DBGWAS_Fasttree_DP_LMM_annotation.txt", sep = "\t", header=F) 
+colnames(DBGWAS_FastTree_cont_ann) <- colnames(DBGWAS_FastTree_cont)
+DBGWAS_FastTree_cont_ann <- DBGWAS_FastTree_cont_ann |> 
+  filter(af >=0.05, af <0.95)|>
+  mutate(core_accessory = ifelse(str_extract(notes, "^[^:]+")=="AP018935.1", "ref", "accessory"),
+         coord_range = str_extract(notes, "(?<=:)[0-9]+-[0-9]+"),
+         POS = as.integer(str_extract(coord_range, "^[0-9]+")),
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))  |>
+  separate(
+    notes, 
+    into = c("contig_position", "upstream", "gene", "downstream"), 
+    sep = ";", 
+    remove = FALSE, 
+    fill = "right"
+  )
+
+# Manhattan Plot
+DBGWAS_FastTree_cont_manplot <- manhattan_plot(DBGWAS_FastTree_cont_ann |> filter(core_accessory=="core"), DBGWAS_FastTree_cont_ann, "DBGWAS")
+DBGWAS_FastTree_cont_manplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.4.Subanalysis_3/DBGWAS_manplot.png", plot = DBGWAS_FastTree_cont_manplot, width = 9, height = 6, dpi = 300, units = "in")
+
+
+# QQ plot 
+DBGWAS_FastTree_cont_qqplot <- QQ_plot(DBGWAS_FastTree_cont_ann, "DBGWAS")
+DBGWAS_FastTree_cont_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.4.Subanalysis_3/DBGWAS_QQplot.png", plot = DBGWAS_FastTree_cont_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+```
+# 2.3. Pan-GWAS (Fastree DP LMM, Panaroo, *Continuous*)
+```{r}
+# Load GWAS results
+PanGWAS_FastTree_cont <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.4.Subanalysis_3/PanGWAS_FastTree_DP_LMM.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+
+# Get significant hits
+PanGWAS_FastTree_cont_sig <- PanGWAS_FastTree_cont |>
+  filter(lrt.pvalue < 0.05 / nrow(PanGWAS_FastTree_cont)) |>
+  mutate(
+    OR = exp(beta),
+    OR_lower = exp(beta - 1.96 * beta.std.err),
+    OR_upper = exp(beta + 1.96 * beta.std.err),
+    OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+    P_value = formatC(lrt.pvalue, format = "e", digits = 2)
+  ) |>
+  select(variant, OR_CI, P_value)
+PanGWAS_FastTree_cont_sig
+
+# QQ plot 
+PanGWAS_FastTree_cont_qqplot <- QQ_plot(PanGWAS_FastTree_cont, "PanGWAS")
+PanGWAS_FastTree_cont_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.4.Subanalysis_3/PANGWAS_QQplot.png", plot = PanGWAS_FastTree_cont_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+```
+
+
+# 3. Sub Analysis 1 : POPULATION STRUCTURE CORRECTION
+## Each block = SNP-GWAS, DB-GWAS and Pan-GWAS (Panaroo, Binary)
+## 3.1. Fastree DP (full aln) FEM
+```{r}
+### SNP-GWAS
+# Load GWAS results
+SNPGWAS_data_Fasttree_DP_FEM <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.1.Fasttree_DP_FEM/SNPGWAS_Fasttree_DP_FEM.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)|> 
+  mutate(POS=as.integer(str_split(as.character(variant), "_", simplify = T)[,2]), 
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))
+
+# Load Annotations
+SNPGWAS_data_Fasttree_DP_FEM_ann_df <- left_join(SNPGWAS_data_Fasttree_DP_FEM,
+  SNPGWAS_data_Fasttree_LMM_ann |>
+  mutate(variant = paste("AP018935.1", POS, REF, ALT, sep="_")))
+
+# Manhattan Plot
+SNPGWAS_data_Fasttree_DP_FEM_manplot <- manhattan_plot(SNPGWAS_data_Fasttree_DP_FEM_ann_df, SNPGWAS_data_Fasttree_DP_FEM_ann_df, "SNPGWAS")
+SNPGWAS_data_Fasttree_DP_FEM_manplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.1.Fasttree_DP_FEM/SNPGWAS_manplot.png", plot = SNPGWAS_data_Fasttree_DP_FEM_manplot, width = 9, height = 6, dpi = 300, units = "in")
+
+
+# QQ plot 
+SNPGWAS_data_Fasttree_DP_FEM_qqplot <- QQ_plot(SNPGWAS_data_Fasttree_DP_FEM, "SNPGWAS") 
+SNPGWAS_data_Fasttree_DP_FEM_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.1.Fasttree_DP_FEM/SNPGWAS_QQplot.png", plot = SNPGWAS_data_Fasttree_DP_FEM_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+### DB-GWAS
+DBGWAS_FastTree_DP_FEM <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.1.Fasttree_DP_FEM/DBGWAS_Fasttree_DP_FEM.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+
+# Load Annotations
+DBGWAS_FastTree_DP_FEM_annotations <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.1.Fasttree_DP_FEM/DBGWAS_Fasttree_DP_FEM_annotation.txt", sep = "\t", header=F) 
+colnames(DBGWAS_FastTree_DP_FEM_annotations) <- colnames(DBGWAS_FastTree_DP_FEM)
+DBGWAS_FastTree_DP_FEM_annotations <- DBGWAS_FastTree_DP_FEM_annotations |> 
+  filter(af >=0.05, af <0.95)|>
+  mutate(core_accessory = ifelse(str_extract(notes, "^[^:]+")=="AP018935.1", "core", "accessory"),
+         coord_range = str_extract(notes, "(?<=:)[0-9]+-[0-9]+"),
+         POS = as.integer(str_extract(coord_range, "^[0-9]+")),
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))  |>
+  separate(
+    notes, 
+    into = c("contig_position", "upstream", "gene", "downstream"), 
+    sep = ";", 
+    remove = FALSE, 
+    fill = "right"
+  )
+
+# Manhattan Plot
+DBGWAS_FastTree_DP_FEM_manplot <- manhattan_plot(DBGWAS_FastTree_DP_FEM_annotations|> filter(core_accessory=="core"),DBGWAS_FastTree_DP_FEM_annotations, "DBGWAS")
+DBGWAS_FastTree_DP_FEM_manplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.1.Fasttree_DP_FEM/DBGWAS_manplot.png", plot = DBGWAS_FastTree_DP_FEM_manplot, width = 9, height = 6, dpi = 300, units = "in")
+
+# QQ plot 
+DBGWAS_FastTree_DP_FEM_qqplot <- QQ_plot(DBGWAS_FastTree_DP_FEM_annotations, "DBGWAS")
+DBGWAS_FastTree_DP_FEM_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.1.Fasttree_DP_FEM/DBGWAS_QQplot.png", plot = DBGWAS_FastTree_DP_FEM_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+### Pan-GWAS
+# Load GWAS results
+PanGWAS_FastTree_DP_FEM <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.1.Fasttree_DP_FEM/PanGWAS_FastTree_DP_FEM.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+
+# Get significant hits
+PanGWAS_FastTree_DP_FEM_sig <- PanGWAS_FastTree_DP_FEM |>
+  filter(lrt.pvalue < 0.05 / nrow(PanGWAS_FastTree_DP_FEM)) |>
+  mutate(
+    OR = exp(beta),
+    OR_lower = exp(beta - 1.96 * beta.std.err),
+    OR_upper = exp(beta + 1.96 * beta.std.err),
+    OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+    P_value = formatC(lrt.pvalue, format = "e", digits = 2)
+  ) |>
+  select(variant, OR_CI, P_value)
+PanGWAS_FastTree_DP_FEM_sig
+
+# QQ plot 
+PanGWAS_FastTree_DP_FEM_qqplot <- QQ_plot(PanGWAS_FastTree_DP_FEM, "PanGWAS")
+PanGWAS_FastTree_DP_FEM_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.1.Fasttree_DP_FEM/PanGWAS_QQplot.png", plot = PanGWAS_FastTree_DP_FEM_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+# Summary table
+suban1_summary_df <- data.frame(Method= "Fasttree DP FEM",
+                 SNPGWAS= nrow(SNPGWAS_data_Fasttree_DP_FEM |> filter(lrt.pvalue < 0.05 / nrow(SNPGWAS_data_Fasttree_DP_FEM))),
+                 DBGWAS= nrow(DBGWAS_FastTree_DP_FEM_annotations |> filter(lrt.pvalue < 0.05 / nrow(DBGWAS_FastTree_DP_FEM_annotations))),
+                 PanGWAS= nrow(PanGWAS_FastTree_DP_FEM |> filter(lrt.pvalue < 0.05 / nrow(PanGWAS_FastTree_DP_FEM))))
+
+```
+
+## 3.2. Fastree SP (full aln) LMM
+```{r}
+# Load GWAS results
+SNPGWAS_Fasttree_SP_LMM <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.2.Fasttree_SP_LMM/SNPGWAS_Fasttree_SP_LMM.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)|> 
+  mutate(POS=as.integer(str_split(as.character(variant), "_", simplify = T)[,2]), 
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))
+
+# Load Annotations
+SNPGWAS_Fasttree_SP_LMM_ann_df <- left_join(SNPGWAS_Fasttree_SP_LMM,
+  SNPGWAS_data_Fasttree_LMM_ann |>
+  mutate(variant = paste("AP018935.1", POS, REF, ALT, sep="_")))
+
+# Manhattan Plot
+SNPGWAS_Fasttree_SP_LMM_manplot <- manhattan_plot(SNPGWAS_Fasttree_SP_LMM_ann_df, SNPGWAS_Fasttree_SP_LMM_ann_df, "SNPGWAS")
+SNPGWAS_Fasttree_SP_LMM_manplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.2.Fasttree_SP_LMM/SNPGWAS_manplot.png", plot = SNPGWAS_Fasttree_SP_LMM_manplot, width = 9, height = 6, dpi = 300, units = "in")
+
+
+# QQ plot 
+SNPGWAS_Fasttree_SP_LMM_qqplot <- QQ_plot(SNPGWAS_Fasttree_SP_LMM_ann_df, "SNPGWAS") 
+SNPGWAS_Fasttree_SP_LMM_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.2.Fasttree_SP_LMM/SNPGWAS_QQplot.png", plot = SNPGWAS_Fasttree_SP_LMM_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+### DB-GWAS
+DBGWAS_Fasttree_SP_LMM <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.2.Fasttree_SP_LMM/DBGWAS_Fasttree_SP_LMM.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+
+# Load Annotations
+DBGWAS_Fasttree_SP_LMM_annotations <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.2.Fasttree_SP_LMM/DBGWAS_Fasttree_SP_LMM_annotation.txt", sep = "\t", header=F) 
+colnames(DBGWAS_Fasttree_SP_LMM_annotations) <- colnames(DBGWAS_Fasttree_SP_LMM)
+DBGWAS_Fasttree_SP_LMM_annotations <- DBGWAS_Fasttree_SP_LMM_annotations |> 
+  filter(af >=0.05, af <0.95)|>
+  mutate(core_accessory = ifelse(str_extract(notes, "^[^:]+")=="AP018935.1", "core", "accessory"),
+         coord_range = str_extract(notes, "(?<=:)[0-9]+-[0-9]+"),
+         POS = as.integer(str_extract(coord_range, "^[0-9]+")),
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))  |>
+  separate(
+    notes, 
+    into = c("contig_position", "upstream", "gene", "downstream"), 
+    sep = ";", 
+    remove = FALSE, 
+    fill = "right"
+  )
+
+# Manhattan Plot
+DBGWAS_Fasttree_SP_LMM_manplot <- manhattan_plot(DBGWAS_Fasttree_SP_LMM_annotations |> filter(core_accessory=="core"), DBGWAS_Fasttree_SP_LMM_annotations, "DBGWAS")
+DBGWAS_Fasttree_SP_LMM_manplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.2.Fasttree_SP_LMM/DBGWAS_manplot.png", plot = DBGWAS_Fasttree_SP_LMM_manplot, width = 9, height = 6, dpi = 300, units = "in")
+
+# QQ plot 
+DBGWAS_Fasttree_SP_LMM_qqplot <- QQ_plot(DBGWAS_Fasttree_SP_LMM_annotations, "DBGWAS")
+DBGWAS_Fasttree_SP_LMM_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.2.Fasttree_SP_LMM/DBGWAS_QQplot.png", plot = DBGWAS_Fasttree_SP_LMM_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+### Pan-GWAS
+# Load GWAS results
+PanGWAS_Fasttree_SP_LMM <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.2.Fasttree_SP_LMM/PanGWAS_Fasttree_SP_LMM.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+
+# Get significant hits
+PanGWAS_Fasttree_SP_LMM_sig <- PanGWAS_Fasttree_SP_LMM |>
+  filter(lrt.pvalue < 0.05 / nrow(PanGWAS_Fasttree_SP_LMM)) |>
+  mutate(
+    OR = exp(beta),
+    OR_lower = exp(beta - 1.96 * beta.std.err),
+    OR_upper = exp(beta + 1.96 * beta.std.err),
+    OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+    P_value = formatC(lrt.pvalue, format = "e", digits = 2)
+  ) |>
+  select(variant, OR_CI, P_value)
+PanGWAS_Fasttree_SP_LMM_sig
+
+# QQ plot 
+PanGWAS_Fasttree_SP_LMM_qqplot <- QQ_plot(PanGWAS_Fasttree_SP_LMM, "PanGWAS")
+PanGWAS_Fasttree_SP_LMM_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.2.Fasttree_SP_LMM/PanGWAS_QQplot.png", plot = PanGWAS_Fasttree_SP_LMM_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+# Summary table
+suban1_summary_df <- rbind(suban1_summary_df, data.frame(Method= "Fasttree SP LMM",
+                 SNPGWAS= nrow(SNPGWAS_Fasttree_SP_LMM_ann_df |> filter(lrt.pvalue < 0.05 / nrow(SNPGWAS_Fasttree_SP_LMM_ann_df))),
+                 DBGWAS= nrow(DBGWAS_Fasttree_SP_LMM_annotations |> filter(lrt.pvalue < 0.05 / nrow(DBGWAS_FastTree_DP_FEM_annotations))),
+                 PanGWAS= nrow(PanGWAS_Fasttree_SP_LMM |> filter(lrt.pvalue < 0.05 / nrow(PanGWAS_Fasttree_SP_LMM)))))
+```
+
+## 3.3. RAxML (core aln) LMM
+```{r}
+# Load GWAS results
+SNPGWAS_RAxML <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.3.RAxML/SNPGWAS_RAxML.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)|> 
+  mutate(POS=as.integer(str_split(as.character(variant), "_", simplify = T)[,2]), 
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))
+
+# Load Annotations
+SNPGWAS_RAxML_ann_df <- left_join(SNPGWAS_RAxML,
+  SNPGWAS_data_Fasttree_LMM_ann |>
+  mutate(variant = paste("AP018935.1", POS, REF, ALT, sep="_")))
+
+# Manhattan Plot
+SNPGWAS_RAxML_manplot <- manhattan_plot(SNPGWAS_RAxML_ann_df, SNPGWAS_RAxML_ann_df, "SNPGWAS", ann=F)
+SNPGWAS_RAxML_manplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.3.RAxML/SNPGWAS_manplot.png", plot = SNPGWAS_RAxML_manplot, width = 9, height = 6, dpi = 300, units = "in")
+
+# QQ plot 
+SNPGWAS_RAxML_qqplot <- QQ_plot(SNPGWAS_RAxML_ann_df, "SNPGWAS") 
+SNPGWAS_RAxML_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.3.RAxML/SNPGWAS_QQplot.png", plot = SNPGWAS_RAxML_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+### DB-GWAS
+DBGWAS_RAxML <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.3.RAxML/DBGWAS_RAxML.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+
+# Load Annotations
+DBGWAS_RAxML_annotations <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.3.RAxML/DBGWAS_RAxML_annotation.txt", sep = "\t", header=F) 
+colnames(DBGWAS_RAxML_annotations) <- colnames(DBGWAS_RAxML)
+DBGWAS_RAxML_annotations <- DBGWAS_RAxML_annotations |> 
+  filter(af >=0.05, af <0.95)|>
+  mutate(core_accessory = ifelse(str_extract(notes, "^[^:]+")=="AP018935.1", "core", "accessory"),
+         coord_range = str_extract(notes, "(?<=:)[0-9]+-[0-9]+"),
+         POS = as.integer(str_extract(coord_range, "^[0-9]+")),
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))  |>
+  separate(
+    notes, 
+    into = c("contig_position", "upstream", "gene", "downstream"), 
+    sep = ";", 
+    remove = FALSE, 
+    fill = "right"
+  )
+
+# Manhattan Plot
+DBGWAS_RAxML_manplot <- manhattan_plot(DBGWAS_RAxML_annotations |> filter(core_accessory=="core"), DBGWAS_RAxML_annotations, "DBGWAS", ann=F)
+DBGWAS_RAxML_manplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.3.RAxML/DBGWAS_manplot.png", plot = DBGWAS_RAxML_manplot, width = 9, height = 6, dpi = 300, units = "in")
+
+# QQ plot 
+DBGWAS_RAxML_qqplot <- QQ_plot(DBGWAS_RAxML_annotations, "DBGWAS")
+DBGWAS_RAxML_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.3.RAxML/DBGWAS_QQplot.png", plot = DBGWAS_RAxML_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+### Pan-GWAS
+# Load GWAS results
+PanGWAS_RAxML <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.3.RAxML/PanGWAS_RAxML.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+
+# Get significant hits
+PanGWAS_RAxML_sig <- PanGWAS_RAxML |>
+  filter(lrt.pvalue < 0.05 / nrow(PanGWAS_RAxML)) |>
+  mutate(
+    OR = exp(beta),
+    OR_lower = exp(beta - 1.96 * beta.std.err),
+    OR_upper = exp(beta + 1.96 * beta.std.err),
+    OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+    P_value = formatC(lrt.pvalue, format = "e", digits = 2)
+  ) |>
+  select(variant, OR_CI, P_value)
+PanGWAS_RAxML_sig
+
+# QQ plot 
+PanGWAS_RAxML_qqplot <- QQ_plot(PanGWAS_RAxML, "PanGWAS")
+PanGWAS_RAxML_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.3.RAxML/PanGWAS_QQplot.png", plot = PanGWAS_RAxML_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+# Summary table
+suban1_summary_df <- rbind(suban1_summary_df, data.frame(Method= "RAxML (core phylogeny)",
+                 SNPGWAS= nrow(SNPGWAS_RAxML_ann_df |> filter(lrt.pvalue < 0.05 / nrow(SNPGWAS_RAxML_ann_df))),
+                 DBGWAS= nrow(DBGWAS_RAxML_annotations |> filter(lrt.pvalue < 0.05 / nrow(DBGWAS_RAxML_annotations))),
+                 PanGWAS= nrow(PanGWAS_RAxML |> filter(lrt.pvalue < 0.05 / nrow(PanGWAS_RAxML)))))
+```
+## 3.4. IQtree (core aln) LMM
+```{r}
+# Load GWAS results
+SNPGWAS_IQtree <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.4.IQtree/SNPGWAS_IQtree.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)|> 
+  mutate(POS=as.integer(str_split(as.character(variant), "_", simplify = T)[,2]), 
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))
+
+# Load Annotations
+SNPGWAS_IQtree_ann_df <- left_join(SNPGWAS_IQtree,
+  SNPGWAS_data_Fasttree_LMM_ann |>
+  mutate(variant = paste("AP018935.1", POS, REF, ALT, sep="_")))
+
+# Manhattan Plot
+SNPGWAS_IQtree_manplot <- manhattan_plot(SNPGWAS_IQtree_ann_df, SNPGWAS_IQtree_ann_df, "SNPGWAS", ann=F)
+SNPGWAS_IQtree_manplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.4.IQtree/SNPGWAS_manplot.png", plot = SNPGWAS_IQtree_manplot, width = 9, height = 6, dpi = 300, units = "in")
+
+# QQ plot 
+SNPGWAS_IQtree_qqplot <- QQ_plot(SNPGWAS_IQtree_ann_df, "SNPGWAS") 
+SNPGWAS_IQtree_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.4.IQtree/SNPGWAS_QQplot.png", plot = SNPGWAS_IQtree_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+
+### DB-GWAS
+DBGWAS_IQtree <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.4.IQtree/DBGWAS_IQtree.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+
+# Load Annotations
+DBGWAS_IQtree_annotations <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.4.IQtree/DBGWAS_IQtree_annotation.txt", sep = "\t", header=F) 
+colnames(DBGWAS_IQtree_annotations) <- colnames(DBGWAS_IQtree)
+DBGWAS_IQtree_annotations <- DBGWAS_IQtree_annotations |> 
+  filter(af >=0.05, af <0.95)|>
+  mutate(core_accessory = ifelse(str_extract(notes, "^[^:]+")=="AP018935.1", "core", "accessory"),
+         coord_range = str_extract(notes, "(?<=:)[0-9]+-[0-9]+"),
+         POS = as.integer(str_extract(coord_range, "^[0-9]+")),
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))  |>
+  separate(
+    notes, 
+    into = c("contig_position", "upstream", "gene", "downstream"), 
+    sep = ";", 
+    remove = FALSE, 
+    fill = "right"
+  )
+
+# Manhattan Plot
+DBGWAS_IQtree_manplot <- manhattan_plot(DBGWAS_IQtree_annotations |> filter(core_accessory=="core"), DBGWAS_IQtree_annotations, "DBGWAS", ann=F)
+DBGWAS_IQtree_manplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.4.IQtree/DBGWAS_manplot.png", plot = DBGWAS_IQtree_manplot, width = 9, height = 6, dpi = 300, units = "in")
+
+# QQ plot 
+DBGWAS_IQtree_qqplot <- QQ_plot(DBGWAS_IQtree_annotations, "DBGWAS")
+DBGWAS_IQtree_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.4.IQtree/DBGWAS_QQplot.png", plot = DBGWAS_IQtree_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+### Pan-GWAS
+# Load GWAS results
+PanGWAS_IQtree <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.4.IQtree/PanGWAS_IQtree.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+
+# Get significant hits
+PanGWAS_IQtree_sig <- PanGWAS_IQtree |>
+  filter(lrt.pvalue < 0.05 / nrow(PanGWAS_IQtree)) |>
+  mutate(
+    OR = exp(beta),
+    OR_lower = exp(beta - 1.96 * beta.std.err),
+    OR_upper = exp(beta + 1.96 * beta.std.err),
+    OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+    P_value = formatC(lrt.pvalue, format = "e", digits = 2)
+  ) |>
+  select(variant, OR_CI, P_value)
+PanGWAS_IQtree_sig
+
+# QQ plot 
+PanGWAS_IQtree_qqplot <- QQ_plot(PanGWAS_IQtree, "PanGWAS")
+PanGWAS_IQtree_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.4.IQtree/PanGWAS_QQplot.png", plot = PanGWAS_IQtree_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+# Summary table
+suban1_summary_df <- rbind(suban1_summary_df, data.frame(Method= "IQtree (core phylogeny)",
+                 SNPGWAS= nrow(SNPGWAS_IQtree_ann_df |> filter(lrt.pvalue < 0.05 / nrow(SNPGWAS_IQtree_ann_df))),
+                 DBGWAS= nrow(DBGWAS_IQtree_annotations |> filter(lrt.pvalue < 0.05 / nrow(DBGWAS_IQtree_annotations))),
+                 PanGWAS= nrow(PanGWAS_IQtree |> filter(lrt.pvalue < 0.05 / nrow(PanGWAS_IQtree)))))
+```
+## 3.5. Mash distances
+```{r}
+# Load GWAS results
+SNPGWAS_mash <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.5.Mash/SNPGWAS_mash.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)|> 
+  mutate(POS=as.integer(str_split(as.character(variant), "_", simplify = T)[,2]), 
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))
+
+# Load Annotations
+SNPGWAS_mash_ann_df <- left_join(SNPGWAS_mash,
+  SNPGWAS_data_Fasttree_LMM_ann |>
+  mutate(variant = paste("AP018935.1", POS, REF, ALT, sep="_")))
+
+# Manhattan Plot
+SNPGWAS_mash_manplot <- manhattan_plot(SNPGWAS_mash_ann_df, SNPGWAS_mash_ann_df, "SNPGWAS", ann=T)
+SNPGWAS_mash_manplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.5.Mash/SNPGWAS_manplot.png", plot = SNPGWAS_mash_manplot, width = 9, height = 6, dpi = 300, units = "in")
+
+
+# QQ plot 
+SNPGWAS_mash_qqplot <- QQ_plot(SNPGWAS_mash_ann_df, "SNPGWAS") 
+SNPGWAS_mash_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.5.Mash/SNPGWAS_QQplot.png", plot = SNPGWAS_mash_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+
+### DB-GWAS
+DBGWAS_mash <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.5.Mash/DBGWAS_mash.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+
+# Load Annotations
+DBGWAS_mash_annotations <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.5.Mash/DBGWAS_mash_annotation.txt", sep = "\t", header=F) 
+colnames(DBGWAS_mash_annotations) <- colnames(DBGWAS_mash)
+DBGWAS_mash_annotations <- DBGWAS_mash_annotations |> 
+  filter(af >=0.05, af <0.95)|>
+  mutate(core_accessory = ifelse(str_extract(notes, "^[^:]+")=="AP018935.1", "core", "accessory"),
+         coord_range = str_extract(notes, "(?<=:)[0-9]+-[0-9]+"),
+         POS = as.integer(str_extract(coord_range, "^[0-9]+")),
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))  |>
+  separate(
+    notes, 
+    into = c("contig_position", "upstream", "gene", "downstream"), 
+    sep = ";", 
+    remove = FALSE, 
+    fill = "right"
+  )
+
+# Manhattan Plot
+DBGWAS_mash_manplot <- manhattan_plot(DBGWAS_mash_annotations |> filter(core_accessory=="core"), DBGWAS_mash_annotations, "DBGWAS")
+DBGWAS_mash_manplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.5.Mash/DBGWAS_manplot.png", plot = DBGWAS_mash_manplot, width = 9, height = 6, dpi = 300, units = "in")
+
+# QQ plot 
+DBGWAS_mash_qqplot <- QQ_plot(DBGWAS_mash_annotations, "DBGWAS")
+DBGWAS_mash_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.5.Mash/DBGWAS_QQplot.png", plot = DBGWAS_mash_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+### Pan-GWAS
+# Load GWAS results
+PanGWAS_mash <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.5.Mash/PanGWAS_mash.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+
+# Get significant hits
+PanGWAS_mash_sig <- PanGWAS_mash |>
+  filter(lrt.pvalue < 0.05 / nrow(PanGWAS_mash)) |>
+  mutate(
+    OR = exp(beta),
+    OR_lower = exp(beta - 1.96 * beta.std.err),
+    OR_upper = exp(beta + 1.96 * beta.std.err),
+    OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+    P_value = formatC(lrt.pvalue, format = "e", digits = 2)
+  ) |>
+  select(variant, OR_CI, P_value)
+PanGWAS_mash_sig
+
+# QQ plot 
+PanGWAS_mash_qqplot <- QQ_plot(PanGWAS_mash, "PanGWAS")
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.5.Mash/PanGWAS_QQplot.png", plot = PanGWAS_mash_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+# Summary table
+suban1_summary_df <- rbind(suban1_summary_df, data.frame(Method= "Mash distances",
+                 SNPGWAS= nrow(SNPGWAS_mash_ann_df |> filter(lrt.pvalue < 0.05 / nrow(SNPGWAS_mash_ann_df))),
+                 DBGWAS= nrow(DBGWAS_mash_annotations |> filter(lrt.pvalue < 0.05 / nrow(DBGWAS_mash_annotations))),
+                 PanGWAS= nrow(PanGWAS_mash |> filter(lrt.pvalue < 0.05 / nrow(PanGWAS_mash)))))
+```
+## 3.6. SC 
+```{r}
+## SNP-GWAS
+# Load GWAS results
+SNPGWAS_SC <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.6.SC/SNPGWAS_SC.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)|> 
+  mutate(POS=as.integer(str_split(as.character(variant), "_", simplify = T)[,2]), 
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))
+
+# Load Annotations
+SNPGWAS_SC_ann_df <- left_join(SNPGWAS_SC,
+  SNPGWAS_data_Fasttree_LMM_ann |>
+  mutate(variant = paste("AP018935.1", POS, REF, ALT, sep="_")))
+
+# Manhattan Plot
+SNPGWAS_SC_manplot <- manhattan_plot(SNPGWAS_SC_ann_df, SNPGWAS_SC_ann_df, "SNPGWAS", ann=F)
+SNPGWAS_SC_manplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.6.SC/SNPGWAS_manplot.png", plot = SNPGWAS_SC_manplot, width = 9, height = 6, dpi = 300, units = "in")
+
+# QQ plot 
+SNPGWAS_SC_qqplot <- QQ_plot(SNPGWAS_SC_ann_df, "SNPGWAS") 
+SNPGWAS_SC_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.6.SC/SNPGWAS_QQplot.png", plot = SNPGWAS_SC_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+
+### DB-GWAS
+DBGWAS_SC <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.6.SC/DBGWAS_SC.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+
+# Load Annotations
+DBGWAS_SC_annotations <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.6.SC/DBGWAS_SC_annotation.txt", sep = "\t", header=F) 
+colnames(DBGWAS_SC_annotations) <- colnames(DBGWAS_SC)
+DBGWAS_SC_annotations <- DBGWAS_SC_annotations |> 
+  filter(af >=0.05, af <0.95)|>
+  mutate(core_accessory = ifelse(str_extract(notes, "^[^:]+")=="AP018935.1", "core", "accessory"),
+         coord_range = str_extract(notes, "(?<=:)[0-9]+-[0-9]+"),
+         POS = as.integer(str_extract(coord_range, "^[0-9]+")),
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))  |>
+  separate(
+    notes, 
+    into = c("contig_position", "upstream", "gene", "downstream"), 
+    sep = ";", 
+    remove = FALSE, 
+    fill = "right"
+  )
+
+# Manhattan Plot
+DBGWAS_SC_manplot <- manhattan_plot(DBGWAS_SC_annotations |> filter(core_accessory=="core"), DBGWAS_SC_annotations, "DBGWAS", ann=F)
+DBGWAS_SC_manplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.6.SC/DBGWAS_manplot.png", plot = DBGWAS_SC_manplot, width = 9, height = 6, dpi = 300, units = "in")
+
+# QQ plot 
+DBGWAS_SC_qqplot <- QQ_plot(DBGWAS_SC_annotations, "DBGWAS")
+DBGWAS_SC_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.6.SC/DBGWAS_QQplot.png", plot = DBGWAS_SC_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+### Pan-GWAS
+# Load GWAS results
+PanGWAS_SC <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.6.SC/PanGWAS_SC.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+
+# Get significant hits
+PanGWAS_SC_sig <- PanGWAS_SC |>
+  filter(lrt.pvalue < 0.05 / nrow(PanGWAS_SC)) |>
+  mutate(
+    OR = exp(beta),
+    OR_lower = exp(beta - 1.96 * beta.std.err),
+    OR_upper = exp(beta + 1.96 * beta.std.err),
+    OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+    P_value = formatC(lrt.pvalue, format = "e", digits = 2)
+  ) |>
+  select(variant, OR_CI, P_value)
+PanGWAS_SC_sig
+
+# QQ plot 
+PanGWAS_SC_qqplot <- QQ_plot(PanGWAS_SC, "PanGWAS")
+PanGWAS_SC_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.6.SC/PanGWAS_QQplot.png", plot = PanGWAS_SC_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+# Summary table
+suban1_summary_df <- rbind(suban1_summary_df, data.frame(Method= "SCs",
+                 SNPGWAS= nrow(SNPGWAS_SC_ann_df |> filter(lrt.pvalue < 0.05 / nrow(SNPGWAS_SC_ann_df))),
+                 DBGWAS= nrow(DBGWAS_SC_annotations |> filter(lrt.pvalue < 0.05 / nrow(DBGWAS_SC_annotations))),
+                 PanGWAS= nrow(PanGWAS_SC |> filter(lrt.pvalue < 0.05 / nrow(PanGWAS_SC)))))
+```
+## 3.7. CC 
+```{r}
+## SNP-GWAS
+# Load GWAS results
+SNPGWAS_CC <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.7.CC/SNPGWAS_CC.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)|> 
+  mutate(POS=as.integer(str_split(as.character(variant), "_", simplify = T)[,2]), 
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))
+
+# Load Annotations
+SNPGWAS_CC_ann_df <- left_join(SNPGWAS_CC,
+  SNPGWAS_data_Fasttree_LMM_ann |>
+  mutate(variant = paste("AP018935.1", POS, REF, ALT, sep="_")))
+
+# Manhattan Plot
+SNPGWAS_CC_manplot <- manhattan_plot(SNPGWAS_CC_ann_df, SNPGWAS_CC_ann_df, "SNPGWAS", ann=F)
+SNPGWAS_CC_manplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.7.CC/SNPGWAS_manplot.png", plot = SNPGWAS_CC_manplot, width = 9, height = 6, dpi = 300, units = "in")
+
+# QQ plot 
+SNPGWAS_CC_qqplot <- QQ_plot(SNPGWAS_CC_ann_df, "SNPGWAS") 
+SNPGWAS_CC_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.7.CC/SNPGWAS_QQplot.png", plot = SNPGWAS_CC_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+### DB-GWAS
+DBGWAS_CC <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.7.CC/DBGWAS_CC.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+
+# Load Annotations
+DBGWAS_CC_annotations <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.7.CC/DBGWAS_CC_annotation.txt", sep = "\t", header=F) 
+colnames(DBGWAS_CC_annotations) <- colnames(DBGWAS_CC)
+DBGWAS_CC_annotations <- DBGWAS_CC_annotations |> 
+  filter(af >=0.05, af <0.95)|>
+  mutate(core_accessory = ifelse(str_extract(notes, "^[^:]+")=="AP018935.1", "core", "accessory"),
+         coord_range = str_extract(notes, "(?<=:)[0-9]+-[0-9]+"),
+         POS = as.integer(str_extract(coord_range, "^[0-9]+")),
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))  |>
+  separate(
+    notes, 
+    into = c("contig_position", "upstream", "gene", "downstream"), 
+    sep = ";", 
+    remove = FALSE, 
+    fill = "right"
+  )
+
+# Manhattan Plot
+DBGWAS_CC_manplot <- manhattan_plot(DBGWAS_CC_annotations |> filter(core_accessory=="core"), DBGWAS_CC_annotations, "DBGWAS", ann=F)
+DBGWAS_CC_manplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.7.CC/DBGWAS_manplot.png", plot = DBGWAS_CC_manplot, width = 9, height = 6, dpi = 300, units = "in")
+
+
+# QQ plot 
+DBGWAS_CC_qqplot <- QQ_plot(DBGWAS_CC_annotations, "DBGWAS")
+DBGWAS_CC_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.7.CC/DBGWAS_QQplot.png", plot = DBGWAS_CC_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+### Pan-GWAS
+# Load GWAS results
+PanGWAS_CC <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.7.CC/PanGWAS_CC.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+
+# Get significant hits
+PanGWAS_CC_sig <- PanGWAS_CC |>
+  filter(lrt.pvalue < 0.05 / nrow(PanGWAS_CC)) |>
+  mutate(
+    OR = exp(beta),
+    OR_lower = exp(beta - 1.96 * beta.std.err),
+    OR_upper = exp(beta + 1.96 * beta.std.err),
+    OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+    P_value = formatC(lrt.pvalue, format = "e", digits = 2)
+  ) |>
+  select(variant, OR_CI, P_value)
+PanGWAS_CC_sig
+
+# QQ plot 
+PanGWAS_CC_qqplot <- QQ_plot(PanGWAS_CC, "PanGWAS")
+PanGWAS_CC_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.2.Subanalysis_1/15.2.7.CC/PanGWAS_QQplot.png", plot = PanGWAS_CC_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+# Summary table
+suban1_summary_df <- rbind(suban1_summary_df, data.frame(Method= "CCs",
+                 SNPGWAS= nrow(SNPGWAS_CC_ann_df |> filter(lrt.pvalue < 0.05 / nrow(SNPGWAS_CC_ann_df))),
+                 DBGWAS= nrow(DBGWAS_CC_annotations |> filter(lrt.pvalue < 0.05 / nrow(DBGWAS_CC_annotations))),
+                 PanGWAS= nrow(PanGWAS_CC |> filter(lrt.pvalue < 0.05 / nrow(PanGWAS_CC)))))
+
+data.frame(t(suban1_summary_df))
+```
+
+# 4. Sub Analysis 2 : PANGENOME TOOL
+## 4.1.Pan-GWAS (Fastree DP LMM, *Roary*, Binary)
+```{r}
+# Load GWAS results
+PanGWAS_ROARY <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.3.Subanalysis_2/PanGWAS_ROARY.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+
+# Get significant hits
+PanGWAS_ROARY_sig <- PanGWAS_ROARY |>
+  filter(lrt.pvalue < 0.05 / nrow(PanGWAS_ROARY)) |>
+  mutate(
+    OR = exp(beta),
+    OR_lower = exp(beta - 1.96 * beta.std.err),
+    OR_upper = exp(beta + 1.96 * beta.std.err),
+    OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+    P_value = formatC(lrt.pvalue, format = "e", digits = 2)
+  ) |>
+  select(variant, OR_CI, P_value)
+PanGWAS_ROARY_sig
+
+
+# QQ plot 
+PanGWAS_ROARY_qqplot <- QQ_plot(PanGWAS_ROARY, "PanGWAS")
+PanGWAS_ROARY_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.3.Subanalysis_2/PanGWAS_Roary_QQplot.png", plot = PanGWAS_ROARY_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+```
+## 4.2.Pan-GWAS (Fastree DP LMM, *Panaroo+CLARC*, Binary)
+```{r}
+# Load GWAS results
+PanGWAS_PANAROO_CLARC <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.3.Subanalysis_2/PanGWAS_PANAROO_CLARC.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+
+# Get significant hits
+PanGWAS_PANAROO_CLARC_sig <- PanGWAS_PANAROO_CLARC |>
+  filter(lrt.pvalue < 0.05 / nrow(PanGWAS_PANAROO_CLARC)) |>
+  mutate(
+    OR = exp(beta),
+    OR_lower = exp(beta - 1.96 * beta.std.err),
+    OR_upper = exp(beta + 1.96 * beta.std.err),
+    OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+    P_value = formatC(lrt.pvalue, format = "e", digits = 2)
+  ) |>
+  select(variant, OR_CI, P_value)
+PanGWAS_PANAROO_CLARC_sig
+
+# QQ plot 
+PanGWAS_PANAROO_CLARC_qqplot <- QQ_plot(PanGWAS_PANAROO_CLARC, "PanGWAS")
+PanGWAS_PANAROO_CLARC_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.3.Subanalysis_2/PanGWAS_PANAROO_CLARC_QQplot.png", plot = PanGWAS_PANAROO_CLARC_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+```
+## 4.3.Pan-GWAS (Fastree DP LMM, *Roary+CLARC*, Binary)
+```{r}
+# Load GWAS results
+PanGWAS_ROARY_CLARC <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.3.Subanalysis_2/PanGWAS_ROARY_CLARC.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+
+# Get significant hits
+PanGWAS_ROARY_CLARC_sig <- PanGWAS_ROARY_CLARC |>
+  filter(lrt.pvalue < 0.05 / nrow(PanGWAS_ROARY_CLARC)) |>
+  mutate(
+    OR = exp(beta),
+    OR_lower = exp(beta - 1.96 * beta.std.err),
+    OR_upper = exp(beta + 1.96 * beta.std.err),
+    OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+    P_value = formatC(lrt.pvalue, format = "e", digits = 2)
+  ) |>
+  select(variant, OR_CI, P_value)
+PanGWAS_ROARY_CLARC_sig
+
+# QQ plot 
+PanGWAS_ROARY_CLARC_qqplot <- QQ_plot(PanGWAS_ROARY_CLARC, "PanGWAS")
+PanGWAS_ROARY_CLARC_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.3.Subanalysis_2/PanGWAS_ROARY_CLARC_QQplot.png", plot = PanGWAS_ROARY_CLARC_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+```
+# Summary table
+```{r}
+# sig level
+col_0 <- c("Panaroo", "Roary", "Panaroo+CLARC", "Roary+CLARC")
+col_1 <- c(nrow(PanGWAS_FastTree), nrow(PanGWAS_ROARY), nrow(PanGWAS_PANAROO_CLARC), nrow(PanGWAS_ROARY_CLARC))
+col_2 <- 0.05/col_1
+
+data.frame(Pangenome_tool = col_0, 
+           N_Accessory_genes = col_1,
+           Sig_threshold = formatC(col_2, format = "e", digits = 2) )
+```

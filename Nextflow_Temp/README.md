@@ -82,8 +82,8 @@ git clone https://github.com/Leacavalli/GBS-GWAS-pipeline.git
 ```
 module load python
 conda create -n java      # Only run once to set up; All following times, skip this
-conda activate java
-conda install openjdk=11  # Only run once to set up; All following times, skip this
+source activate java
+conda install openjdk=17  # Only run once to set up; All following times, skip this
 java -version             # Check java version
 ```
 ### 2.2. Install Nextflow

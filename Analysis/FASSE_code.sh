@@ -132,12 +132,11 @@ cat /n/hanage_gbs_gwas_l3/Lab/phenotypes_tw.txt >> phenotypes.txt
 cp phenotypes.txt phenotypes_filtered.txt
 ## Move those samples to the test pipeline directory
 cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW/
-awk -F'\t' 'NR>1{print $1}' /n/hanage_gbs_gwas_l3/Lab/phenotypes_tw.txt > samples.txt
 mkdir 0.RAW_READS
-ln -s /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL/0.RAW_READS/* 0.RAW_READS
-while read sample; do
-  ln -s /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline/0.RAW_READS_TW/"$sample"*.fastq.gz 0.RAW_READS/
-done < samples.txt
+ln -s /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline/0.RAW_READS_Netherlands/*.fastq.gz 0.RAW_READS/
+ln -s /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline/0.RAW_READS_CDC/*.fastq.gz 0.RAW_READS/
+ln -s /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline/0.RAW_READS_TW/*.fastq.gz 0.RAW_READS/
+
 ## Run pipeline
 cd scripts
 module load python

@@ -1,0 +1,213 @@
+---
+title: "Sensitivity Analysis EOD LOD threshold"
+output: html_document
+date: "2025-10-07"
+---
+
+# 0 Set up environment
+```{r}
+# Clean environment
+rm( list = ls() )
+
+# load libraries
+library(qqman)
+library(circlize)
+library(VennDiagram)
+library(stringr)
+library(tidyverse)
+library(ggrepel)
+library(ggplot2)
+```
+
+# 0. EOD vs LOD/VLOD threshold = 7 days (i.e. 1 weeks) - Main Analysis
+```{r}
+# SNP-GWAS
+SNPGWAS_lt7 <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/SNPGWAS_Fasttree_DP_LMM.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)|> 
+  mutate(POS=as.integer(str_split(as.character(variant), "_", simplify = T)[,2]), 
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))
+SNPGWAS_lt7_sig <- SNPGWAS_lt7 |>  filter(lrt.pvalue < 0.05 /nrow(SNPGWAS_lt7)) 
+SNPGWAS_lt7_sig
+
+# DB-GWAS
+DBGWAS_lt7 <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/DBGWAS_Fasttree_DP_LMM.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)
+DBGWAS_lt7_sig <- DBGWAS_lt7 |>  filter(lrt.pvalue < 0.05 /nrow(DBGWAS_lt7)) 
+DBGWAS_lt7_sig
+
+# PanGWAS
+PanGWAS_lt7 <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/PanGWAS_FastTree_DP_LMM.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+PanGWAS_lt7_sig <- PanGWAS_lt7 |> filter(lrt.pvalue < 0.05 / nrow(PanGWAS_lt7))
+PanGWAS_lt7_sig
+
+# Summarize results
+final_df_lt7 <- rbind(SNPGWAS_lt7_sig |> 
+  mutate(variant = str_remove(variant, "AP018935.1_"))|> 
+  mutate(OR= round(exp(beta), 2),
+         CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
+         CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
+         lt7= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
+  select(variant, lt7),
+DBGWAS_lt7_sig |> 
+  mutate(OR= round(exp(beta), 2),
+         CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
+         CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
+         lt7= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
+  select(variant, lt7),
+PanGWAS_lt7_sig |> 
+  mutate(OR= round(exp(beta), 2),
+         CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
+         CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
+         lt7= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
+  select(variant, lt7))
+
+final_df_lt7
+```
+
+
+# 1. EOD vs LOD/VLOD threshold = 14 days (i.e. 2 weeks)
+```{r}
+# SNP-GWAS
+SNPGWAS_lt14 <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.5.EOD_LOD_Threshold/SNPGWAS_FastTree_DP_LMM_lt14.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)|> 
+  mutate(POS=as.integer(str_split(as.character(variant), "_", simplify = T)[,2]), 
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))
+SNPGWAS_lt14_sig <- SNPGWAS_lt14 |>  filter(lrt.pvalue < 0.05 /nrow(SNPGWAS_lt14)) 
+SNPGWAS_lt14_sig
+
+# DB-GWAS
+DBGWAS_lt14 <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.5.EOD_LOD_Threshold/DBGWAS_FastTree_DP_LMM_lt14.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)
+DBGWAS_lt14_sig <- DBGWAS_lt14 |>  filter(lrt.pvalue < 0.05 /nrow(DBGWAS_lt14)) 
+DBGWAS_lt14_sig
+
+# PanGWAS
+PanGWAS_lt14 <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.5.EOD_LOD_Threshold/PanGWAS_FastTree_DP_LMM_lt14.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+PanGWAS_lt14_sig <- PanGWAS_lt14 |> filter(lrt.pvalue < 0.05 / nrow(PanGWAS_lt14))
+PanGWAS_lt14_sig
+
+# Summarize results
+final_df_lt14 <- rbind(SNPGWAS_lt14_sig |> 
+  mutate(variant = str_remove(variant, "AP018935.1_"))|> 
+  mutate(OR= round(exp(beta), 2),
+         CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
+         CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
+         lt14= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
+  select(variant, lt14),
+DBGWAS_lt14_sig |> 
+  mutate(OR= round(exp(beta), 2),
+         CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
+         CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
+         lt14= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
+  select(variant, lt14),
+PanGWAS_lt14_sig |> 
+  mutate(OR= round(exp(beta), 2),
+         CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
+         CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
+         lt14= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
+  select(variant, lt14))
+
+final_df_lt14
+```
+
+# 2. EOD vs LOD/VLOD threshold = 30 days (i.e. 1 month)
+```{r}
+# SNP-GWAS
+SNPGWAS_lt30 <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.5.EOD_LOD_Threshold/SNPGWAS_FastTree_DP_LMM_lt30.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)|> 
+  mutate(POS=as.integer(str_split(as.character(variant), "_", simplify = T)[,2]), 
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))
+SNPGWAS_lt30_sig <- SNPGWAS_lt30 |>  filter(lrt.pvalue < 0.05 /nrow(SNPGWAS_lt30)) 
+SNPGWAS_lt30_sig
+
+# DB-GWAS
+DBGWAS_lt30 <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.5.EOD_LOD_Threshold/DBGWAS_FastTree_DP_LMM_lt30.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)
+DBGWAS_lt30_sig <- DBGWAS_lt30 |>  filter(lrt.pvalue < 0.05 /nrow(DBGWAS_lt30)) 
+DBGWAS_lt30_sig
+
+# PanGWAS
+PanGWAS_lt30 <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.5.EOD_LOD_Threshold/PanGWAS_FastTree_DP_LMM_lt30.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+PanGWAS_lt30_sig <- PanGWAS_lt30 |> filter(lrt.pvalue < 0.05 / nrow(PanGWAS_lt30))
+PanGWAS_lt30_sig
+
+# Summarize results
+final_df_lt30 <- rbind(SNPGWAS_lt30_sig |> 
+  mutate(variant = str_remove(variant, "AP018935.1_"))|> 
+  mutate(OR= round(exp(beta), 2),
+         CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
+         CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
+         lt30= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
+  select(variant, lt30),
+DBGWAS_lt30_sig |> 
+  mutate(OR= round(exp(beta), 2),
+         CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
+         CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
+         lt30= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
+  select(variant, lt30),
+PanGWAS_lt30_sig |> 
+  mutate(OR= round(exp(beta), 2),
+         CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
+         CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
+         lt30= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
+  select(variant, lt30))
+final_df_lt30
+```
+
+# 3. EOD vs LOD/VLOD threshold = 60 days (i.e. 2 month)
+```{r}
+# SNP-GWAS
+SNPGWAS_lt60 <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.5.EOD_LOD_Threshold/SNPGWAS_FastTree_DP_LMM_lt60.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)|> 
+  mutate(POS=as.integer(str_split(as.character(variant), "_", simplify = T)[,2]), 
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))
+SNPGWAS_lt60_sig <- SNPGWAS_lt60 |>  filter(lrt.pvalue < 0.05 /nrow(SNPGWAS_lt60)) 
+SNPGWAS_lt60_sig
+
+# DB-GWAS
+DBGWAS_lt60 <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.5.EOD_LOD_Threshold/DBGWAS_FastTree_DP_LMM_lt60.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)
+DBGWAS_lt60_sig <- DBGWAS_lt60 |>  filter(lrt.pvalue < 0.05 /nrow(DBGWAS_lt60)) 
+DBGWAS_lt60_sig
+
+# PanGWAS
+PanGWAS_lt60 <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.5.EOD_LOD_Threshold/PanGWAS_FastTree_DP_LMM_lt60.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+PanGWAS_lt60_sig <- PanGWAS_lt60 |> filter(lrt.pvalue < 0.05 / nrow(PanGWAS_lt60))
+PanGWAS_lt60_sig
+
+# Summarize results
+final_df_lt60 <- rbind(SNPGWAS_lt60_sig |> 
+  mutate(variant = str_remove(variant, "AP018935.1_"))|> 
+  mutate(OR= round(exp(beta), 2),
+         CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
+         CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
+         lt60= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
+  select(variant, lt60),
+DBGWAS_lt60_sig |> 
+  mutate(OR= round(exp(beta), 2),
+         CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
+         CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
+         lt60= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
+  select(variant, lt60),
+PanGWAS_lt60_sig |> 
+  mutate(OR= round(exp(beta), 2),
+         CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
+         CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
+         lt60= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
+  select(variant, lt60))
+final_df_lt60
+```
+
+```{r}
+final_df <- left_join(left_join(left_join(final_df_lt7, final_df_lt14), final_df_lt30), final_df_lt60)
+final_df
+```
+
