@@ -1,0 +1,139 @@
+---
+title: "Continuous Age Transformed"
+output: html_document
+date: "2025-10-17"
+---
+
+# Set up environment and load data 
+```{r}
+# Clean environment
+rm( list = ls() )
+
+# Load libraries
+library(tidyverse)
+
+# Load phenotypes
+setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.4.Subanalysis_3/15.4.Subanalysis_transformed_cont_age")
+phenotypes <- read.delim("phenotypes_filtered.txt")
+  
+# Load GWAS results
+SNPGWAS_data_Fasttree_LMM_cont <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.4.Subanalysis_3/SNPGWAS_Fasttree_DP_LMM.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)|> 
+  mutate(POS=as.integer(str_split(as.character(variant), "_", simplify = T)[,2]), 
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))
+
+```
+
+```{r}
+cont_shap <- shapiro.test(phenotypes$continuous_sqrt)$p.value
+
+## Rank-based inverse normal transformation
+p_hist <- ggplot(phenotypes, aes(x=continuous)) +
+  geom_histogram(bins=30) +
+  theme_bw() +
+  ggtitle("Histogram: Untransformed Continuous Age of onset (in days)")
+
+p_qq <- ggplot(phenotypes, aes(sample=continuous)) +
+  stat_qq() +
+  stat_qq_line(col="red") +
+  ggtitle("QQ-plot: Untransformed Continuous Age of onset (in days)") +
+  theme_minimal() +
+  annotate(
+    "text", x = Inf, y = -Inf,
+    label = paste0("Shapiro-Wilk p = ", signif(cont_shap,2)),
+    hjust = 1.1, vjust = -0.5, size=4, color="blue"
+  )
+
+(p_hist + p_qq)
+
+
+# Transform 
+## rank-based inverse normal transformation
+rank_inverse_normal <- function(x) {
+  # Get ranks, preserving NAs
+  r <- rank(x, ties.method = "average", na.last = "keep")
+  n <- sum(!is.na(x))
+  # Scale ranks to open interval (0,1)
+  p <- (r - 0.5) / n
+  # Transform
+  qnorm(p)
+}
+phenotypes$continuous_RIN <- rank_inverse_normal(phenotypes$continuous)
+
+## Log transformation
+phenotypes$continuous_log1p <- log1p(phenotypes$continuous)
+
+## SQRT transformation
+phenotypes$continuous_sqrt <- sqrt(phenotypes$continuous)
+
+# # Box-Cox Transformation
+# library(bestNormalize)
+# phenotypes$continuous_yeojohnson <- yeojohnson(phenotypes$continuous)$x.t
+
+# Calculate Shapiro-Wilk test p-values
+rin_shap <- shapiro.test(phenotypes$continuous_RIN)$p.value
+log1p_shap <- shapiro.test(phenotypes$continuous_log1p)$p.value
+sqrt_shap <- shapiro.test(phenotypes$continuous_sqrt)$p.value
+
+## Rank-based inverse normal transformation
+p_hist_rin <- ggplot(phenotypes, aes(x=continuous_RIN)) +
+  geom_histogram(bins=30) +
+  theme_bw() +
+  ggtitle("Histogram: Rank-based Inverse Normal")
+
+p_qq_rin <- ggplot(phenotypes, aes(sample=continuous_RIN)) +
+  stat_qq() +
+  stat_qq_line(col="red") +
+  ggtitle("QQ-plot: Rank-based Inverse Normal") +
+  theme_minimal() +
+  annotate(
+    "text", x = Inf, y = -Inf,
+    label = paste0("Shapiro-Wilk p = ", signif(rin_shap,2)),
+    hjust = 1.1, vjust = -0.5, size=4, color="blue"
+  )
+
+(p_hist_rin + p_qq_rin)
+
+## Log1p transformation
+p_hist_log1p <- ggplot(phenotypes, aes(x=continuous_log1p)) +
+  geom_histogram(bins=30) +
+  theme_bw() +
+  ggtitle("Histogram: Log1p")
+
+p_qq_log1p <- ggplot(phenotypes, aes(sample=continuous_log1p)) +
+  stat_qq() +
+  stat_qq_line(col="red") +
+  ggtitle("QQ-plot: Log1p") +
+  theme_minimal() +
+  annotate(
+    "text", x = Inf, y = -Inf,
+    label = paste0("Shapiro-Wilk p = ", signif(log1p_shap,2)),
+    hjust = 1.1, vjust = -0.5, size=4, color="blue"
+  )
+
+(p_hist_log1p + p_qq_log1p)
+
+
+## SQRT transformation
+p_hist_sqrt <- ggplot(phenotypes, aes(x=continuous_sqrt)) +
+  geom_histogram(bins=30) +
+  theme_bw() +
+  ggtitle("Histogram: SQRT")
+
+p_qq_sqrt <- ggplot(phenotypes, aes(sample=continuous_sqrt)) +
+  stat_qq() +
+  stat_qq_line(col="red") +
+  ggtitle("QQ-plot: SQRT") +
+  theme_minimal() +
+  annotate(
+    "text", x = Inf, y = -Inf,
+    label = paste0("Shapiro-Wilk p = ", signif(sqrt_shap,2)),
+    hjust = 1.1, vjust = -0.5, size=4, color="blue"
+  )
+
+# Arrange plots: 
+(p_hist_sqrt + p_qq_sqrt)
+```
+
+

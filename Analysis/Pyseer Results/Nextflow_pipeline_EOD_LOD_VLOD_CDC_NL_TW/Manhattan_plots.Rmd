@@ -1,0 +1,212 @@
+---
+title: "CDC_NL_TW"
+output: html_document
+date: "2025-10-20"
+---
+
+# 0 Set up environment
+```{r}
+# Clean environment
+rm( list = ls() )
+
+# load libraries
+library(qqman)
+library(circlize)
+library(VennDiagram)
+library(stringr)
+library(tidyverse)
+library(ggrepel)
+library(ggplot2)
+
+# Prepare Plotting functions 
+manhattan_plot <- function(data, data_full, type, ann=T) {
+  # Compute significance threshold
+  threshold <- -log10(0.05 / nrow(data_full))
+  
+  # Subset for significant hits (above threshold and not NA in label)
+  ann_sub <- data[ -log10(data$lrt.pvalue) > threshold & !is.na(data[["gene"]]), ]
+  
+  # Calculate expanded y limits
+   y_max <- max(-log10(data$lrt.pvalue), na.rm = TRUE)
+   y_lim <- c(0, max(y_max,threshold) * 1.10)
+  
+  plot <- ggplot(data, aes(x=POS, y=-log10(lrt.pvalue))) +
+    geom_point(aes(color=OR_pos), alpha=0.8, size=1.3) +
+    scale_color_manual(values= c("skyblue", "orange")) +
+    scale_y_continuous(expand = c(0, 0), limits = y_lim) +
+    theme_bw()+
+    theme(
+      legend.title = element_blank(), 
+      panel.border = element_blank(),
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.x = element_blank(),
+      plot.title = element_text(face = "bold", hjust = 0.5)
+    ) +
+    labs(
+      x = "Genomic Position (Start)",
+      y = expression(-log[10](italic(p))),
+      title = paste0(type, " Manhattan Plot with Significant Hits Annotated")
+    ) +
+    geom_hline(yintercept = threshold, color="red", lty="dashed") 
+  
+  if(ann==F){
+   plot
+  }else{
+    plot +
+    geom_label_repel(
+      data = ann_sub,
+      aes(label = .data[["gene"]]),
+      size = 2,
+      min.segment.length = 0.5,
+      show.legend = FALSE,
+      na.rm = TRUE, 
+      max.overlaps = Inf)
+  }
+}
+
+QQ_plot <- function(data, type){
+  df <- data.frame(expected= (-log10(ppoints(length(data |> pull(lrt.pvalue))))), 
+                             observed=(-log10(sort(data |> pull(lrt.pvalue))))) 
+  df |>
+    ggplot(aes(x = expected, y = observed)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, color="red", lty="dashed")  +      
+  labs(
+    x = "-log10(Expected P)",
+    y = "-log10(Observed P)",
+    title = paste0(type," QQ plot")
+  ) +
+  theme_minimal()+
+  xlim(0, 10) +
+  ylim(0, 10)
+}
+
+```
+
+# 1. Main Analysis
+# 1.1. SNP-GWAS (Fastree DP LMM, Panaroo, Binary)
+```{r}
+# Load Missingness proportion 
+Missingness_Prop <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW/Missingness_Prop.txt")
+Core_region_POS <- Missingness_Prop |> filter(V2<0.05) |> pull(V1)
+
+# Load GWAS results
+SNPGWAS_data_Fasttree_LMM <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW/SNPGWAS_Fasttree_LMM.txt", sep = "\t", header=T)|>
+  filter(af>=0.05, af <0.95)|> 
+  mutate(POS=as.integer(str_split(as.character(variant), "_", simplify = T)[,2]), 
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))|>
+  filter(POS %in% Core_region_POS)
+
+# # Load Annotations
+# SNPGWAS_data_Fasttree_LMM_ann <- read.csv("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW/SNP_annotations.csv", header=F)
+# colnames(SNPGWAS_data_Fasttree_LMM_ann) <- c("POS", "REF", "ALT", "FUNCLASS", "IMPACT", "gene", "nt_change", "aa_change")
+# SNPGWAS_data_Fasttree_LMM_ann_df <- left_join(SNPGWAS_data_Fasttree_LMM,
+#   SNPGWAS_data_Fasttree_LMM_ann |>
+#   mutate(variant = paste("AP018935.1", POS, REF, ALT, sep="_")))
+
+# Manhattan Plot
+SNPGWAS_data_Fasttree_LMM_manplot <- manhattan_plot(SNPGWAS_data_Fasttree_LMM, SNPGWAS_data_Fasttree_LMM, "SNPGWAS", ann=F)
+SNPGWAS_data_Fasttree_LMM_manplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW/SNPGWAS_manplot.png", plot = SNPGWAS_data_Fasttree_LMM_manplot, width = 9, height = 6, dpi = 300, units = "in")
+
+# QQ plot 
+SNPGWAS_data_Fasttree_LMM_qqplot <- QQ_plot(SNPGWAS_data_Fasttree_LMM, "SNPGWAS") 
+SNPGWAS_data_Fasttree_LMM_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW/SNPGWAS_QQplot.png", plot = SNPGWAS_data_Fasttree_LMM_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+```
+
+# 1.2. DB-GWAS (Fastree DP LMM, Panaroo, Binary)
+```{r}
+# Load GWAS results
+DBGWAS_FastTree <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW/DBGWAS_Fasttree_LMM.txt", sep = "\t", header=T) |>
+  filter(af >=0.05, af <0.95)
+
+# Load Annotations
+DBGWAS_FastTree_annotations <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW/DBGWAS_Fasttree_LMM_annotation.txt", sep = "\t", header=F) 
+colnames(DBGWAS_FastTree_annotations) <- colnames(DBGWAS_FastTree)
+DBGWAS_FastTree_annotations <- DBGWAS_FastTree_annotations |> 
+  filter(af >=0.05, af <0.95)|>
+  mutate(core_accessory = ifelse(str_extract(notes, "^[^:]+")=="AP018935.1", "ref", "accessory"),
+         coord_range = str_extract(notes, "(?<=:)[0-9]+-[0-9]+"), 
+         start= str_split(coord_range, "-", simplify = T)[,1], 
+         end= str_split(coord_range, "-", simplify = T)[,2],
+         POS = as.integer(str_extract(coord_range, "^[0-9]+")),
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))  |>
+  separate(
+    notes, 
+    into = c("contig_position", "upstream", "gene", "downstream"), 
+    sep = ";", 
+    remove = FALSE, 
+    fill = "right"
+  )
+
+# Manhattan Plot
+DBGWAS_FastTree_manplot <- manhattan_plot(DBGWAS_FastTree_annotations |> filter(core_accessory=="ref"), DBGWAS_FastTree_annotations, "DBGWAS")
+DBGWAS_FastTree_manplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW/DBGWAS_manplot.png", plot = DBGWAS_FastTree_manplot, width = 9, height = 6, dpi = 300, units = "in")
+
+DBGWAS_FastTree_manplot_core <- manhattan_plot(DBGWAS_FastTree_annotations |> filter(core_accessory=="ref") |> filter(POS %in% Core_region_POS), DBGWAS_FastTree_annotations, "DBGWAS")
+DBGWAS_FastTree_manplot_core
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW/DBGWAS_manplot_core.png", plot = DBGWAS_FastTree_manplot_core, width = 9, height = 6, dpi = 300, units = "in")
+
+
+# Results table 
+DBGWAS_FastTree_annotations_sig <- DBGWAS_FastTree_annotations |> 
+  filter(lrt.pvalue < 0.05 /nrow(DBGWAS_FastTree_annotations))  
+DBGWAS_FastTree_annotations_sig_acc <- DBGWAS_FastTree_annotations_sig |> 
+  filter(core_accessory =="accessory")   |> 
+  arrange(POS)
+DBGWAS_FastTree_annotations_sig_ref <- DBGWAS_FastTree_annotations_sig |> 
+  filter(core_accessory =="ref")   |> 
+  arrange(POS)
+DBGWAS_final <- rbind(DBGWAS_FastTree_annotations_sig_acc, DBGWAS_FastTree_annotations_sig_ref)
+DBGWAS_final
+
+DBGWAS_final |>
+  mutate(core_accessory = factor(core_accessory, levels= c("core", "accessory")))|>
+  arrange(core_accessory, as.numeric(start))|>
+  mutate(
+    OR = exp(beta),
+    OR_lower = exp(beta - 1.96 * beta.std.err),
+    OR_upper = exp(beta + 1.96 * beta.std.err),
+    OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+    P_value = formatC(lrt.pvalue, format = "e", digits = 2)
+  ) |>
+  mutate(Number= 1:nrow(DBGWAS_final))|> 
+  dplyr::select(Number, variant, core_accessory, coord_range, af, OR_CI, P_value, gene) 
+
+
+# QQ plot 
+DBGWAS_FastTree_qqplot <- QQ_plot(DBGWAS_FastTree_annotations, "DBGWAS")
+DBGWAS_FastTree_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW/DBGWAS_QQplot.png", plot = DBGWAS_FastTree_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+```
+
+# 1.3. Pan-GWAS (Fastree DP LMM, Panaroo, Binary)
+```{r}
+# Load GWAS results
+PanGWAS_FastTree <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW/PanGWAS_Panaroo_Fasttree_LMM.txt", sep = "\t", header=T) 
+
+# Get significant hits
+PanGWAS_FastTree_sig <- PanGWAS_FastTree |>
+  filter(lrt.pvalue < 0.05 / nrow(PanGWAS_FastTree)) |>
+  mutate(
+    OR = exp(beta),
+    OR_lower = exp(beta - 1.96 * beta.std.err),
+    OR_upper = exp(beta + 1.96 * beta.std.err),
+    OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+    P_value = formatC(lrt.pvalue, format = "e", digits = 2)
+  ) |>
+  dplyr::select(variant, af, OR_CI, P_value)
+PanGWAS_FastTree_sig
+
+# QQ plot 
+PanGWAS_FastTree_qqplot <- QQ_plot(PanGWAS_FastTree, "PanGWAS")
+PanGWAS_FastTree_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW/PanGWAS_QQplot.png", plot = PanGWAS_FastTree_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+```
+

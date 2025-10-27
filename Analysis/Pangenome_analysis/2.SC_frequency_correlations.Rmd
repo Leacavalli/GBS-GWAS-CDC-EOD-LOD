@@ -1,0 +1,97 @@
+---
+title: "SC Frequencies"
+output: html_document
+date: "2025-10-22"
+---
+
+```{r}
+# Clean environment
+rm( list = ls() )
+
+# load libraries
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(xlsx)
+
+# Load metadata
+SCs <- read.csv("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Phylogenies/EOD_LOD_VLOD_CDC_NL_TW/GBS_GWAS_db_core_clusters.csv") |> rename(Sample=Taxon, SC=Cluster)
+
+# List samples from each dataset
+NL_metadata <- read.xlsx("~/GitHub/GBS-GWAS-CDC-EOD-LOD/0.Raw_data/Netherlands_Sanger_metadata.xlsx", 1) 
+NLD_samples <- NL_metadata |> filter(ENA.lane.accession %in% SCs$Sample) |> pull(ENA.lane.accession)
+CDC_metadata <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC/phenotypes.txt", header=T) 
+CDC_samples <- CDC_metadata |> filter(samples %in% SCs$Sample) |> pull(samples)
+
+# Add country to metadata
+metadata <- SCs |> 
+  mutate(Country= ifelse(Sample %in% NLD_samples, "NL", 
+                         ifelse(Sample %in% CDC_samples, "USA", "TW")) )|> 
+  filter(Country != "TW")
+
+# Prepare Plot Data 
+fewer5_SC <- names(which(table(metadata$SC)<10))
+SC_Freq_df <- metadata |>
+  group_by(Country)|>
+  dplyr::mutate(N_Country = n())|>
+  ungroup()|>
+  group_by(Country, N_Country, SC)|>
+  summarise(N_SC = n())|>
+  ungroup()|>
+  dplyr::mutate(p_SC = N_SC/N_Country)|>
+  dplyr::select(Country, SC, p_SC)|>
+  pivot_wider(names_from = Country, values_from = p_SC) |>
+  rename(Proportion_NLD=NL, 
+         Proportion_CDC= USA) |>
+  dplyr::mutate(SC= as.factor(SC), 
+         Proportion_NLD = ifelse(is.na(Proportion_NLD), 0, Proportion_NLD), 
+         Proportion_CDC = ifelse(is.na(Proportion_CDC), 0, Proportion_CDC))|> 
+  dplyr::mutate(SC2= ifelse(SC %in% fewer5_SC, "other", SC))|> 
+  dplyr::mutate(SC2= factor(SC2, level=c(1:length(which(table(metadata$SC)>=10)), "other")))
+
+
+```
+
+
+# Plot SC frequencies across countries
+```{r }
+# Create a data frame for shading the region (independent of gene_pres_abs_clean_V2)
+shade_data <- data.frame(x = seq(0, 0.5, by = 0.01))
+shade_data <- shade_data %>%
+  mutate(ymin_5 = pmax(0, x - 0.05),
+         ymax_5 = pmin(0.5, x + 0.05),
+         ymin_10 = pmax(0, x - 0.10),
+         ymax_10 = pmin(0.5, x + 0.10),
+         ymin_15 = pmax(0, x - 0.15),
+         ymax_15 = pmin(0.5, x + 0.15),
+         ymin_25 = pmax(0, x - 0.25),
+         ymax_25 = pmin(0.5, x + 0.25))
+
+# Data point colors
+SC_colors <- c("#dbdb8d", "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", 
+                   "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf",
+                   "#f7b6d2", "#c5b0d5", "#c49c94", "black")
+# Correlation test 
+cor_test <- cor.test(SC_Freq_df$Proportion_NLD, SC_Freq_df$Proportion_CDC)
+cor_coefficient <- round(cor_test$estimate, 2)
+p_value <- signif(cor_test$p.value, 3)
+
+# Plot
+p_SC_all <- ggplot() +
+  geom_ribbon(data = shade_data, aes(x = x, ymin = ymin_5, ymax = ymax_5), fill = "grey95", alpha = 0.5)+
+  geom_ribbon(data = shade_data, aes(x = x, ymin = ymin_25, ymax = ymax_25), fill = "grey95", alpha = 0.5)+
+  geom_point(data= SC_Freq_df, aes(x = Proportion_NLD, y = Proportion_CDC, color = SC2), size=3) +
+  geom_abline(slope = 1, intercept = 0, color = "black") +  
+  theme_classic() +
+  xlab(paste0("SC frequencies in Netherlands (n=", length(NLD_samples), ")")) +
+  ylab(paste0("SC frequencies in USA (n=", length(CDC_samples), ")")) +
+  annotate("text", x = 0.02, y = 0.45, hjust = 0, label = paste("Pearson's correlation:\nr =", cor_coefficient, ", p ", ifelse(p_value< 0.001, "< 0.001", paste("=",p_value))), size = 4, color = "black") +
+  scale_color_manual(values=SC_colors)+
+  scale_x_continuous(limits = c(0, 0.5), expand=c(0.02, 0)) +
+  scale_y_continuous(limits = c(0, 0.5), expand=c(0.02, 0)) +
+  ggtitle(paste0("Infant Invasive Disease (n=", (length(NLD_samples)+length(CDC_samples)), ")"))
+p_SC_all
+
+# Save
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pangenome_analysis/2.SC_freq_correlations.png", plot = p_SC_all, width = 7, height = 6, dpi = 300, units = "in", bg = "white")
+```

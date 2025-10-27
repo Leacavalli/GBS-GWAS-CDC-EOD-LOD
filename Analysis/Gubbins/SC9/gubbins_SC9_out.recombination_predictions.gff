@@ -1,0 +1,32 @@
+##gff-version 3
+##sequence-region SEQUENCE 1 2231314
+SEQUENCE	GUBBINS	CDS	626154	626199	0.000	.	0	node="Node_5->SRR5063523";neg_log_likelihood="179.429503";taxa="SRR5063523";snp_count="4";
+SEQUENCE	GUBBINS	CDS	1452153	1452160	0.000	.	0	node="Node_18->SRR29447095";neg_log_likelihood="130.809729";taxa="SRR29447095";snp_count="7";
+SEQUENCE	GUBBINS	CDS	468565	468574	0.000	.	0	node="Node_1->SRR5063458";neg_log_likelihood="171.483475";taxa="SRR5063458";snp_count="5";
+SEQUENCE	GUBBINS	CDS	848711	848719	0.000	.	0	node="Node_11->SRR29507131";neg_log_likelihood="190.652039";taxa="SRR29507131";snp_count="5";
+SEQUENCE	GUBBINS	CDS	1452153	1452160	0.000	.	0	node="Node_13->SRR31502751";neg_log_likelihood="203.569631";taxa="SRR31502751";snp_count="7";
+SEQUENCE	GUBBINS	CDS	1452153	1452160	0.000	.	0	node="Node_14->SRR29664753";neg_log_likelihood="69.682593";taxa="SRR29664753";snp_count="7";
+SEQUENCE	GUBBINS	CDS	927906	927912	0.000	.	0	node="Node_2->SRR5063287";neg_log_likelihood="170.736967";taxa="SRR5063287";snp_count="3";
+SEQUENCE	GUBBINS	CDS	454967	454970	0.000	.	0	node="Node_1->SRR5063458";neg_log_likelihood="149.037791";taxa="SRR5063458";snp_count="4";
+SEQUENCE	GUBBINS	CDS	848711	848719	0.000	.	0	node="Node_13->SRR31502751";neg_log_likelihood="181.040714";taxa="SRR31502751";snp_count="5";
+SEQUENCE	GUBBINS	CDS	1452153	1452160	0.000	.	0	node="Node_8->SRR5061116";neg_log_likelihood="105.754218";taxa="SRR5061116";snp_count="7";
+SEQUENCE	GUBBINS	CDS	636287	636293	0.000	.	0	node="Node_14->SRR29664753";neg_log_likelihood="54.480691";taxa="SRR29664753";snp_count="3";
+SEQUENCE	GUBBINS	CDS	848711	848719	0.000	.	0	node="Node_8->SRR5061116";neg_log_likelihood="81.501442";taxa="SRR5061116";snp_count="5";
+SEQUENCE	GUBBINS	CDS	848711	848719	0.000	.	0	node="Node_18->SRR9088366";neg_log_likelihood="112.185967";taxa="SRR9088366";snp_count="5";
+SEQUENCE	GUBBINS	CDS	2051556	2051562	0.000	.	0	node="Node_1->SRR5063458";neg_log_likelihood="136.375962";taxa="SRR5063458";snp_count="3";
+SEQUENCE	GUBBINS	CDS	1452153	1452160	0.000	.	0	node="Node_11->SRR5063340";neg_log_likelihood="189.275987";taxa="SRR5063340";snp_count="7";
+SEQUENCE	GUBBINS	CDS	936599	936607	0.000	.	0	node="Node_13->SRR29450297";neg_log_likelihood="156.618171";taxa="SRR29450297";snp_count="6";
+SEQUENCE	GUBBINS	CDS	848711	848718	0.000	.	0	node="Node_1->SRR5061472";neg_log_likelihood="166.044080";taxa="SRR5061472";snp_count="4";
+SEQUENCE	GUBBINS	CDS	933630	933639	0.000	.	0	node="Node_9->SRR5063606";neg_log_likelihood="136.630450";taxa="SRR5063606";snp_count="8";
+SEQUENCE	GUBBINS	CDS	249537	249573	0.000	.	0	node="Node_9->SRR5063606";neg_log_likelihood="124.028160";taxa="SRR5063606";snp_count="3";
+SEQUENCE	GUBBINS	CDS	1452153	1452160	0.000	.	0	node="Node_15->SRR9087912";neg_log_likelihood="95.602616";taxa="SRR9087912";snp_count="7";
+SEQUENCE	GUBBINS	CDS	615500	619227	0.000	.	0	node="Node_15->SRR9087912";neg_log_likelihood="84.754459";taxa="SRR9087912";snp_count="5";
+SEQUENCE	GUBBINS	CDS	264088	326706	0.000	.	0	node="Node_10->Node_9";neg_log_likelihood="1544.478537";taxa=" SRR5063606  SRR7282015 SRR5061116";snp_count="404";
+SEQUENCE	GUBBINS	CDS	212330	229983	0.000	.	0	node="Node_10->Node_9";neg_log_likelihood="396.771942";taxa=" SRR5063606  SRR7282015 SRR5061116";snp_count="57";
+SEQUENCE	GUBBINS	CDS	243313	260092	0.000	.	0	node="Node_10->Node_9";neg_log_likelihood="181.314873";taxa=" SRR5063606  SRR7282015 SRR5061116";snp_count="29";
+SEQUENCE	GUBBINS	CDS	848711	848719	0.000	.	0	node="Node_10->Node_9";neg_log_likelihood="65.619064";taxa=" SRR5063606  SRR7282015 SRR5061116";snp_count="5";
+SEQUENCE	GUBBINS	CDS	848711	848719	0.000	.	0	node="Node_6->Node_4";neg_log_likelihood="15.637426";taxa=" SRR31467374  SRR31471300  SRR5063287 SRR29462689";snp_count="5";
+SEQUENCE	GUBBINS	CDS	634278	639422	0.000	.	0	node="Node_17->SRR29463250";neg_log_likelihood="131.407999";taxa="SRR29463250";snp_count="5";
+SEQUENCE	GUBBINS	CDS	433953	433968	0.000	.	0	node="Node_7->SRR5063726";neg_log_likelihood="163.599621";taxa="SRR5063726";snp_count="6";
+SEQUENCE	GUBBINS	CDS	616918	623298	0.000	.	0	node="Node_22->SRR7282667";neg_log_likelihood="281.423513";taxa="SRR7282667";snp_count="9";
+SEQUENCE	GUBBINS	CDS	635909	639661	0.000	.	0	node="Node_22->SRR7282667";neg_log_likelihood="246.485262";taxa="SRR7282667";snp_count="5";

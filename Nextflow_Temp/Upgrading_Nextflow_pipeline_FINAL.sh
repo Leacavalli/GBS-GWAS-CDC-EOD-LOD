@@ -113,10 +113,12 @@ awk '$2 < 0.05 {print "AP018935.1\t" $1}' Missingness_Prop.txt > Keep_Pos_max5mi
 # Filter only positions with <5% missingness
 zcat merged.vcf.gz | awk 'BEGIN { while ((getline < "Keep_Pos_max5missing.txt") > 0) s[$1":"$2]=1 } /^#/ {print; next} (s[$1":"$2])' > merged_max5missing.vcf
 # Pyseer
+# MAIN ANALYSIS
 cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC/TEST_Fasttree
 module load python
 source activate pyseer
 sbatch -p fasse -t 0-12:00 --mem=50000 --wrap="python ../Files/pyseer/scripts/phylogeny_distance.py --lmm EOD_LOD_VLOD_CDC_FastTree_DP.tre > EOD_LOD_VLOD_CDC_FastTree_DP_K.tsv"
+## GWAS
 sbatch -p fasse -t 0-12:00 --mem=100000 --wrap="pyseer --lmm --phenotypes ../Files/phenotypes_filtered.txt --phenotype-column binary --vcf ../11.SNIPPY_MULTI/merged_max5missing.vcf --similarity EOD_LOD_VLOD_CDC_FastTree_DP_K.tsv > SNPGWAS_FastTree_DP_LMM.txt"
 sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="pyseer --lmm --phenotypes ../Files/phenotypes_filtered.txt  --phenotype-column binary --kmers ../14.UNITIGS/unitigs.txt --uncompressed --similarity EOD_LOD_VLOD_CDC_FastTree_DP_K.tsv > DBGWAS_FastTree_DP_LMM.txt"
 sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="annotate_hits_pyseer DBGWAS_FastTree_DP_LMM.txt ../Files/DBGWAS_references.txt DBGWAS_FastTree_DP_LMM_annotation.txt"
@@ -231,3 +233,77 @@ cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_NL/scri
 module load python
 source activate java
 sbatch -p fasse -c 48 -t 7-00:00:00 --mem=180000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline.nf --main --sub1 --sub2 --path_nextflow_dir /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_NL --path_conda_envs /n/home_fasse/lcavalli/.conda/envs"
+sbatch -p fasse -c 48 -t 7-00:00:00 --mem=180000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline.nf -resume --main --sub1 --sub2 --path_nextflow_dir /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_NL --path_conda_envs /n/home_fasse/lcavalli/.conda/envs"
+
+module load python
+source activate roary
+sbatch -p fasse -c 16 -t 7-00:00:00 --mem=100000 --wrap="roary -e --mafft -p 16 ../6.ANNOTATION/*.gff -f ../13.Pangenome_analysis/13.2.ROARY"
+
+
+# Run pipeline with CDC-only data
+cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC/scripts
+module load python
+source activate java
+sbatch -p fasse -c 48 -t 7-00:00:00 --mem=180000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline.nf --main --sub1 --sub2 --path_nextflow_dir /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC --path_conda_envs /n/home_fasse/lcavalli/.conda/envs"
+
+# Run with different EOD/LOD thresholds
+cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.Pyseer/15.5.EOD_LOD_Threshold
+module load python
+source activate pyseer
+## phenotypes_EOD_lt14
+sbatch -p fasse -t 0-12:00 --mem=100000 --wrap="pyseer --lmm --phenotypes phenotypes_EOD_lt14.txt --phenotype-column binary --vcf ../../11.SNIPPY_MULTI/merged_max5missing.vcf --similarity ../../12.Phylogeny/12.1.FastTree_DP/EOD_LOD_VLOD_CDC_FastTree_DP_K.tsv > SNPGWAS_FastTree_DP_LMM_lt14.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="pyseer --lmm --phenotypes phenotypes_EOD_lt14.txt  --phenotype-column binary --kmers ../../14.UNITIGS/unitigs.txt --uncompressed --similarity ../../12.Phylogeny/12.1.FastTree_DP/EOD_LOD_VLOD_CDC_FastTree_DP_K.tsv > DBGWAS_FastTree_DP_LMM_lt14.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="pyseer --min-af 0.05 --max-af 0.95 --lmm --phenotypes phenotypes_EOD_lt14.txt --phenotype-column binary --pres ../../13.Pangenome_analysis/13.1.Panaroo/gene_presence_absence.Rtab --similarity ../../12.Phylogeny/12.1.FastTree_DP/EOD_LOD_VLOD_CDC_FastTree_DP_K.tsv > PanGWAS_FastTree_DP_LMM_lt14.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="annotate_hits_pyseer DBGWAS_FastTree_DP_LMM_lt14.txt ../../Files/DBGWAS_references.txt DBGWAS_FastTree_DP_LMM_annotation_lt14.txt"
+## phenotypes_EOD_lt30
+sbatch -p fasse -t 0-12:00 --mem=100000 --wrap="pyseer --lmm --phenotypes phenotypes_EOD_lt30.txt --phenotype-column binary --vcf ../../11.SNIPPY_MULTI/merged_max5missing.vcf --similarity ../../12.Phylogeny/12.1.FastTree_DP/EOD_LOD_VLOD_CDC_FastTree_DP_K.tsv > SNPGWAS_FastTree_DP_LMM_lt30.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="pyseer --lmm --phenotypes phenotypes_EOD_lt30.txt  --phenotype-column binary --kmers ../../14.UNITIGS/unitigs.txt --uncompressed --similarity ../../12.Phylogeny/12.1.FastTree_DP/EOD_LOD_VLOD_CDC_FastTree_DP_K.tsv > DBGWAS_FastTree_DP_LMM_lt30.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="pyseer --min-af 0.05 --max-af 0.95 --lmm --phenotypes phenotypes_EOD_lt30.txt --phenotype-column binary --pres ../../13.Pangenome_analysis/13.1.Panaroo/gene_presence_absence.Rtab --similarity ../../12.Phylogeny/12.1.FastTree_DP/EOD_LOD_VLOD_CDC_FastTree_DP_K.tsv > PanGWAS_FastTree_DP_LMM_lt30.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="annotate_hits_pyseer DBGWAS_FastTree_DP_LMM_lt30.txt ../../Files/DBGWAS_references.txt DBGWAS_FastTree_DP_LMM_annotation_lt30.txt"
+## phenotypes_EOD_lt60
+sbatch -p fasse -t 0-12:00 --mem=100000 --wrap="pyseer --lmm --phenotypes phenotypes_EOD_lt60.txt --phenotype-column binary --vcf ../../11.SNIPPY_MULTI/merged_max5missing.vcf --similarity ../../12.Phylogeny/12.1.FastTree_DP/EOD_LOD_VLOD_CDC_FastTree_DP_K.tsv > SNPGWAS_FastTree_DP_LMM_lt60.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="pyseer --lmm --phenotypes phenotypes_EOD_lt60.txt  --phenotype-column binary --kmers ../../14.UNITIGS/unitigs.txt --uncompressed --similarity ../../12.Phylogeny/12.1.FastTree_DP/EOD_LOD_VLOD_CDC_FastTree_DP_K.tsv > DBGWAS_FastTree_DP_LMM_lt60.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="pyseer --min-af 0.05 --max-af 0.95 --lmm --phenotypes phenotypes_EOD_lt60.txt --phenotype-column binary --pres ../../13.Pangenome_analysis/13.1.Panaroo/gene_presence_absence.Rtab --similarity ../../12.Phylogeny/12.1.FastTree_DP/EOD_LOD_VLOD_CDC_FastTree_DP_K.tsv > PanGWAS_FastTree_DP_LMM_lt60.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="annotate_hits_pyseer DBGWAS_FastTree_DP_LMM_lt60.txt ../../Files/DBGWAS_references.txt DBGWAS_FastTree_DP_LMM_annotation_lt60.txt"
+
+
+
+# Run pipeline with CDC-only data
+cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW/scripts
+module load python
+source activate java
+sbatch -p fasse -c 48 -t 7-00:00:00 --mem=180000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline.nf --main --path_nextflow_dir /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW --path_conda_envs /n/home_fasse/lcavalli/.conda/envs"
+sbatch -p fasse_bigmem -c 48 -t 7-00:00:00 --mem=490000 --wrap="nextflow -C nextflow.config run Nextflow_pipeline.nf -resume --main --path_nextflow_dir /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW --path_conda_envs /n/home_fasse/lcavalli/.conda/envs"
+#6217858
+sbatch -p fasse_bigmem -t 7-00:00:00 --mem=490000 --wrap=" /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW/Files/FastTree_DUSE_DOUBLE -gtr -gamma -nt /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW/11.SNIPPY_MULTI/clean.full.aln > /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW/12.Phylogeny/12.2.FastTree/FastTree_phylo.tre"
+# 6217856
+
+
+
+# Remove recombination
+module load python
+# conda create -n gubbins
+source activate gubbins
+#conda config --add channels r
+#conda config --add channels defaults
+#conda config --add channels conda-forge
+#conda config --add channels bioconda
+#conda install gubbins
+gubbins -h
+
+cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC/11.SNIPPY_MULTI
+sbatch -p fasse_bigmem -c 48 -t 7-00:00:00 --mem=490000 --wrap="run_gubbins.py --prefix gubbins_out --threads 48 --starting-tree ../12.Phylogeny/12.1.FastTree_DP/EOD_LOD_VLOD_CDC_FastTree_DP.tre --model GTRGAMMA clean.full.aln"
+# slurm-6217863.out
+
+# Full alignment
+cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC/16.Gubbins/Fulltree_Gubbins
+../seqtk/seqtk subseq ../../11.SNIPPY_MULTI/clean.full.aln Full_samples.txt > Full.fasta
+sbatch -p fasse_bigmem -c 48 -t 7-00:00:00 --mem=490000 --wrap="run_gubbins.py --prefix /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC/16.Gubbins/Fulltree_Gubbins/gubbins_fulltree_out --threads 48 --starting-tree /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC/12.Phylogeny/12.1.FastTree_DP/EOD_LOD_VLOD_CDC_FastTree_DP.tre --model GTRGAMMA Full.fasta"
+
+# Need to subset to each major SC ?
+## SC1
+cd
+../seqtk/seqtk subseq ../../11.SNIPPY_MULTI/clean.full.aln SC1_Samples.txt > SC1.fasta
+sbatch -p fasse_bigmem -c 48 -t 7-00:00:00 --mem=490000 --wrap="run_gubbins.py --prefix /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC/16.Gubbins/SC1_Gubbins/gubbins_SC1_out --threads 48 --model GTRGAMMA /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC/11.SNIPPY_MULTI/clean.full.aln"
+
+Ok also, I have regenarate the plots for the branchwater and pushed to github. They are in . But I am missing the strainGST results for one sample : SRR17284135. I also could not find it in /n/holylabs/LABS/hanage_lab/Lab/rbalasubramanian/GI_Vaginal/Sourmash_Strainge. Although I do have its relative abundance so we presumably did run metaphlan on it, bur perhaps not strainGE ?... I believe this may be a sample we had previously excluded but are now including after your recategorization of body site of isolation... Could you let me know if you find strainGST

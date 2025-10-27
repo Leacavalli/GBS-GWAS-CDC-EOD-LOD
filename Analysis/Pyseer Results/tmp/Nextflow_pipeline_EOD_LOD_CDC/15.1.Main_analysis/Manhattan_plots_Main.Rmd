@@ -1,0 +1,298 @@
+---
+title: "Main Analysis"
+output: html_document
+date: "2025-07-17"
+---
+
+# Set up environment
+```{r}
+# Clean environment
+rm( list = ls() )
+
+# Load necessary
+library(qqman)
+library(circlize)
+library(VennDiagram)
+library(ggrepel)
+library(stringr)
+library(tidyverse)
+
+```
+
+# SNP-GWAS
+```{r}
+SNPGWAS_data <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_CDC/15.1.Main_analysis/SNPGWAS_Fasttree_LMM_max5missing.txt", sep = "\t", header=T)|> 
+  mutate(POS=as.integer(str_split(as.character(variant), "_", simplify = T)[,2]), 
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))
+
+# Extract "BP" from the first column by splitting at "_"
+positions <- sapply(strsplit(as.character(SNPGWAS_data[[1]]), "_"), function(x) x[2])
+
+# Get significance threshold
+p_threshold_SNPGWAS <- 0.05/nrow(SNPGWAS_data)
+
+# Construct final data frame
+out_df <- data.frame(
+  CHR = 1,
+  SNP = ".",
+  BP = as.numeric(positions),
+  P = as.numeric(SNPGWAS_data$lrt.pvalue),
+  r2 = 0
+)
+
+# Prepare annotations
+SNPGWAS_ann_sub <- SNPGWAS_data %>%
+  filter(lrt.pvalue < p_threshold_SNPGWAS) %>%
+  separate(
+    notes, 
+    into = c("contig_position", "upstream", "gene_in", "downstream"), 
+    sep = ";", 
+    remove = FALSE, 
+    fill = "right"
+  ) %>%
+  group_by(gene_in) %>%
+  slice_min(lrt.pvalue, n = 1, with_ties = FALSE) %>%  
+  ungroup()
+
+# Manhattan Plot
+# SNPGWAS_manplot <- manhattan(
+#   out_df,
+#   ylim = c(0, 4) ,
+#   chr = "CHR",
+#   bp = "BP",
+#   pval = "P", 
+#   snp = "SNP",
+#   main = "Manhattan Plot of SNP-GWAS\n Population Structure Controlled w/: FastTree (LMM)",
+#   col = "skyblue",
+#   genomewideline = -log10(p_threshold_SNPGWAS), 
+#   suggestiveline = F, 
+#   annotatePval = 0.01)
+
+SNPGWAS_manplot <- ggplot(SNPGWAS_data, aes(x=POS, y=-log10(lrt.pvalue))) +
+  geom_point(aes(color=OR_pos), alpha=0.8, size=1.3) +
+  scale_color_manual(values= c("skyblue", "orange"))+
+  scale_y_continuous(expand = c(0, 0) ) +
+  theme_bw()+
+  theme(
+    legend.title = element_blank(), 
+    panel.border = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    plot.title = element_text(face = "bold", hjust = 0.5)
+  ) +
+  labs(
+    x = "Genomic Position (Start)",
+    y = expression(-log[10](italic(p))),
+    title = "SNPGWAS Manhattan Plot with Significant Hits Annotated"
+  ) +
+  geom_hline(yintercept = -log10(p_threshold_SNPGWAS), color="red", lty="dashed") 
+
+
+SNPGWAS_manplot_5_95 <- ggplot(SNPGWAS_data |> filter(af>=0.05, af <0.95), 
+                               aes(x=POS, y=-log10(lrt.pvalue))) +
+  geom_point(aes(color=OR_pos), alpha=0.8, size=1.3) +
+  scale_color_manual(values= c("skyblue", "orange"))+
+  scale_y_continuous(expand = c(0, 0) ) +
+  theme_bw()+
+  theme(
+    legend.title = element_blank(), 
+    panel.border = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    plot.title = element_text(face = "bold", hjust = 0.5)
+  ) +
+  labs(
+    x = "Genomic Position (Start)",
+    y = expression(-log[10](italic(p))),
+    title = "SNPGWAS Manhattan Plot with Significant Hits Annotated"
+  ) +
+  geom_hline(yintercept = -log10(0.05/nrow(SNPGWAS_data|> filter(af>=0.05, af <0.95))), color="red", lty="dashed") 
+
+
+# QQ plot 
+# SNPGWAS_qqplot <- qq(out_df$P)
+# Construct final data frame
+
+SNPGWAS_qqplot <- data.frame(expected= (-log10(ppoints(length(SNPGWAS_data |> pull(lrt.pvalue))))), 
+                             observed=(-log10(sort(SNPGWAS_data |> pull(lrt.pvalue))))) |>
+  ggplot(aes(x = expected, y = observed)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, color="red", lty="dashed") +
+  xlim(0, 8) +          # change x axis limits here
+  ylim(0, 8) +          # and y axis limits if desired
+  labs(
+    x = "-log10(Expected P)",
+    y = "-log10(Observed P)",
+    title = "SNPGWAS QQ plot"
+  ) +
+  theme_minimal()
+
+SNPGWAS_qqplot_5_95 <- data.frame(expected= (-log10(ppoints(length(SNPGWAS_data|> filter(af>=0.05, af <0.95) |> pull(lrt.pvalue))))), 
+                             observed=(-log10(sort(SNPGWAS_data |> filter(af>=0.05, af <0.95)|> pull(lrt.pvalue))))) |>
+  ggplot(aes(x = expected, y = observed)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, color="red", lty="dashed") +
+  xlim(0, 8) +          # change x axis limits here
+  ylim(0, 8) +          # and y axis limits if desired
+  labs(
+    x = "-log10(Expected P)",
+    y = "-log10(Observed P)",
+    title = "SNPGWAS QQ plot"
+  ) +
+  theme_minimal()
+
+```
+
+
+# DB-GWAS
+```{r}
+data_DBGWAS <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_CDC/15.1.Main_analysis/DBGWAS_Fasttree_LMM.txt", sep = "\t", header=T) |> filter(af >=0.05, af <0.95)
+
+data_DBGWAS_annotations <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_CDC/15.1.Main_analysis/DBGWAS_Fasttree_LMM_annotation.txt", sep = "\t", header=F)
+colnames(data_DBGWAS_annotations) <- colnames(data_DBGWAS)
+data_DBGWAS_annotations <- data_DBGWAS_annotations |> filter(af >=0.05, af <0.95)
+
+# Split the annotation column
+
+# Extract contig/chromosome
+data_DBGWAS_annotations <- data_DBGWAS_annotations |>
+  mutate(coord_range = str_extract(notes, "(?<=:)[0-9]+-[0-9]+"),
+         start = as.integer(str_extract(coord_range, "^[0-9]+")),
+         end = as.integer(str_extract(coord_range, "(?<=-)[0-9]+")), 
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1")) 
+
+
+
+# Extract "BP" from the first column by splitting at "_"
+positions_DBGWAS_start <- data_DBGWAS_annotations$start
+
+# Get significance threshold
+p_threshold_DBGWAS <- 0.05/nrow(data_DBGWAS_annotations)
+
+# Construct final data frame
+out_df_DBGWAS <- data.frame(
+  CHR = 1,
+  SNP = ".",
+  BP = as.numeric(positions_DBGWAS_start),
+  P= data_DBGWAS_annotations$lrt.pvalue,
+  r2 = 0
+)
+
+ann_sub <- data_DBGWAS_annotations %>%
+  filter(lrt.pvalue < p_threshold_DBGWAS) %>%
+  separate(
+    notes, 
+    into = c("contig_position", "upstream", "gene_in", "downstream"), 
+    sep = ";", 
+    remove = FALSE, 
+    fill = "right"
+  ) %>%
+  group_by(gene_in) %>%
+  slice_min(lrt.pvalue, n = 1, with_ties = FALSE) %>%  
+  ungroup()
+
+# Manhattan Plot
+# manhattan(
+#   out_df_DBGWAS,
+#   ylim = c(0, 12) ,
+#   chr = "CHR",
+#   bp = "BP",
+#   p = "P",  # Use the column with -log10(p-values)
+#   snp = "SNP",
+#   main = "Manhattan Plot of DBGWAS\n Population Structure Controlled w/: FastTree (LMM)",
+#   col = "skyblue", 
+#   genomewideline = -log10(p_threshold_DBGWAS),  
+#   suggestiveline =F, 
+#   annotatePval =  -log10(p_threshold_DBGWAS)
+# )
+DBGWAS_manplot <- ggplot(data_DBGWAS_annotations, aes(x=start, y=-log10(lrt.pvalue))) +
+    # Show all points
+  geom_point(aes(color=OR_pos), alpha=0.8, size=1.3) +
+  scale_color_manual(values= c("skyblue", "orange"))+
+    # custom X axis:
+    scale_y_continuous(expand = c(0, 0) ) +
+  theme_bw()+
+  theme(
+    legend.title = element_blank(), 
+    panel.border = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    plot.title = element_text(face = "bold", hjust = 0.5)
+  ) +
+  labs(
+    x = "Genomic Position (Start)",
+    y = expression(-log[10](italic(p))),
+    title = "DBGWAS Manhattan Plot with Significant Hits Annotated"
+  ) +
+  geom_hline(yintercept = -log10(p_threshold_DBGWAS), color="red", lty="dashed") +
+  geom_label_repel(data=ann_sub, aes(label=gene_in), size=2,min.segment.length = 0.5) 
+
+# QQ plot 
+# qq(out_df_DBGWAS$P)
+
+n <- length(out_df_DBGWAS$P)
+expected <- -log10(ppoints(n))
+observed <- -log10(sort(out_df_DBGWAS$P))
+df <- data.frame(expected, observed)
+
+ggplot(df, aes(x = expected, y = observed)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, color="red", lty="dashed") +
+  xlim(0, 12) +          # change x axis limits here
+  ylim(0, 12) +          # and y axis limits if desired
+  labs(
+    x = "-log10(Expected P)",
+    y = "-log10(Observed P)",
+    title = "QQ plot"
+  ) +
+  theme_minimal()
+
+# Table of significant genes
+gene_hits = read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_CDC/15.1.Main_analysis/gene_hits.txt", stringsAsFactors=FALSE, header=TRUE)
+
+# Plot of sig hits 
+
+gene_hits|>
+  filter(maxp> -log10(p_threshold_DBGWAS))|>
+ggplot(aes(x=avg_beta, y=maxp, colour=avg_maf, size=hits, label=gene)) +
+   geom_point(alpha=0.5) +
+   geom_text_repel(aes(size=60), show.legend = FALSE, colour='black') +
+   scale_size("Number of k-mers", range=c(1,10)) +
+   scale_colour_gradient('Average MAF') +
+   theme_bw(base_size=14) +
+   ggtitle("EOD vs LOD") +
+   xlab("Average effect size") +
+   ylab("Maximum -log10(p-value)")
+
+```
+
+```{r}
+setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_CDC")
+cl_eggnogg <- read.delim("panaroo_annotation.txt", sep = "\t", header=F, comment.char = "#")
+web_eggnogg <- read.delim("web_panaroo_annotations.txt", sep = "\t", header=F, comment.char = "#")
+
+cl_eggnogg |> filter(! V1 %in% web_eggnogg$V1)
+web_eggnogg |> filter(! V1 %in% cl_eggnogg$V1)
+
+web_eggnogg |> filter(V1  cl_eggnogg$V1)
+
+test<- left_join(cl_eggnogg |> select(V1, V7, V8) |> rename("gene"="V1", "cl_COG"="V7", "cl_class"="V8"), 
+          web_eggnogg |> select(V1, V7, V8) |> rename("gene"="V1", "web_COG"="V7", "web_class"="V8"))
+test  |> 
+  select(gene, cl_COG, web_COG)|> 
+  filter(cl_COG != web_COG)
+
+test  |> 
+  mutate(cl_COG = ifelse(cl_COG =="-", "S", cl_COG))|> 
+  mutate(web_COG = ifelse(web_COG =="-", "S", web_COG))|> 
+  filter(cl_COG != web_COG)
+
+web_eggnogg$V8 != cl_eggnogg$V8
+
+nrow(cl_eggnogg)
+nrow(web_eggnogg)+267
+
+```
+

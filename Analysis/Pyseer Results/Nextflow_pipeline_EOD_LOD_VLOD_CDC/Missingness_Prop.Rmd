@@ -1,0 +1,100 @@
+---
+title: "Missingness"
+output: html_document
+date: "2025-10-08"
+---
+
+# 0 Set up environment
+```{r}
+# Clean environment
+rm( list = ls() )
+
+# load libraries
+library(tidyverse)
+```
+
+# Missingness proportion among SNPs
+```{r}
+# Load table
+setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC")
+Missingness_Prop <- read.delim("Missingness_Prop.txt", header=F, sep=" ")
+colnames(Missingness_Prop) <- c("POS", "Missingness_Proportion")
+
+# Set your window size in base pairs
+window_size <- 50000
+
+
+# Create a window index for each row
+Missingness_Prop_binned <- Missingness_Prop |>
+  mutate(window = floor(POS / window_size) * window_size) |>
+  group_by(window) |>
+  summarize(mean_missingness = mean(Missingness_Proportion))
+
+# Plot: one point per window for mean missingness
+ggplot(Missingness_Prop_binned, aes(x = window + window_size/2, y = mean_missingness)) +
+  geom_point() +
+  geom_line() +
+  theme_minimal() +
+  labs(
+    x = "Genomic Position",
+    y = "Mean Missingness per Window",
+    title = paste("Missingness Across Genome (", window_size, "bp windows)", sep="")
+  )
+```
+# N proportion among SNPs
+```{r}
+# Load table
+setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC")
+N_Prop <- read.delim("N_Prop.txt", header=F, sep=" ")
+colnames(N_Prop) <- c("POS", "N_Prop")
+
+# Set your window size in base pairs
+window_size <- 50000
+
+
+# Create a window index for each row
+N_Prop_binned <- N_Prop |>
+  mutate(window = floor(POS / window_size) * window_size) |>
+  group_by(window) |>
+  summarize(mean_missingness = mean(N_Prop))
+
+# Plot: one point per window for mean missingness
+ggplot(N_Prop_binned, aes(x = window + window_size/2, y = mean_missingness)) +
+  geom_point() +
+  geom_line() +
+  theme_minimal() +
+  labs(
+    x = "Genomic Position",
+    y = "Mean N per Window",
+    title = paste("N Across Genome (", window_size, "bp windows)", sep="")
+  )
+```
+
+# Gaps proportion among SNPs
+```{r}
+# Load table
+setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC")
+Gaps_Prop <- read.delim("Gaps_Prop.txt", header=F, sep=" ")
+colnames(Gaps_Prop) <- c("POS", "Gaps_Prop")
+
+# Set your window size in base pairs
+window_size <- 50000
+
+
+# Create a window index for each row
+Gaps_Prop_binned <- Gaps_Prop |>
+  mutate(window = floor(POS / window_size) * window_size) |>
+  group_by(window) |>
+  summarize(mean_missingness = mean(Gaps_Prop))
+
+# Plot: one point per window for mean missingness
+ggplot(Gaps_Prop_binned, aes(x = window + window_size/2, y = mean_missingness)) +
+  geom_point() +
+  geom_line() +
+  theme_minimal() +
+  labs(
+    x = "Genomic Position",
+    y = "Mean Gaps per Window",
+    title = paste("Gaps Across Genome (", window_size, "bp windows)", sep=""))
+```
+

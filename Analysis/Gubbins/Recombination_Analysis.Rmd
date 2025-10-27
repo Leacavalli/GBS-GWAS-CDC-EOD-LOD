@@ -1,0 +1,195 @@
+---
+title: "Recombination_Analysis"
+output: html_document
+date: "2025-10-17"
+---
+
+```{r}
+# Clean environment
+rm( list = ls() )
+
+# load libraries
+library(stringr)
+library(tidyverse)
+library(ggplot2)
+library(ape)
+library(phytools)
+library(ggtree)
+library(khroma)
+
+# Import tree
+setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Phylogenies/EOD_LOD_VLOD_CDC")
+Fasttree_VLOD_DP <- read.tree("Fastree_DP.tre")
+Fasttree_VLOD_DP_mid <- midpoint.root(Fasttree_VLOD_DP)
+
+# Load metadata SCs
+setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC")
+SCs <- read.csv("GBS_GWAS_db_core_clusters.csv") |> rename(Sample=Taxon, SC=Cluster)
+
+# Subset tree by SC
+Fasttree_SC1 <- keep.tip(Fasttree_VLOD_DP_mid, SCs |> filter(SC ==1) |> pull(Sample))
+Fasttree_SC2 <- keep.tip(Fasttree_VLOD_DP_mid, SCs |> filter(SC ==2) |> pull(Sample))
+Fasttree_SC3 <- keep.tip(Fasttree_VLOD_DP_mid, SCs |> filter(SC ==3) |> pull(Sample))
+Fasttree_SC4 <- keep.tip(Fasttree_VLOD_DP_mid, SCs |> filter(SC ==4) |> pull(Sample))
+Fasttree_SC5 <- keep.tip(Fasttree_VLOD_DP_mid, SCs |> filter(SC ==5) |> pull(Sample))
+Fasttree_SC6 <- keep.tip(Fasttree_VLOD_DP_mid, SCs |> filter(SC ==6) |> pull(Sample))
+Fasttree_SC7 <- keep.tip(Fasttree_VLOD_DP_mid, SCs |> filter(SC ==7) |> pull(Sample))
+Fasttree_SC8 <- keep.tip(Fasttree_VLOD_DP_mid, SCs |> filter(SC ==8) |> pull(Sample))
+Fasttree_SC9 <- keep.tip(Fasttree_VLOD_DP_mid, SCs |> filter(SC ==9) |> pull(Sample))
+Fasttree_SC10 <- keep.tip(Fasttree_VLOD_DP_mid, SCs |> filter(SC ==10) |> pull(Sample))
+
+
+# Save SC sample lists 
+setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins")
+write.table(SCs |> filter(SC ==1) |> select(Sample), "SC1_Samples.txt", col.names = F, row.names = F, quote = F )
+write.table(SCs |> filter(SC ==2) |> select(Sample), "SC2_Samples.txt", col.names = F, row.names = F, quote = F )
+write.table(SCs |> filter(SC ==3) |> select(Sample), "SC3_Samples.txt", col.names = F, row.names = F, quote = F )
+write.table(SCs |> filter(SC ==4) |> select(Sample), "SC4_Samples.txt", col.names = F, row.names = F, quote = F )
+write.table(SCs |> filter(SC ==5) |> select(Sample), "SC5_Samples.txt", col.names = F, row.names = F, quote = F )
+write.table(SCs |> filter(SC ==6) |> select(Sample), "SC6_Samples.txt", col.names = F, row.names = F, quote = F )
+write.table(SCs |> filter(SC ==7) |> select(Sample), "SC7_Samples.txt", col.names = F, row.names = F, quote = F )
+write.table(SCs |> filter(SC ==8) |> select(Sample), "SC8_Samples.txt", col.names = F, row.names = F, quote = F )
+write.table(SCs |> filter(SC ==9) |> select(Sample), "SC9_Samples.txt", col.names = F, row.names = F, quote = F )
+write.table(SCs |> filter(SC ==10) |> select(Sample), "SC10_Samples.txt", col.names = F, row.names = F, quote = F )
+```
+
+# recombination-free full tree
+```{r}
+# Load recombination-free tree
+Gubbins_tree <- read.tree("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/Fulltree_nostarttree/gubbins_fulltree_nostarttree.final_tree.tre")
+Gubbins_tree_mid <- midpoint.root(Gubbins_tree)
+
+
+# Load metadata
+SCs <- read.csv("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC/GBS_GWAS_db_core_clusters.csv") |> rename(Sample=Taxon, SC=Cluster)
+
+# Load phenotypes
+setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC")
+phenotypes <- read.table("phenotypes.txt", header=T)
+phenotypes <- phenotypes |>
+  rename(Sample =samples ) |> 
+  mutate(Age_cat = ifelse(continuous<=7, "EOD", 
+                          ifelse(continuous<=89, "LOD", "VLOD")))
+
+# Prep metadata for tree
+fewer5_SC <- which(table(SCs$SC)<=10)
+metadata_tree <- SCs |>
+  mutate(SC2= ifelse(SC %in% fewer5_SC, "other", SC))|>
+  mutate(SC2= factor(SC2, level=c(1:14, "other")))|> 
+  rename("label" = "Sample")|> 
+  filter(label %in% Gubbins_tree_mid$tip.label)
+
+# Join metadata and tree 
+Gubbins_tree_mid_metadata <- full_join(keep.tip(Gubbins_tree_mid, metadata_tree$label), metadata_tree , by = 'label')
+
+# Prepare colors for phylo
+SC_colors <- c("#dbdb8d", "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd","#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf", "#f7b6d2",  "#c5b0d5", "#c49c94", "black")
+
+# SC tips
+Gubbins_tree_p1 <- ggtree(Gubbins_tree_mid_metadata, ladderize = T, lwd=0.1) + 
+  geom_tippoint(aes(color=as.factor(SC2)),size=1.5)+
+  scale_colour_manual(name="SC", values=SC_colors)
+Gubbins_tree_p1
+```
+
+# Get Recombination to point mutation rate
+```{r}
+# Load Branch statistics
+Fulltree_branch_stats <-  read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/Fulltree/gubbins_fulltree_nostarttree.per_branch_statistics.csv")
+SC1_branch_stats <-  read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/SC1/gubbins_SC1_out.per_branch_statistics.csv")
+SC2_branch_stats <-  read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/SC2/gubbins_SC2_out.per_branch_statistics.csv")
+SC3_branch_stats <-  read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/SC3/gubbins_SC3_out.per_branch_statistics.csv")
+SC4_branch_stats <-  read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/SC4/gubbins_SC4_out.per_branch_statistics.csv")
+SC5_branch_stats <-  read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/SC5/gubbins_SC5_out.per_branch_statistics.csv")
+SC6_branch_stats <-  read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/SC6/gubbins_SC6_out.per_branch_statistics.csv")
+SC7_branch_stats <-  read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/SC7/gubbins_SC7_out.per_branch_statistics.csv")
+SC8_branch_stats <-  read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/SC8/gubbins_SC8_out.per_branch_statistics.csv")
+SC9_branch_stats <-  read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/SC9/gubbins_SC9_out.per_branch_statistics.csv")
+SC10_branch_stats <-  read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/SC10/gubbins_SC10_out.per_branch_statistics.csv")
+
+# Overall  r.m 
+# r.m = Number.of.SNPs.Inside.Recombinations/Number.of.SNPs.Outside.Recombination
+Fulltree_r.m <- round(sum(Fulltree_branch_stats$Number.of.SNPs.Inside.Recombinations)/sum(Fulltree_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
+SC1_r.m <- round(sum(SC1_branch_stats$Number.of.SNPs.Inside.Recombinations)/sum(SC1_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
+SC2_r.m <- round(sum(SC2_branch_stats$Number.of.SNPs.Inside.Recombinations)/sum(SC2_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
+SC3_r.m <- round(sum(SC3_branch_stats$Number.of.SNPs.Inside.Recombinations)/sum(SC3_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
+SC4_r.m <- round(sum(SC4_branch_stats$Number.of.SNPs.Inside.Recombinations)/sum(SC4_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
+SC5_r.m <- round(sum(SC5_branch_stats$Number.of.SNPs.Inside.Recombinations)/sum(SC5_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
+SC6_r.m <- round(sum(SC6_branch_stats$Number.of.SNPs.Inside.Recombinations)/sum(SC6_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
+SC7_r.m <- round(sum(SC7_branch_stats$Number.of.SNPs.Inside.Recombinations)/sum(SC7_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
+SC8_r.m <- round(sum(SC8_branch_stats$Number.of.SNPs.Inside.Recombinations)/sum(SC8_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
+SC9_r.m <- round(sum(SC9_branch_stats$Number.of.SNPs.Inside.Recombinations)/sum(SC9_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
+SC10_r.m <- round(sum(SC10_branch_stats$Number.of.SNPs.Inside.Recombinations)/sum(SC10_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
+
+# Overall  rho.theta 
+# rho.theta = Number.of.Recombination.Blocks/Number.of.SNPs.Outside.Recombination
+Fulltree_rho.theta <- round(sum(Fulltree_branch_stats$Number.of.Recombination.Blocks)/sum(Fulltree_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
+SC1_rho.theta <- round(sum(SC1_branch_stats$Number.of.Recombination.Blocks)/sum(SC1_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
+SC2_rho.theta <- round(sum(SC2_branch_stats$Number.of.Recombination.Blocks)/sum(SC2_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
+SC3_rho.theta <- round(sum(SC3_branch_stats$Number.of.Recombination.Blocks)/sum(SC3_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
+SC4_rho.theta <- round(sum(SC4_branch_stats$Number.of.Recombination.Blocks)/sum(SC4_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
+SC5_rho.theta <- round(sum(SC5_branch_stats$Number.of.Recombination.Blocks)/sum(SC5_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
+SC6_rho.theta <- round(sum(SC6_branch_stats$Number.of.Recombination.Blocks)/sum(SC6_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
+SC7_rho.theta <- round(sum(SC7_branch_stats$Number.of.Recombination.Blocks)/sum(SC7_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
+SC8_rho.theta <- round(sum(SC8_branch_stats$Number.of.Recombination.Blocks)/sum(SC8_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
+SC9_rho.theta <- round(sum(SC9_branch_stats$Number.of.Recombination.Blocks)/sum(SC9_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
+SC10_rho.theta <- round(sum(SC10_branch_stats$Number.of.Recombination.Blocks)/sum(SC10_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
+
+
+# Put results together
+df_r.m_rho.theta <- data.frame(SC = c("Fulltree", paste0("SC", 1:10)), 
+           r.m = c(Fulltree_r.m, SC1_r.m,SC2_r.m,SC3_r.m,SC4_r.m,SC5_r.m,SC6_r.m,SC7_r.m,SC8_r.m,SC9_r.m,SC10_r.m), 
+           rho.theta = c(Fulltree_rho.theta,SC1_rho.theta,SC2_rho.theta,SC3_rho.theta,SC4_rho.theta,SC5_rho.theta,SC6_rho.theta,SC7_rho.theta,SC8_rho.theta,SC9_rho.theta,SC10_rho.theta))
+df_r.m_rho.theta
+```
+
+
+# 
+```{r}
+# Load Branch statistics
+recomb_predictions <- read.gff("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/Fulltree/gubbins_fulltree_nostarttree.recombination_predictions.gff", na.strings = c(".", "?"), GFF3 = TRUE)
+
+(recomb_predictions) 
+
+
+
+recomb_predictions |> 
+  ggplot()+
+  geom_histogram(aes(x= start), bins =500)+
+  geom_line(aes(x= start), bins =500)+
+  theme_classic()
+  
+
+
+# Create bins and compute counts
+binned <- recomb_predictions |> 
+  mutate(bin = cut(start, breaks = 100)) |> 
+  group_by(bin) |>
+  summarise(count = n(), 
+            start = mean(start, na.rm=TRUE)) # mean position for each bin
+
+ggplot() +
+  geom_histogram(data = recomb_predictions, aes(x = start), bins = 500, fill = "grey80", color = "black") +
+  geom_line(data = binned, aes(x = start, y = count), color = "red") +
+  theme_classic()
+
+
+recomb_predictions|> 
+  filter(start %in% 1205397:1207538 | end %in% 1205397:1207538 )
+
+
+recomb_predictions
+
+
+
+```
+
+
+
+```{r}
+# Load VCF
+VCF <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/merged_max5missing.vcf" )
+
+```
+
+

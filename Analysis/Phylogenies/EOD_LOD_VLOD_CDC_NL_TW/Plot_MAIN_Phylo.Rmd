@@ -1,0 +1,161 @@
+---
+title: "Phylo CDC NL TW"
+output: html_document
+date: "2025-10-20"
+---
+
+
+# Set up environment and load data 
+```{r}
+# Clean environment
+rm( list = ls() )
+
+# Load libraries
+library(tidyverse)
+library(phytools)
+library(ape)
+library(treeio)
+library(ggtree)
+library(ggplot2)
+library(ggnewscale)
+library(RColorBrewer)
+library(cartography)
+library(khroma)
+
+# Import tree
+setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Phylogenies/EOD_LOD_VLOD_CDC_NL_TW")
+Fasttree <- read.tree("FastTree_phylo.tre")
+Fasttree_mid <- midpoint.root(Fasttree)
+
+
+# Load metadata
+serotypes <- read.delim("Serotypes.txt", header=T) |> mutate(GBS.SBG = ifelse(GBS.SBG=="", NA, GBS.SBG)) 
+CCs <- read.csv("combined_results_with_cc.txt") |> dplyr::select(Sample, clonal_complex)
+SCs <- read.csv("GBS_GWAS_db_core_clusters.csv") |> rename(Sample=Taxon, SC=Cluster)
+STs <- read.delim("ST_results.txt") |>
+  mutate(ST2 = str_remove(str_remove(ST,"\\*"),"\\?"))
+
+
+# Load phenotypes
+phenotypes <- read.table("phenotypes_filtered.txt", header=T)
+phenotypes <- phenotypes |>
+  rename(Sample =samples ) |> 
+  mutate(Age_cat = ifelse(binary==0, "EOD", "LOD/VLOD"))
+
+# Prep metadata for tree
+typing_data <- left_join(left_join(left_join(left_join(serotypes, CCs ), SCs), phenotypes), (STs |> dplyr::select(Sample, ST, ST2)))
+fewer5_SC <- which(table(typing_data$SC)<=10)
+metadata_tree <- typing_data |>
+  mutate(SC2= ifelse(SC %in% fewer5_SC, "other", SC))|>
+  mutate(SC2= factor(SC2, level=c(1:14, "other")))|>
+  mutate(Serotype2 = str_remove(str_remove(GBS.SBG,"\\*"),"\\?"))|>
+  mutate(Serotype2 = ifelse(grepl("III-", Serotype2), "III", Serotype2))|>
+  mutate(Serotype2 = factor(Serotype2, levels=c("Ia", "Ib","II", "III", "IV", "V","VI","VII","VIII", "IX")))|> 
+  rename("label" = "Sample")|> 
+  filter(label %in% Fasttree_mid$tip.label)
+
+# Fix missing CCs
+ref_ST_cc_df <- rbind(unique(metadata_tree|> filter(!grepl("\\*", ST), !grepl("\\?", ST)) |> dplyr::select(ST, clonal_complex)), 
+                       data.frame(ST= c(1750, 2107, 137, 1809, 235, 482, 1946, 2106, 234),
+                                  clonal_complex=c("cc17", "cc17", "cc17", "cc23", "cc1", "cc17", "cc17", "cc19", "cc23")))
+
+# Load CDC and NL accessions
+library(xlsx)
+NL_metadata <- read.xlsx("~/GitHub/GBS-GWAS-CDC-EOD-LOD/0.Raw_data/Netherlands_Sanger_metadata.xlsx", 1) 
+NL_accessions <- NL_metadata |> pull(ENA.lane.accession)
+CDC_metadata <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC/phenotypes.txt", header=T) 
+CDC_accessions <- CDC_metadata |> pull(samples)
+
+
+# Join tree with metadata
+metadata_tree_v0 <- unique(left_join(metadata_tree |> dplyr::select(-clonal_complex), ref_ST_cc_df |> rename(ST2=ST)) |> 
+  mutate(clonal_complex = case_when(
+    label == "SRR29440471" ~ "cc19",
+    label == "SRR29458952" ~ "cc17",
+    label == "SRR29459527" ~ "cc1",
+    label == "SRR29476238" ~ "c459",
+    label == "SRR29480489" ~ "cc17",
+    label == "SRR29489178" ~ "cc17",
+    label == "SRR29489593" ~ "cc1",
+    label == "SRR29489703" ~ "cc19",
+    label == "SRR29506764" ~ "cc19",
+    label == "SRR29506975" ~ "cc19",
+    label == "SRR29508494" ~ "cc1",
+    label == "SRR31502751" ~ "cc452",
+    label == "SRR5063593" ~ "cc19",
+    label == "ERR1659749" ~ "cc19",
+    label == "SRR23753882" ~ "cc17",
+    label == "SRR23754097" ~ "cc17",
+    TRUE ~ clonal_complex # keep existing value for all others
+  )) |> 
+  mutate(clonal_complex = ifelse(ST2 %in% c(4,16,103, 130, 255, 929, 932, 1553, 1559,1580, 1606), "No_CC", clonal_complex))) |> 
+  mutate(Country= ifelse(label %in% NL_accessions, "Netherlands", ifelse(label %in% CDC_accessions, "USA", "Taiwan")))
+
+
+# Join metadata and tree 
+Fasttree_mid_metadata <- full_join(keep.tip(Fasttree_mid, metadata_tree_v0$label), metadata_tree_v0 , by = 'label')
+
+
+# Prepare heatmap data for phylo
+## Serotype
+Metadata_Serotype = metadata_tree_v0 |> dplyr::select(Serotype2)
+row.names(Metadata_Serotype) <-  metadata_tree_v0$label
+colnames(Metadata_Serotype)= c("1")
+## CC
+Metadata_CC= metadata_tree_v0 |> dplyr::select(clonal_complex)
+row.names(Metadata_CC) <-  metadata_tree_v0$label
+colnames(Metadata_CC)= c("2")
+## Age category
+Metadata_Age_cat= metadata_tree_v0|> dplyr::select(Age_cat)
+row.names(Metadata_Age_cat) <-  metadata_tree_v0$label
+colnames(Metadata_Age_cat)= c("3")
+## Country
+Metadata_Country = metadata_tree_v0 |> dplyr::select(Country)
+row.names(Metadata_Country) <-  metadata_tree_v0$label
+colnames(Metadata_Country)= c("4")
+
+
+# Prepare colors for phylo
+SC_colors <- c("#dbdb8d", "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd","#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf", "#f7b6d2",  "#c5b0d5", "#c49c94", "black")
+Serotype_colors <- c(color("muted")(9),"#D55E00" , "grey")
+names(Serotype_colors) <- levels(Metadata_Serotype[,1])
+CC_colors <- carto.pal(pal1 = "pastel.pal" ,n1 = 13)
+Age_cat_colors <- c("#004488", "#DDAA33", "#BB5566")
+
+# # Save clean version of data
+# setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Phylogenies/EOD_LOD_VLOD_CDC")
+# write.csv(metadata_tree_v0 |> 
+#   dplyr::select(-GBS.SBG, -SC2, -ST)|>
+#   rename(Serotype = Serotype2, 
+#          ST = ST2), "Clean_Typing_data.csv", quote = F, row.names = F)
+```
+
+# Plot Fasttre full aln tree (double precision)
+```{r}
+# SC tips
+Fasttre_full_sp_p1 <- ggtree(Fasttree_mid_metadata, ladderize = T, lwd=0.1) + 
+  geom_tippoint(aes(color=as.factor(SC2)),size=1.5)+
+  scale_colour_manual(name="SC", values=SC_colors)
+
+# Serotype
+Fasttre_full_sp_p2 <- gheatmap(Fasttre_full_sp_p1 + new_scale_fill(), Metadata_Serotype ,  width=0.15, offset=0.0005, 
+               font.size = 5, colnames_offset_y = -10, color=NA)+
+  scale_fill_manual(values = Serotype_colors, name="1: Serotype")
+
+# CCs
+Fasttre_full_sp_p3 <- gheatmap(Fasttre_full_sp_p2 + new_scale_fill(), Metadata_CC,  width=0.15, offset=0.005,
+               font.size = 5, colnames_offset_y = -10, color=NA)+
+  scale_fill_manual(values = CC_colors, name="2: CC")
+
+#  Age category
+Fasttre_full_sp_p4 <- gheatmap(Fasttre_full_sp_p3 + new_scale_fill(), Metadata_Age_cat,  width=0.15, offset=0.01,
+               font.size = 5, colnames_offset_y = -10, color=NA)+
+  scale_fill_manual(values = Age_cat_colors, name="3: Age of Onset")
+
+#  Country
+Fasttre_full_sp_p5 <- gheatmap(Fasttre_full_sp_p4 + new_scale_fill(), Metadata_Country,  width=0.15, offset=0.015,
+               font.size = 5, colnames_offset_y = -10, color=NA)+
+  scale_fill_manual(values = c("orange", "red", "#1f77b4"), name="4: Country")
+
+Fasttre_full_sp_p5
+```
