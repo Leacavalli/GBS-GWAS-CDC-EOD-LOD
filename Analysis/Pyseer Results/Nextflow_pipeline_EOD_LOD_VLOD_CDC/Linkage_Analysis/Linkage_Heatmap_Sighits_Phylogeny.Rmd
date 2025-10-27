@@ -27,18 +27,24 @@ library(khroma)
 # PLot phylogeny 
 ```{r}
 # Import tree
-setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Phylogenies/EOD_LOD_VLOD_CDC")
-Fasttree_VLOD_DP <- read.tree("Fastree_DP.tre")
-Fasttree_VLOD_DP_mid <- midpoint.root(Fasttree_VLOD_DP)
+setwd("/Users/ruchita/Documents/Harvard/Lab/CDC/GBS GWAS/")
+tr  <- read.tree("GBS_GWAS_FastTree_phylo_rooted_GAS.tre")
+OUT <- grep("SRR32569359", tr$tip.label, value = TRUE)[1]
+if (!is.null(tr$root.edge)) tr$root.edge <- NULL
+if (!is.na(OUT) && OUT %in% tr$tip.label) tr <- drop.tip(tr, OUT)
+tr <- phangorn::midpoint(tr)
+tr <- ladderize(tr, right = TRUE)
+
+
 
 # Load metadata
-setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC")
+setwd("/Users/ruchita/Documents/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC")
 serotypes <- read.table("Serotypes.txt", header=T)
 CCs <- read.csv("combined_results_with_cc.txt")
 SCs <- read.csv("GBS_GWAS_db_core_clusters.csv") |> rename(Sample=Taxon, SC=Cluster)
 
 # Load phenotypes
-setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC")
+setwd("/Users/ruchita/Documents/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC")
 phenotypes <- read.table("phenotypes.txt", header=T)
 phenotypes <- phenotypes |>
   rename(Sample =samples ) |> 
@@ -54,10 +60,10 @@ metadata_tree_v0 <- typing_data |>
   mutate(Serotype2 = ifelse(grepl("III-", Serotype2), "III", Serotype2))|>
   mutate(Serotype2 = factor(Serotype2, levels=c("Ia", "Ib","II", "III", "IV", "V","VI", "VIII")))|> 
   rename("label" = "Sample")|> 
-  filter(label %in% Fasttree_VLOD_DP_mid$tip.label)
+  filter(label %in% tr$tip.label)
 
 # Join metadata and tree 
-Fasttree_VLOD_DP_mid_metadata <- full_join(keep.tip(Fasttree_VLOD_DP_mid, metadata_tree_v0$label), metadata_tree_v0 , by = 'label')
+Fasttree_VLOD_DP_mid_metadata <- full_join(keep.tip(tr, metadata_tree_v0$label), metadata_tree_v0 , by = 'label')
 
 
 # Prepare heatmap data for phylo
@@ -76,7 +82,18 @@ colnames(Metadata_Age_cat)= c("3")
 
 # Prepare colors for phylo
 SC_colors <- c("#dbdb8d", "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd","#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf", "#f7b6d2",  "#c5b0d5", "#c49c94", "black")
-Serotype_colors <- c(color("muted")(9),"#D55E00" , "grey")
+sero_lvls <- levels(Metadata_Serotype[,1])
+
+Serotype_colors <- c(
+  "Ia"   = "#0072B2",  # blue
+  "Ib"   = "#E69F00",  # orange
+  "II"   = "#009E73",  # bluish green
+  "III"  = "#D55E00",  # vermillion
+  "IV"   = "#CC79A7",  # reddish purple
+  "V"    = "#56B4E9",  # sky blue
+  "VI"   = "#F0E442",  # yellow
+  "VIII" = "#999999"   # gray (avoid black since SC uses it)
+)[sero_lvls]           # reorder to your factor levels
 names(Serotype_colors) <- levels(Metadata_Serotype[,1])
 CC_colors <- carto.pal(pal1 = "pastel.pal" ,n1 = 12)
 Age_cat_colors <- c("#004488", "#DDAA33", "#BB5566")
@@ -92,10 +109,32 @@ Fasttre_p1_noleg <-  ggtree(Fasttree_VLOD_DP_mid_metadata, ladderize = T, lwd=0.
 # Serotype
 Fasttre_p2 <- gheatmap(Fasttre_p1 + new_scale_fill(), Metadata_Serotype ,  width=0.15, offset=0.0005, 
                font.size = 5, colnames_offset_y = -50, color=NA)+
-  scale_fill_manual(values = Serotype_colors, name="1: Serotype")
+scale_fill_manual(
+  values = Serotype_colors,
+  name   = "1: Serotype",
+  breaks = names(Serotype_colors),  # keep order
+  drop   = FALSE,
+  guide  = guide_legend(
+    ncol = 2, byrow = TRUE,         # <- 2 columns = easier to read
+    keyheight = unit(3, "mm"),
+    keywidth  = unit(6, "mm"),
+    title.position = "top"
+  )
+)
 Fasttre_p2_leg <- gheatmap(Fasttre_p1_noleg + new_scale_fill(), Metadata_Serotype ,  width=0.15, offset=0.0005, 
                font.size = 5, colnames_offset_y = -10, color=NA)+
-  scale_fill_manual(values = Serotype_colors, name="1: Serotype")
+  scale_fill_manual(
+  values = Serotype_colors,
+  name   = "1: Serotype",
+  breaks = names(Serotype_colors),  # keep order
+  drop   = FALSE,
+  guide  = guide_legend(
+    ncol = 2, byrow = TRUE,         # <- 2 columns = easier to read
+    keyheight = unit(3, "mm"),
+    keywidth  = unit(6, "mm"),
+    title.position = "top"
+  )
+)
 
 # CCs
 Fasttre_p3 <- gheatmap(Fasttre_p2 + new_scale_fill(), Metadata_CC,  width=0.15, offset=0.005,
@@ -112,10 +151,183 @@ Fasttre_p4 <- gheatmap(Fasttre_p3 + new_scale_fill(), Metadata_Age_cat,  width=0
 Fasttre_p4
 Fasttre_p4_leg <- gheatmap(Fasttre_p1_noleg + new_scale_fill(), Metadata_Age_cat,  width=0.15, offset=0.01,
                font.size = 5, colnames_offset_y = -10, color=NA)+
-  scale_fill_manual(values = Age_cat_colors, name="3: Age of Onset")
+  scale_fill_manual(values = Age_cat_colors, name="3: Age of Onset") + theme_update(
+  legend.position    = "bottom",
+  legend.box         = "vertical",
+  legend.title       = element_text(size = 9),
+  legend.text        = element_text(size = 8),
+  legend.key.height  = unit(3, "mm"),
+  legend.key.width   = unit(6, "mm")
+)
 
+ggsave(
+  filename = file.path(
+    "/Users/ruchita/Documents/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC",
+    paste0("phylo_SC", sc, ".pdf")
+  ),
+  plot = Fasttre_p4_leg,
+  width = 7.5,
+  height = 5.2,
+  units = "in",
+  device = "pdf"   # ← simple and reliable
+)
 
 ```
+
+SC Specific Phylogenies
+
+```{r}
+## ---- packages ----
+library(ape)
+library(phangorn)
+library(ggplot2)
+library(ggtree)
+library(ggnewscale)
+library(dplyr)
+library(stringr)
+library(readr)
+library(RColorBrewer)   # for CC palette
+
+## ---- I/O paths ----
+setwd("/Users/ruchita/Documents/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC")
+tr  <- read.tree("GBS_GWAS_FastTree_phylo_rooted_GAS.tre")
+
+# root/drop outgroup, midpoint, ladderize
+OUT <- grep("SRR32569359", tr$tip.label, value = TRUE)[1]
+if (!is.null(tr$root.edge)) tr$root.edge <- NULL
+if (!is.na(OUT) && OUT %in% tr$tip.label) tr <- drop.tip(tr, OUT)
+tr <- phangorn::midpoint(tr)
+tr <- ladderize(tr, right = TRUE)
+
+## ---- metadata ----
+setwd("/Users/ruchita/Documents/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC")
+serotypes <- read.table("Serotypes.txt", header=TRUE)
+CCs       <- read.csv("combined_results_with_cc.txt")
+SCs       <- read.csv("GBS_GWAS_db_core_clusters.csv") |>
+  rename(Sample = Taxon, SC = Cluster)
+phenotypes <- read.table("phenotypes.txt", header=TRUE) |>
+  rename(Sample = samples) |>
+  mutate(Age_cat = ifelse(continuous <= 7, "EOD",
+                   ifelse(continuous <= 89, "LOD", "VLOD")))
+
+typing_data <- serotypes |>
+  left_join(CCs, by = "Sample") |>
+  left_join(SCs, by = "Sample") |>
+  left_join(phenotypes, by = "Sample")
+
+# tidy serotype labels
+typing_data <- typing_data |>
+  mutate(
+    Serotype2 = str_remove(str_remove(GBS.SBG, "\\*"), "\\?"),
+    Serotype2 = ifelse(grepl("III-", Serotype2), "III", Serotype2),
+    Serotype2 = factor(Serotype2,
+                       levels = c("Ia","Ib","II","III","IV","V","VI","VIII"))
+  )
+
+# keep samples present in the tree
+typing_data <- typing_data |>
+  rename(label = Sample) |>
+  filter(label %in% tr$tip.label)
+
+## ---- define "main SCs" ----
+# treat "main" as SCs with >5 isolates (change the threshold if you truly want the top 14)
+sc_counts <- table(typing_data$SC)
+main_SCs  <- names(sc_counts[sc_counts > 5])
+main_SCs  <- sort(as.integer(main_SCs))  # pretty ordering
+
+# If you explicitly want exactly 14 SCs regardless of size, uncomment:
+# main_SCs <- sort(as.integer(names(sort(sc_counts, decreasing = TRUE)[1:14])))
+
+## ---- palettes ----
+# Serotype (Okabe–Ito; color-blind friendly)
+Serotype_colors <- c(
+  "Ia"   = "#0072B2", "Ib"   = "#E69F00", "II"   = "#009E73",
+  "III"  = "#D55E00", "IV"   = "#CC79A7", "V"    = "#56B4E9",
+  "VI"   = "#F0E442", "VIII" = "#999999"
+)
+
+# CC palette (Pastel1 has 9; expand with Set3 to reach 12+ if needed)
+CC_colors <- c(brewer.pal(9, "Pastel1"),
+               brewer.pal(12, "Set3"))[1:12]
+names(CC_colors) <- sort(unique(typing_data$clonal_complex))[seq_along(CC_colors)]
+
+## ---- helper: build one plot for an SC ----
+plot_sc <- function(sc_id) {
+  dat_sc <- typing_data |> filter(SC == sc_id)
+
+  # prune tree to tips in this SC
+  tr_sc  <- keep.tip(tr, dat_sc$label)
+
+  # CC heatmap data
+  meta_cc <- dat_sc |> select(clonal_complex)
+  rownames(meta_cc) <- dat_sc$label
+  colnames(meta_cc) <- "CC"
+
+  # which serotypes are present here?
+  present_sero <- levels(droplevels(dat_sc$Serotype2))
+  sero_cols_present <- Serotype_colors[present_sero]
+
+  # base tree – tips colored by Serotype; legend shows only present serotypes
+  p <- ggtree(tr_sc, ladderize = TRUE, lwd = 0.1) +
+    geom_tippoint(aes(color = dat_sc$Serotype2[match(label, dat_sc$label)]),
+                  size = 1.8) +
+    scale_color_manual(
+      values = sero_cols_present,
+      breaks = present_sero,   # legend only for serotypes in this SC
+      name   = "Serotype"
+    ) +
+    guides(color = guide_legend(
+      ncol = 2, byrow = TRUE, title.position = "top",
+      override.aes = list(size = 3)  # nicer legend dots
+    )) +
+    theme(
+      legend.position = "bottom",
+      legend.box = "vertical",
+      legend.title = element_text(size = 9),
+      legend.text  = element_text(size = 8)
+    ) +
+    ggtree::vexpand(.12, -1)  # a bit less right padding since CC is closer
+
+  # add ONLY CC heatmap, closer to the tips (smaller offset)
+  p <- gheatmap(p + new_scale_fill(), meta_cc,
+                width = 0.10, offset = 0.0015,   # <-- closer than before
+                font.size = 5, colnames_offset_y = -18, color = NA) +
+    scale_fill_manual(
+      values = CC_colors, name = "1: CC",
+      guide = guide_legend(title.position = "top")
+    )
+
+  p + ggtitle(paste0("SC ", sc_id))
+}
+
+
+## ---- build + save all ----
+plots_by_sc <- lapply(main_SCs, function(sc) {
+  message("Making plot for SC ", sc)
+  p <- plot_sc(sc)
+  
+  # Print each plot so you can view it interactively
+  print(p)
+  
+  # Save each plot to your specified folder
+ggsave(
+  filename = file.path(
+    "/Users/ruchita/Documents/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC",
+    paste0("phylo_SC", sc, ".pdf")
+  ),
+  plot = p,
+  width = 7.5,
+  height = 5.2,
+  units = "in",
+  device = "pdf"   # ← simple and reliable
+)
+  
+  p  # keep it in the list
+})
+
+names(plots_by_sc) <- paste0("SC_", main_SCs)
+```
+
 
 
 # 1. Main Analysis
