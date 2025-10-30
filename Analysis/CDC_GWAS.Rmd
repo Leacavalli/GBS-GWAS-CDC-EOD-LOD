@@ -1,0 +1,1471 @@
+---
+title: "CDC GWAS"
+output: html_document
+date: "2025-06-05"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load libraries
+
+```{r}
+library(dplyr)
+library(ggplot2)
+```
+
+
+Load data
+```{r}
+age <- read.table("agedays.txt", header = TRUE)
+age <- as.data.frame(age)
+
+
+age$disease_onset <- ifelse(age$AGEDYS < 7, "EOD",
+                      ifelse(age$AGEDYS <= 89, "LOD", "VLOD"))
+
+age_NL <- read.table("phenotypes_NL_EOD_LOD.txt",header = TRUE)
+age_TW <- read.table("phenotypes_tw.txt",header = TRUE)
+
+
+```
+
+Distribution of age
+
+```{r}
+
+ggplot(age, aes(x = AGEDYS)) +
+  geom_histogram(binwidth = 7, fill = "skyblue", color = "black") +
+  geom_vline(xintercept = c(7, 90, 365), color = "red", linetype = "dashed", size = 1) +
+  labs(title = "Age Distribution", x = "Age in Days", y = "Count") +
+  theme_minimal()
+
+ggplot(age, aes(x = disease_onset)) +
+  geom_bar(fill = "steelblue") +
+  theme_minimal() +
+  labs(title = "Number of Cases by Disease Onset",
+       x = "Disease Onset",
+       y = "Number of Cases")
+
+
+```
+
+Combined dataset EOD LOD plots
+
+```{r}
+# Recode and label age_NL
+age_NL <- age_NL %>%
+  mutate(disease_onset = ifelse(binary == 0, "EOD", "LOD"),
+         region = "Netherlands")
+
+# Recode and label age_TW
+age_TW <- age_TW %>%
+  mutate(disease_onset = ifelse(binary == 0, "EOD", "LOD"),
+         region = "Taiwan")
+
+# Label age (assumes it already has a disease_onset column)
+age <- age %>%
+  mutate(region = "CDC ABCs")
+
+# Bind all dataframes
+combined_age <- bind_rows(age, age_NL, age_TW)
+
+ggplot(combined_age, aes(x = disease_onset, fill = disease_onset)) +
+  geom_bar(width = 0.7, color = "black") +
+  facet_wrap(~ region) +
+  scale_fill_manual(values = c("EOD" = "#4DAF4A", "LOD" = "#377EB8", "VLOD" = "#E41A1C")) +
+  theme_minimal(base_size = 14) +
+  theme(
+    strip.text = element_text(face = "bold", size = 16),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    legend.position = "none",
+    panel.grid.major.x = element_blank()
+  ) +
+  labs(
+    title = "Number of Cases by Disease Onset Across Regions",
+    x = "Disease Onset",
+    y = "Number of Cases"
+  )
+```
+
+CDC Site of Isolation
+
+```{r}
+isolation <- read.table("column8_counts.txt")
+isolation <- isolation[-1,]
+
+iso_df <- do.call(rbind, strsplit(isolation, ",")) |> as.data.frame()
+colnames(iso_df) <- c("Site of Isolation", "Count") 
+
+iso_df$Count <- as.numeric(as.character(iso_df$Count))
+
+iso_df <- iso_df[order(iso_df$Count, decreasing = TRUE), ]
+
+# Plot
+
+
+ggplot(iso_df, aes(x = reorder(`Site of Isolation`, Count), y = Count, fill = `Site of Isolation`)) +
+  geom_bar(stat = "identity", color = "black", width = 0.7) +
+  coord_flip() +
+  scale_fill_brewer(palette = "Set3") +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "none",
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 14, face = "bold"),
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    panel.grid.major.y = element_blank()
+  ) +
+  labs(
+    title = "CDC ABCs Sample Counts by Isolation Site",
+    x = "Site of Isolation",
+    y = "Number of Samples"
+  )
+
+```
+
+Collection Date for CDC, Taiwan, Netheralnds 
+
+
+```{r}
+
+taiwan_md <- read.csv("Taiwan_metadata.csv", header = TRUE)
+netherlands_md <- read.csv("Netherlands_metadata.csv", header = TRUE)
+
+tw_year_df <- as.data.frame(table(taiwan_md$Collection_Date))
+colnames(tw_year_df) <- c("Year", "Count")
+
+
+nl_year_df <- as.data.frame(table(netherlands_md$Year.of.sampling))
+colnames(nl_year_df) <- c("Year", "Count")
+
+
+
+cdc_year <- read.table("column5_counts.txt")
+cdc_year <- cdc_year[-1,]
+
+cdc_year_df <- do.call(rbind, strsplit(cdc_year, ",")) |> as.data.frame()
+colnames(cdc_year_df) <- c("Year", "Count") 
+
+cdc_year_df$Count <- as.numeric(as.character(cdc_year_df$Count))
+
+
+# Add source labels
+cdc_year_df <- cdc_year_df %>%
+  mutate(Source = "CDC ABCs")
+
+nl_year_df <- nl_year_df %>%
+  mutate(Source = "Netherlands")
+
+tw_year_df <- tw_year_df %>%
+  mutate(Source = "Taiwan")
+
+# Combine all into one dataframe
+combined_df <- bind_rows(cdc_year_df, nl_year_df, tw_year_df)
+
+# Ensure Year is treated as a factor for discrete x-axis, or numeric for continuous
+combined_df$Year <- as.factor(combined_df$Year)
+
+# Plot
+ggplot(combined_df, aes(x = Year, y = Count, fill = Source)) +
+  geom_col(width = 0.7, color = "black") +
+  scale_y_continuous(expand = c(0, 0)) +
+  theme_minimal(base_size = 14) +
+  labs(
+    title = "Sample Counts by Year Across Regions",
+    x = "Year",
+    y = "Number of Samples",
+    fill = "Region"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "bottom",
+    legend.title = element_text(size = 13),
+    legend.text = element_text(size = 12)
+  ) +
+  scale_fill_brewer(palette = "Set2")
+
+
+```
+
+Serotype distribution across dataframes (CDC, NL, TW)
+
+
+```{r}
+cdc_st <- read.table("column9_counts.txt")
+cdc_st <- cdc_st[-1,]
+
+cdc_st_df <- do.call(rbind, strsplit(cdc_st, ",")) |> as.data.frame()
+colnames(cdc_st_df) <- c("Serotype", "Count") 
+
+cdc_st_df$Count <- as.numeric(as.character(cdc_st_df$Count))
+
+tw_st_df <- data.frame(
+  Serotype = c("IA", "IB", "II", "III","V","VI","VII"),
+  Count = c(104,22,7,147,10,10,1)
+)
+
+nl_st_df <- data.frame(
+  Serotype = c("IA","IB","II","III","IV","V","VI","VII","IX","NT"),
+  Count = c(260,84,74,815,29,63,5,2,4,2)
+)
+
+
+# Add source labels
+cdc_st_df <- cdc_st_df %>%
+  mutate(Source = "CDC ABCs")
+
+nl_st_df <- nl_st_df %>%
+  mutate(Source = "Netherlands")
+
+tw_st_df <- tw_st_df %>%
+  mutate(Source = "Taiwan")
+
+# Combine all into one dataframe
+combined_df <- bind_rows(cdc_st_df, nl_st_df, tw_st_df)
+
+# Ensure Year is treated as a factor for discrete x-axis, or numeric for continuous
+combined_df$Serotype <- as.factor(combined_df$Serotype)
+
+# Plot
+ggplot(combined_df, aes(x = Serotype, y = Count, fill = Source)) +
+  geom_col(width = 0.7, color = "black", show.legend = FALSE) +
+  facet_wrap(~ Source, scales = "free_y") +
+  theme_minimal(base_size = 14) +
+  scale_y_continuous(limits = c(0, 1000), expand = c(0, 0)) +
+  labs(title = "Sample Counts by Serotype Across Regions",
+       x = "Serotype",
+       y = "Number of Samples") +
+  theme(
+    strip.text = element_text(size = 16, face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  ) +
+  scale_fill_brewer(palette = "Set2")
+
+```
+
+PanGWAS Results 
+
+Pipeline 1
+
+CDC_EOD_LOD 
+
+```{r}
+#Panaroo eggnog annotations
+panaroo_eggnog <- read.table("EOD_LOD_CDC_panaroo.annotations", 
+                             header = FALSE, sep = "\t", fill = TRUE)
+
+colnames(panaroo_eggnog)[1] <- "variant"
+#Roary eggnog annotations 
+
+roary_eggnog <- read.table("EOD_LOD_CDC_roary.annotations", 
+                             header = FALSE, sep = "\t", fill = TRUE)
+
+#Panaroo pyseer results
+panaroo_pyseer <- read.table("PanGWAS_Panaroo_Fasttree_EOD_LOD_CDC.txt", 
+                             header = TRUE, sep = "\t", fill = TRUE)
+
+alpha_bon_panaroo <- 0.05/nrow(panaroo_pyseer)
+#Roary pyseer results 
+roary_pyseer <- read.table("PanGWAS_Roary_Fasttree_EOD_LOD_CDC.txt", 
+                             header = TRUE, sep = "\t", fill = TRUE)
+
+alpha_bon_roary <- 0.05/nrow(roary_pyseer)
+
+
+#Functional distribution of significant panaroo cogs
+
+sig_hits_panaroo <- panaroo_pyseer[panaroo_pyseer$lrt.pvalue < alpha_bon_panaroo, ]
+
+matching_annotations_panaroo <- merge(sig_hits_panaroo, panaroo_eggnog[, c(1, 7)], by = "variant")
+colnames(matching_annotations_panaroo)[9] <- "Functional Group" #not all hits where in panaroo_eggnog
+
+#Functional distribution of significant roary cogs
+
+sig_hits_roary <- roary_pyseer[roary_pyseer$lrt.pvalue < alpha_bon_roary, ] #some significant but idk how to compare to eggnog results 
+
+
+
+
+```
+
+
+Pipeline 2
+
+CDC_EOD_LOD_VLOD 
+
+```{r}
+
+#Panaroo eggnog annotations
+panaroo_eggnog <- read.table("EOD_LOD_VLOD_CDC_panaroo.annotations", 
+                             header = FALSE, sep = "\t", fill = TRUE)
+
+colnames(panaroo_eggnog)[1] <- "variant"
+#Roary eggnog annotations 
+
+roary_eggnog <- read.table("EOD_LOD_VLOD_CDC_roary.annotations", 
+                             header = FALSE, sep = "\t", fill = TRUE)
+
+#Panaroo pyseer results
+panaroo_pyseer <- read.table("PanGWAS_Panaroo_Fasttree_EOD_LOD_VLOD_CDC.txt", 
+                             header = TRUE, sep = "\t", fill = TRUE)
+
+alpha_bon_panaroo <- 0.05/nrow(panaroo_pyseer)
+#Roary pyseer results 
+roary_pyseer <- read.table("PanGWAS_Roary_Fasttree_EOD_LOD_VLOD_CDC.txt", 
+                             header = TRUE, sep = "\t", fill = TRUE)
+
+alpha_bon_roary <- 0.05/nrow(roary_pyseer)
+
+#Functional distribution of significant panaroo cogs
+
+# Filter for significant COGs
+sig_hits_panaroo <- panaroo_pyseer[panaroo_pyseer$lrt.pvalue < alpha_bon_panaroo, ]
+
+matching_annotations_panaroo <- merge(sig_hits_panaroo, panaroo_eggnog[, c(1, 7)], by = "variant")
+colnames(matching_annotations_panaroo)[9] <- "Functional Group" # different distribution of cogs? 
+
+#Functional distribution of significant roary cogs
+
+sig_hits_roary <- roary_pyseer[roary_pyseer$lrt.pvalue < alpha_bon_roary, ] #none were significant 
+
+
+```
+
+Pipeline 3
+
+CDC_NL_EOD_LOD_VLOD 
+
+```{r}
+#Panaroo eggnog annotations
+panaroo_eggnog <- read.table("EOD_LOD_VLOD_CDC_NL_panaroo.annotations", 
+                             header = FALSE, sep = "\t", fill = TRUE)
+
+colnames(panaroo_eggnog)[1] <- "variant"
+#Roary eggnog annotations 
+
+roary_eggnog <- read.table("EOD_LOD_VLOD_CDC_NL_roary.annotations", 
+                             header = FALSE, sep = "\t", fill = TRUE)
+
+#Panaroo pyseer results
+panaroo_pyseer <- read.table("PanGWAS_Panaroo_Fasttree_EOD_LOD_VLOD_CDC_NL.txt", 
+                             header = TRUE, sep = "\t", fill = TRUE)
+
+alpha_bon_panaroo <- 0.05/nrow(panaroo_pyseer)
+#Roary pyseer results 
+roary_pyseer <- read.table("PanGWAS_Roary_Fasttree_EOD_LOD_VLOD_CDC_NL.txt", 
+                             header = TRUE, sep = "\t", fill = TRUE)
+
+alpha_bon_roary <- 0.05/nrow(roary_pyseer)
+
+#Functional distribution of significant panaroo cogs
+
+# Filter for significant COGs
+sig_hits_panaroo <- panaroo_pyseer[panaroo_pyseer$lrt.pvalue < alpha_bon_panaroo, ]
+
+matching_annotations_panaroo <- merge(sig_hits_panaroo, panaroo_eggnog[, c(1, 7)], by = "variant")
+colnames(matching_annotations_panaroo)[9] <- "Functional Group" # different distribution of cogs? 
+
+#Functional distribution of significant roary cogs
+
+sig_hits_roary <- roary_pyseer[roary_pyseer$lrt.pvalue < alpha_bon_roary, ] #none were significant 
+
+
+```
+Panaroo Vs CLARC Sub analysis results 
+
+Pipeline 1 
+
+CDC_EOD_LOD
+
+```{r}
+
+#Panaroo pyseer results
+panaroo_pyseer <- read.table("PanGWAS_Panaroo_Fasttree_EOD_LOD_CDC.txt", 
+                             header = TRUE, sep = "\t", fill = TRUE)
+
+#Panaroo + CLARC  pyseer results
+panaroo_pyseer_CLARC <- read.table("PanGWAS_Panaroo_CLARC_Fasttree_EOD_LOD_CDC.txt", 
+                             header = TRUE, sep = "\t", fill = TRUE)
+
+
+#Bonferonni Correction (Did we do clarc right?)
+alpha_bon_panaroo <- 0.05/nrow(panaroo_pyseer)
+
+
+alpha_bon_panaroo_CLARC <- 0.05/nrow(panaroo_pyseer_CLARC)
+
+
+sig_hits_panaroo <- panaroo_pyseer[panaroo_pyseer$lrt.pvalue < alpha_bon_panaroo, ]
+
+
+sig_hits_panaroo_CLARC <- panaroo_pyseer_CLARC[panaroo_pyseer_CLARC$lrt.pvalue < alpha_bon_panaroo_CLARC, ]
+
+
+```
+
+Pipeline 2 
+
+CDC_EOD_LOD_VLOD
+
+```{r}
+
+#Panaroo pyseer results
+panaroo_pyseer <- read.table("PanGWAS_Panaroo_Fasttree_EOD_LOD_VLOD_CDC.txt", 
+                             header = TRUE, sep = "\t", fill = TRUE)
+
+#Panaroo + CLARC  pyseer results
+panaroo_pyseer_CLARC <- read.table("PanGWAS_Panaroo_CLARC_Fasttree_EOD_LOD_VLOD_CDC.txt", 
+                             header = TRUE, sep = "\t", fill = TRUE)
+
+
+#Bonferonni Correction (Did we do clarc right?)
+alpha_bon_panaroo <- 0.05/nrow(panaroo_pyseer)
+
+
+alpha_bon_panaroo_CLARC <- 0.05/nrow(panaroo_pyseer_CLARC)
+
+
+sig_hits_panaroo <- panaroo_pyseer[panaroo_pyseer$lrt.pvalue < alpha_bon_panaroo, ]
+
+
+sig_hits_panaroo_CLARC <- panaroo_pyseer_CLARC[panaroo_pyseer_CLARC$lrt.pvalue < alpha_bon_panaroo_CLARC, ]
+
+```
+
+Pipeline 3
+
+CDC_EOD_LOD_VLOD_NL
+
+```{r}
+
+#Panaroo pyseer results
+panaroo_pyseer <- read.table("PanGWAS_Panaroo_Fasttree_EOD_LOD_VLOD_CDC_NL.txt", 
+                             header = TRUE, sep = "\t", fill = TRUE)
+
+#Panaroo + CLARC  pyseer results
+panaroo_pyseer_CLARC <- read.table("PanGWAS_Panaroo_CLARC_Fasttree_EOD_LOD_VLOD_CDC_NL.txt", 
+                             header = TRUE, sep = "\t", fill = TRUE)
+
+
+#Bonferonni Correction (Did we do clarc right?)
+alpha_bon_panaroo <- 0.05/nrow(panaroo_pyseer)
+
+
+alpha_bon_panaroo_CLARC <- 0.05/nrow(panaroo_pyseer_CLARC)
+
+
+sig_hits_panaroo <- panaroo_pyseer[panaroo_pyseer$lrt.pvalue < alpha_bon_panaroo, ]
+
+
+sig_hits_panaroo_CLARC <- panaroo_pyseer_CLARC[panaroo_pyseer_CLARC$lrt.pvalue < alpha_bon_panaroo_CLARC, ]
+
+```
+
+
+Roary Vs CLARC Sub analysis results 
+
+Pipeline 1 
+
+CDC_EOD_LOD
+
+```{r}
+
+#roary pyseer results
+roary_pyseer <- read.table("PanGWAS_Roary_Fasttree_EOD_LOD_CDC.txt", 
+                             header = TRUE, sep = "\t", fill = TRUE)
+
+#roary + CLARC  pyseer results
+roary_pyseer_CLARC <- read.table("PanGWAS_Roary_CLARC_Fasttree_EOD_LOD_CDC.txt", 
+                             header = TRUE, sep = "\t", fill = TRUE)
+
+
+#Bonferonni Correction (Did we do clarc right?)
+alpha_bon_roary <- 0.05/nrow(roary_pyseer)
+
+
+alpha_bon_roary_CLARC <- 0.05/nrow(roary_pyseer_CLARC)
+
+
+sig_hits_roary <- roary_pyseer[roary_pyseer$lrt.pvalue < alpha_bon_roary, ]
+
+
+sig_hits_roary_CLARC <- roary_pyseer_CLARC[roary_pyseer_CLARC$lrt.pvalue < alpha_bon_roary_CLARC, ]
+
+
+```
+
+Pipeline 2 
+
+CDC_EOD_LOD_VLOD
+
+```{r}
+
+
+#roary pyseer results
+roary_pyseer <- read.table("PanGWAS_Roary_Fasttree_EOD_LOD_VLOD_CDC.txt", 
+                             header = TRUE, sep = "\t", fill = TRUE)
+
+#roary + CLARC  pyseer results
+roary_pyseer_CLARC <- read.table("PanGWAS_Roary_CLARC_Fasttree_EOD_LOD_VLOD_CDC.txt", 
+                             header = TRUE, sep = "\t", fill = TRUE)
+
+
+#Bonferonni Correction (Did we do clarc right?)
+alpha_bon_roary <- 0.05/nrow(roary_pyseer)
+
+
+alpha_bon_roary_CLARC <- 0.05/nrow(roary_pyseer_CLARC)
+
+
+sig_hits_roary <- roary_pyseer[roary_pyseer$lrt.pvalue < alpha_bon_roary, ]
+
+
+sig_hits_roary_CLARC <- roary_pyseer_CLARC[roary_pyseer_CLARC$lrt.pvalue < alpha_bon_roary_CLARC, ]
+
+```
+
+Pipeline 3
+
+CDC_EOD_LOD_VLOD_NL
+
+```{r}
+
+#Panaroo pyseer results
+roary_pyseer <- read.table("PanGWAS_Roary_Fasttree_EOD_LOD_VLOD_CDC_NL.txt", 
+                             header = TRUE, sep = "\t", fill = TRUE)
+
+#Panaroo + CLARC  pyseer results
+roary_pyseer_CLARC <- read.table("PanGWAS_Roary_CLARC_Fasttree_EOD_LOD_VLOD_CDC_NL.txt", 
+                             header = TRUE, sep = "\t", fill = TRUE)
+
+
+#Bonferonni Correction (Did we do clarc right?)
+alpha_bon_roary <- 0.05/nrow(roary_pyseer)
+
+
+alpha_bon_roary_CLARC <- 0.05/nrow(roary_pyseer_CLARC)
+
+
+sig_hits_roary <- roary_pyseer[roary_pyseer$lrt.pvalue < alpha_bon_roary, ]
+
+
+sig_hits_roary_CLARC <- roary_pyseer_CLARC[roary_pyseer_CLARC$lrt.pvalue < alpha_bon_roary_CLARC, ]
+
+```
+
+QQ Plots
+
+Pipeline 1
+
+CDC_EOD_LOD
+
+```{r}
+
+# Load necessary library
+library(qqman)
+
+# Read in the Pyseer output
+panaroo_pyseer <- read.table("PanGWAS_Panaroo_Fasttree_EOD_LOD_CDC.txt", 
+                             header = TRUE, sep = "\t", fill = TRUE)
+
+# Extract p-values (use 'lrt-pvalue' or 'filter-pvalue')
+pvals <- panaroo_pyseer$lrt.pvalue  # or use pyseer_results$filter.pvalue
+
+# Remove NA or invalid values
+pvals <- pvals[!is.na(pvals) & pvals > 0 & pvals <= 1]
+
+# QQ plot
+qq(pvals, main = "QQ Plot of Pyseer Pan-GWAS P-values Panaroo EOD LOD CDC",xlim = c(0, 10),ylim = c(0,10))
+
+```
+
+```{r}
+
+# Load necessary library
+library(qqman)
+
+# Read in the Pyseer output
+roary_pyseer <- read.table("PanGWAS_Roary_Fasttree_EOD_LOD_CDC.txt", 
+                             header = TRUE, sep = "\t", fill = TRUE)
+
+# Extract p-values (use 'lrt-pvalue' or 'filter-pvalue')
+pvals <- panaroo_pyseer$lrt.pvalue  # or use pyseer_results$filter.pvalue
+
+# Remove NA or invalid values
+pvals <- pvals[!is.na(pvals) & pvals > 0 & pvals <= 1]
+
+# QQ plot
+qq(pvals, main = "QQ Plot of Pyseer Pan-GWAS P-values Roary EOD LOD CDC",xlim = c(0, 10),ylim = c(0,10))
+
+```
+Pipeline 1
+
+CDC_EOD_LOD_VLOD
+
+```{r}
+
+# Load necessary library
+library(qqman)
+
+# Read in the Pyseer output
+panaroo_pyseer <- read.table("PanGWAS_Panaroo_Fasttree_EOD_LOD_VLOD_CDC.txt", 
+                             header = TRUE, sep = "\t", fill = TRUE)
+
+# Extract p-values (use 'lrt-pvalue' or 'filter-pvalue')
+pvals <- panaroo_pyseer$lrt.pvalue  # or use pyseer_results$filter.pvalue
+
+# Remove NA or invalid values
+pvals <- pvals[!is.na(pvals) & pvals > 0 & pvals <= 1]
+
+# QQ plot
+qq(pvals, main = "QQ Plot of Pyseer Pan-GWAS P-values Panaroo EOD LOD VLOD CDC",xlim = c(0, 10),ylim = c(0,10))
+
+```
+
+```{r}
+
+# Load necessary library
+library(qqman)
+
+# Read in the Pyseer output
+roary_pyseer <- read.table("PanGWAS_Roary_Fasttree_EOD_LOD_VLOD_CDC.txt", 
+                             header = TRUE, sep = "\t", fill = TRUE)
+
+# Extract p-values (use 'lrt-pvalue' or 'filter-pvalue')
+pvals <- panaroo_pyseer$lrt.pvalue  # or use pyseer_results$filter.pvalue
+
+# Remove NA or invalid values
+pvals <- pvals[!is.na(pvals) & pvals > 0 & pvals <= 1]
+
+# QQ plot
+qq(pvals, main = "QQ Plot of Pyseer Pan-GWAS P-values Roary EOD LOD VLOD CDC",xlim = c(0, 10), ylim = c(0,10))
+
+```
+Pipeline 3
+
+CDC NL EOD LOD VLOD 
+
+```{r}
+
+# Load necessary library
+library(qqman)
+
+# Read in the Pyseer output
+panaroo_pyseer <- read.table("PanGWAS_Panaroo_Fasttree_EOD_LOD_VLOD_CDC_NL.txt", 
+                             header = TRUE, sep = "\t", fill = TRUE)
+
+# Extract p-values (use 'lrt-pvalue' or 'filter-pvalue')
+pvals <- panaroo_pyseer$lrt.pvalue  # or use pyseer_results$filter.pvalue
+
+# Remove NA or invalid values
+pvals <- pvals[!is.na(pvals) & pvals > 0 & pvals <= 1]
+
+# QQ plot
+qq(pvals, main = "QQ Plot of Pyseer Pan-GWAS P-values Panaroo EOD LOD VLOD CDC NL",xlim = c(0, 10),ylim = c(0,10))
+
+```
+
+```{r}
+
+# Load necessary library
+library(qqman)
+
+# Read in the Pyseer output
+roary_pyseer <- read.table("PanGWAS_Roary_Fasttree_EOD_LOD_VLOD_CDC_NL.txt", 
+                             header = TRUE, sep = "\t", fill = TRUE)
+
+# Extract p-values (use 'lrt-pvalue' or 'filter-pvalue')
+pvals <- panaroo_pyseer$lrt.pvalue  # or use pyseer_results$filter.pvalue
+
+# Remove NA or invalid values
+pvals <- pvals[!is.na(pvals) & pvals > 0 & pvals <= 1]
+
+# QQ plot
+qq(pvals, main = "QQ Plot of Pyseer Pan-GWAS P-values Roary EOD LOD VLOD CDC NL",xlim = c(0, 10), ylim = c(0,10))
+
+```
+
+Pipeline 1 IQTree Visualization core tree file 
+
+ST Tips 
+
+```{r}
+library(ggtree)
+library(treeio)
+library(tidyverse)
+
+# Load the tree
+tree <- read.tree("core_tree.treefile")
+
+# Load your metadata file (CSV or TSV) with sample names and CC/ST info
+# Make sure the first column is the tip label (e.g., SampleID), and columns for CC and/or ST
+metadata <- read.table("ST.txt", sep = "\t", header = FALSE, fill = TRUE, comment.char = "")
+colnames(metadata) <- c("SampleID","ST")
+
+# Assuming metadata has a column 'SampleID' and either 'CC' or 'ST'
+tree_data <- full_join(as_tibble(tree), metadata, by = c("label" = "SampleID"))
+
+# Color by ST
+ggtree(tree) %<+% metadata +
+  geom_tippoint(aes(color = ST), size = 2) +
+  theme_tree2() +
+  labs(color = "Sequence Type")
+
+
+
+```
+
+Serotype tips 
+
+```{r}
+library(ggtree)
+library(treeio)
+library(tidyverse)
+
+# Load the tree
+tree <- read.tree("core_tree.treefile")
+
+# Load your metadata file (CSV or TSV) with sample names and CC/ST info
+# Make sure the first column is the tip label (e.g., SampleID), and columns for CC and/or ST
+metadata <- read.table("Serotype.txt", sep = "\t", header = FALSE, fill = TRUE, comment.char = "")
+colnames(metadata) <- c("SampleID","Serotype")
+
+# Assuming metadata has a column 'SampleID' and either 'CC' or 'ST'
+tree_data <- full_join(as_tibble(tree), metadata, by = c("label" = "SampleID"))
+
+# Color by ST
+ggtree(tree) %<+% metadata +
+  geom_tippoint(aes(color = Serotype), size = 2) +
+  theme_tree2() +
+  labs(color = "Serotype")
+
+
+
+```
+
+EOD/LOD tips 
+
+```{r}
+library(ggtree)
+library(treeio)
+library(tidyverse)
+
+# Load the tree
+tree <- read.tree("core_tree.treefile")
+
+# Load your metadata file (CSV or TSV) with sample names and CC/ST info
+# Make sure the first column is the tip label (e.g., SampleID), and columns for CC and/or ST
+metadata <- read.table("phenotypes_CDC_EOD_LOD_VLOD.txt", sep = "\t", header = FALSE, fill = TRUE, comment.char = "")
+colnames(metadata) <- c("SampleID","EOD","Continuous")
+
+# Assuming metadata has a column 'SampleID' and either 'CC' or 'ST'
+tree_data <- full_join(as_tibble(tree), metadata, by = c("label" = "SampleID"))
+
+# Color by ST
+ggtree(tree) %<+% metadata +
+  geom_tippoint(aes(color = EOD), size = 2) +
+  theme_tree2() +
+  labs(color = "EOD/LOD")
+
+```
+
+FastTree Phylogenies 
+
+```{r}
+library(ggtree)
+library(treeio)
+library(tidyverse)
+
+# Load the FastTree-generated tree
+tree <- read.tree("GBS_GWAS_FastTree_phylo.tre")
+
+# Load your metadata
+metadata <- read.table("phenotypes_CDC_EOD_LOD_VLOD.txt", sep = "\t", header = FALSE, fill = TRUE, comment.char = "")
+colnames(metadata) <- c("SampleID", "EOD", "Continuous")
+
+# Merge tree tip labels with metadata
+tree_data <- full_join(as_tibble(tree), metadata, by = c("label" = "SampleID"))
+
+# Plot the tree colored by EOD
+ggtree(tree) %<+% metadata +
+  geom_tippoint(aes(color = EOD), size = 2) +
+  theme_tree2() +
+  labs(color = "EOD/LOD")
+
+```
+Serotypes
+
+```{r}
+library(ggtree)
+library(treeio)
+library(tidyverse)
+
+# Load the tree
+tree <- read.tree("GBS_GWAS_FastTree_phylo.tre")
+
+# Load your metadata file (CSV or TSV) with sample names and CC/ST info
+# Make sure the first column is the tip label (e.g., SampleID), and columns for CC and/or ST
+metadata <- read.table("Serotype.txt", sep = "\t", header = FALSE, fill = TRUE, comment.char = "")
+colnames(metadata) <- c("SampleID","Serotype")
+
+# Assuming metadata has a column 'SampleID' and either 'CC' or 'ST'
+tree_data <- full_join(as_tibble(tree), metadata, by = c("label" = "SampleID"))
+
+# Color by ST
+ggtree(tree) %<+% metadata +
+  geom_tippoint(aes(color = Serotype), size = 2) +
+  theme_tree2() +
+  labs(color = "Serotype")
+
+
+
+```
+ST 
+
+```{r}
+library(ggtree)
+library(treeio)
+library(tidyverse)
+
+# Load the tree
+tree <- read.tree("GBS_GWAS_FastTree_phylo.tred")
+
+# Load your metadata file (CSV or TSV) with sample names and CC/ST info
+# Make sure the first column is the tip label (e.g., SampleID), and columns for CC and/or ST
+metadata <- read.table("ST.txt", sep = "\t", header = FALSE, fill = TRUE, comment.char = "")
+colnames(metadata) <- c("SampleID","ST")
+
+# Assuming metadata has a column 'SampleID' and either 'CC' or 'ST'
+tree_data <- full_join(as_tibble(tree), metadata, by = c("label" = "SampleID"))
+
+# Color by ST
+ggtree(tree) %<+% metadata +
+  geom_tippoint(aes(color = ST), size = 2) +
+  theme_tree2() +
+  labs(color = "Sequence Type")
+
+
+
+```
+SNP Variant Calling Pipeline 1
+
+```{r}
+library(ggplot2)
+library(readr)
+library(dplyr)
+library(forcats)
+
+# Read your per-sample counts
+counts <- read_tsv("snpeff_effect_counts_per_sample.tsv",
+                   col_names = c("sample", "effect", "count"))
+
+# --- Simplify: keep top 10 effect types across all samples ---
+top_effects <- counts %>%
+  group_by(effect) %>%
+  summarise(total = sum(count)) %>%
+  arrange(desc(total)) %>%
+  slice_head(n = 10) %>%
+  pull(effect)
+
+counts_simplified <- counts %>%
+  mutate(effect_grouped = ifelse(effect %in% top_effects, effect, "Other")) %>%
+  group_by(sample, effect_grouped) %>%
+  summarise(count = sum(count), .groups = "drop")
+
+# --- Order effects by overall abundance ---
+effect_order <- counts_simplified %>%
+  group_by(effect_grouped) %>%
+  summarise(total = sum(count)) %>%
+  arrange(desc(total)) %>%
+  pull(effect_grouped)
+
+counts_simplified <- counts_simplified %>%
+  mutate(effect_grouped = factor(effect_grouped, levels = effect_order))
+
+# --- Plot ---
+p <- ggplot(counts_simplified, aes(x = sample, y = count, fill = effect_grouped)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Top SnpEff Variant Effects per Sample",
+       x = "Sample", y = "Variant Count", fill = "Effect Type") +
+  theme_minimal(base_size = 14) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        legend.position = "right")
+p
+
+```
+
+Rooted Fasttree phylogeny 
+
+Rooting checks 
+
+```{r}
+
+# install.packages("ape") # if needed
+library(ape)
+
+f <- "GBS_GWAS_FastTree_phylo_rooted_GAS.tre"
+tr <- read.tree(f)
+
+# 1) Is the tree marked as rooted?
+is.rooted(tr)
+
+# 2) Is your outgroup tip present?
+"SRR32569359" %in% tr$tip.label
+
+# 3) Does rooting on SRR32569359 change anything? (It shouldn't if already rooted correctly)
+tr_check <- root(tr, outgroup = "SRR32569359", resolve.root = TRUE)
+all.equal.phylo(tr, tr_check)   # should be TRUE (or nearly TRUE)
+
+# 4) Is SRR32569359 sister to all others? (clade size should be 1)
+mrca_node <- getMRCA(tr, c("SRR32569359", setdiff(tr$tip.label, "SRR32569359")[1]))
+# The MRCA of outgroup + any other tip should be the root node if correctly rooted:
+mrca_node == Nnode(tr) + 1
+
+```
+
+```{r}
+library(ape)
+library(ggtree)
+library(ggplot2)
+library(dplyr)
+library(phangorn)
+
+# --- inputs ---
+tree_file  <- "GBS_GWAS_FastTree_phylo_rooted_GAS.tre"
+pheno_file <- "phenotypes_CDC_EOD_LOD_VLOD.txt"
+out_pattern <- "SRR32569359"  # pattern matching your GAS/outgroup tip
+
+# --- read tree & drop outgroup ---
+tr  <- read.tree(tree_file)
+OUT <- grep(out_pattern, tr$tip.label, value = TRUE)[1]
+
+# Remove any stored root-edge stub (just a visual thing)
+if (!is.null(tr$root.edge)) tr$root.edge <- NULL
+
+# Drop the outgroup tip if present
+if (!is.na(OUT) && OUT %in% tr$tip.label) {
+  tr <- drop.tip(tr, OUT)
+}
+
+# Midpoint-root and tidy
+tr <- phangorn::midpoint(tr)
+tr <- ladderize(tr, right = TRUE)
+
+# --- read phenotypes & build annotation for remaining tips ---
+ph <- read.table(pheno_file, header = TRUE, stringsAsFactors = FALSE)
+# your file has 3 cols; you keep 1 & 2 and rename
+ph <- ph[, -3]
+colnames(ph) <- c("accession", "pheno")
+
+# keep only tips that remain after dropping OUT
+ph <- ph[ph$accession %in% tr$tip.label, , drop = FALSE]
+
+anno <- data.frame(label = tr$tip.label) %>%
+  left_join(ph, by = c("label" = "accession")) %>%
+  mutate(group = ifelse(pheno == 0, "EOD",
+                 ifelse(!is.na(pheno), "LOD/VLOD", NA)))  # NA for missing
+
+# --- plot: fan layout, colored tips ---
+p <- ggtree(tr, layout = "fan", open.angle = 120) %<+% anno +
+  geom_tippoint(aes(color = group), size = 0.8, stroke = 0) +
+  scale_color_manual(
+    values = c("EOD" = "#377eb8", "LOD/VLOD" = "#e41a1c"),
+    na.value = "grey70",
+    name = "Phenotype"
+  ) +
+  theme_tree2() +
+  ggtitle("GBS FastTree (OUT dropped; midpoint-rooted; colored by EOD vs LOD/VLOD)") +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        legend.position = "right")
+
+print(p)
+
+
+```
+
+
+
+```{r}
+library(ape)
+library(ggtree)
+library(dplyr)
+library(ggplot2)
+
+tree_file  <- "GBS_GWAS_FastTree_phylo_rooted_GAS.tre"
+pheno_file <- "phenotypes_CDC_EOD_LOD_VLOD.txt"
+
+tr <- read.tree(tree_file)
+
+# remove the stored root edge so ggtree doesn't draw it
+if (!is.null(tr$root.edge)) tr$root.edge <- NULL
+
+ph <- read.table(pheno_file, header = TRUE, stringsAsFactors = FALSE)
+ph <- ph[,-3]
+colnames(ph) <- c("accession", "pheno")
+
+anno <- data.frame(label = tr$tip.label) %>%
+  left_join(ph, by = c("label" = "accession")) %>%
+  mutate(group = ifelse(pheno == 0, "EOD", "LOD/VLOD"))
+
+p <- ggtree(tr, layout = "circular") %<+% anno +
+  geom_tippoint(aes(color = group), size = 0.8, stroke = 0) +
+  scale_color_manual(values = c("EOD" = "#377eb8", "LOD/VLOD" = "#e41a1c")) +
+  theme_tree2() +
+  ggtitle("GBS FastTree rooted on GAS (colored tips)") +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        legend.position = "right")
+
+p
+
+
+
+```
+
+Full Phylogeny for publication
+
+```{r}
+# ---- libraries ----
+library(ape)
+library(ggtree)
+library(ggplot2)
+library(dplyr)
+library(phangorn)
+library(scales)
+
+# ---- inputs ----
+tree_file   <- "GBS_GWAS_FastTree_phylo_rooted_GAS.tre"
+pheno_file  <- "phenotypes_CDC_EOD_LOD_VLOD.txt"
+st_file     <- "ST.txt"
+sero_file   <- "Serotype.txt"
+out_pattern <- "SRR32569359"
+
+# ---- layout settings ----
+heatmap_offset <- 0.006
+heatmap_width  <- 0.12
+tip_size       <- 0.7
+st_top_n       <- 15      # set to NULL to keep all STs
+
+# helper: choose legend grid with spare slots
+calc_grid <- function(k, min_cols = 2L, max_cols = 12L) {
+  if (k <= 1L) return(list(nrow = 1L, ncol = 1L))
+  ncol <- max(min_cols, min(max_cols, k))
+  nrow <- ceiling(k / ncol)
+  if (nrow * ncol <= k) ncol <- min(max_cols, ncol + 1L)
+  list(nrow = nrow, ncol = ncol)
+}
+
+# ---- read tree ----
+tr  <- read.tree(tree_file)
+OUT <- grep(out_pattern, tr$tip.label, value = TRUE)[1]
+if (!is.null(tr$root.edge)) tr$root.edge <- NULL
+if (!is.na(OUT) && OUT %in% tr$tip.label) tr <- drop.tip(tr, OUT)
+tr <- phangorn::midpoint(tr)
+tr <- ladderize(tr, right = TRUE)
+
+# ---- read phenotype ----
+ph <- read.table(pheno_file, header = TRUE, sep = "", stringsAsFactors = FALSE)
+ph <- ph[, 1:2]; colnames(ph) <- c("accession", "pheno")
+ph <- ph %>% mutate(Onset = ifelse(pheno == 0, "EOD", "LOD/VLOD")) %>% select(accession, Onset)
+
+# ---- read ST & Serotype ----
+st_tab   <- read.table(st_file,   header = FALSE, sep = "", stringsAsFactors = FALSE)
+sero_tab <- read.table(sero_file, header = FALSE, sep = "", stringsAsFactors = FALSE)
+colnames(st_tab)   <- c("accession", "ST")
+colnames(sero_tab) <- c("accession", "serotype")
+
+# ---- merge ----
+anno <- data.frame(label = tr$tip.label, stringsAsFactors = FALSE) %>%
+  left_join(ph,      by = c("label" = "accession")) %>%
+  left_join(st_tab,  by = c("label" = "accession")) %>%
+  left_join(sero_tab,by = c("label" = "accession"))
+anno$ST <- as.character(anno$ST)
+
+# ---- collapse rare STs (optional) ----
+if (!is.null(st_top_n)) {
+  st_counts <- table(anno$ST)
+  keep_st   <- names(sort(st_counts, decreasing = TRUE))[seq_len(min(st_top_n, length(st_counts)))]
+  anno$ST   <- ifelse(is.na(anno$ST), NA_character_,
+                      ifelse(anno$ST %in% keep_st, anno$ST, "Other"))
+}
+
+# ---- heatmap data ----
+heat_df <- anno %>% transmute(label, Onset, Serotype = serotype)
+row.names(heat_df) <- heat_df$label
+heat_df <- heat_df[tr$tip.label, c("Onset","Serotype"), drop = FALSE]
+
+# ---- palettes ----
+# ST palette
+st_levels <- sort(unique(na.omit(anno$ST)))
+st_levels <- c(setdiff(st_levels, "Other"), intersect("Other", st_levels))
+st_cols   <- setNames(hue_pal()(length(st_levels)), st_levels)
+if ("Other" %in% names(st_cols)) st_cols["Other"] <- "#7f7f7f"
+
+# heatmap palettes (put Onset first)
+onset_cols  <- c("EOD" = "#1f78b4", "LOD/VLOD" = "#e31a1c")  # strong, opaque
+sero_levels <- sort(unique(na.omit(heat_df$Serotype)))
+sero_cols   <- setNames(hue_pal()(length(sero_levels)), sero_levels)
+heat_cols   <- c(onset_cols, sero_cols)
+
+# legend breaks: force EOD & LOD/VLOD first (side-by-side), then serotypes, then NA if present
+fill_breaks <- c(names(onset_cols), sero_levels)
+fill_breaks <- intersect(names(heat_cols), fill_breaks)
+cg_fill  <- calc_grid(length(fill_breaks), min_cols = 2L, max_cols = 14L)
+
+# ST legend sizing
+cg_color <- calc_grid(length(st_levels), min_cols = 6L, max_cols = 14L)
+
+# ---- tree ----
+p <- ggtree(tr, layout = "rectangular") %<+% anno +
+  geom_tippoint(aes(color = ST), size = tip_size) +
+  scale_color_manual(values = st_cols, na.value = "grey60", name = "ST") +
+  theme_tree2() +
+  ggtitle("GBS phylogeny (tips colored by ST) with onset & serotype heatmap") +
+  theme(
+    plot.title = element_text(hjust = 0.02, face = "bold"),
+    legend.position = "bottom",
+    legend.title = element_text(size = 8),
+    legend.text  = element_text(size = 6),
+    legend.key.size = unit(0.4, "lines"),
+    legend.box = "vertical",
+    legend.spacing.y = unit(1, "pt"),
+    axis.line.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.title.x = element_blank()
+  ) +
+  guides(
+    color = guide_legend(
+      title = "ST",
+      nrow = cg_color$nrow,
+      ncol = cg_color$ncol,
+      byrow = TRUE,
+      override.aes = list(size = 2)
+    )
+  )
+
+# ---- heatmap (SOLID fills; no borders = no “washed out” look) ----
+p_heat <- gheatmap(
+  p, heat_df,
+  offset = heatmap_offset,
+  width  = heatmap_width,
+  color  = NA,           # <— removes tile borders so colors look fully opaque
+  colnames = TRUE,
+  colnames_angle = 90,
+  font.size = 2.8,
+  hjust = 0
+) +
+  scale_fill_manual(values = heat_cols, breaks = fill_breaks, name = NULL) +
+  guides(
+    fill = guide_legend(
+      title = NULL,
+      nrow = cg_fill$nrow,
+      ncol = cg_fill$ncol,  # ensures EOD & LOD/VLOD appear next to each other
+      byrow = TRUE,
+      override.aes = list(size = 2.5)
+    )
+  ) +
+  theme(
+    legend.position = "bottom",
+    legend.text = element_text(size = 6),
+    legend.key.size = unit(0.4, "lines"),
+    legend.box = "vertical"
+  )
+
+print(p_heat)
+```
+Final Figure
+```{r}
+# ---- libraries ----
+library(ape)
+library(ggtree)
+library(ggplot2)
+library(dplyr)
+library(phangorn)
+library(scales)
+
+# ---- inputs ----
+tree_file   <- "GBS_GWAS_FastTree_phylo_rooted_GAS.tre"
+pheno_file  <- "phenotypes_CDC_EOD_LOD_VLOD.txt"
+sero_file   <- "Serotype.txt"
+cc_file     <- "CC_clusters.txt"
+out_pattern <- "SRR32569359"
+
+# ---- layout settings ----
+heatmap_offset <- 0.006
+heatmap_width  <- 0.12
+tip_size       <- 0.7
+
+# helper: legend grid utility
+calc_grid <- function(k, min_cols = 2L, max_cols = 12L) {
+  if (k <= 1L) return(list(nrow = 1L, ncol = 1L))
+  ncol <- max(min_cols, min(max_cols, k))
+  nrow <- ceiling(k / ncol)
+  if (nrow * ncol <= k) ncol <- min(max_cols, ncol + 1L)
+  list(nrow = nrow, ncol = ncol)
+}
+
+# ---- read tree ----
+tr  <- read.tree(tree_file)
+OUT <- grep(out_pattern, tr$tip.label, value = TRUE)[1]
+if (!is.null(tr$root.edge)) tr$root.edge <- NULL
+if (!is.na(OUT) && OUT %in% tr$tip.label) tr <- drop.tip(tr, OUT)
+tr <- phangorn::midpoint(tr)
+tr <- ladderize(tr, right = TRUE)
+
+# ---- read phenotype ----
+ph <- read.table(pheno_file, header = TRUE, sep = "", stringsAsFactors = FALSE)
+ph <- ph[, 1:2]; colnames(ph) <- c("accession", "pheno")
+ph <- ph %>%
+  mutate(Onset = ifelse(pheno == 0, "EOD", "LOD/VLOD")) %>%
+  select(accession, Onset)
+
+# ---- read Serotype & CC ----
+sero_tab <- read.table(sero_file, header = FALSE, sep = "", stringsAsFactors = FALSE)
+colnames(sero_tab) <- c("accession", "Serotype")
+
+cc_tab <- read.table(cc_file, header = FALSE, sep = "", stringsAsFactors = FALSE)
+colnames(cc_tab) <- c("accession", "CC")
+
+# ---- merge ----
+anno <- data.frame(label = tr$tip.label, stringsAsFactors = FALSE) %>%
+  left_join(ph,       by = c("label" = "accession")) %>%
+  left_join(sero_tab, by = c("label" = "accession")) %>%
+  left_join(cc_tab,   by = c("label" = "accession"))
+
+# ---- heatmap data: keep only Onset + CC ----
+heat_df <- anno %>% transmute(label, Onset, CC)
+row.names(heat_df) <- heat_df$label
+heat_df <- heat_df[tr$tip.label, c("Onset", "CC"), drop = FALSE]
+
+# ---- palettes ----
+# Tip color (Serotype)
+sero_levels <- sort(unique(na.omit(anno$Serotype)))
+sero_cols   <- setNames(hue_pal()(length(sero_levels)), sero_levels)
+
+# Heatmap palettes
+onset_cols  <- c("EOD" = "#1f78b4", "LOD/VLOD" = "#e31a1c")
+cc_levels   <- sort(unique(na.omit(heat_df$CC)))
+cc_cols     <- setNames(hue_pal()(length(cc_levels)), cc_levels)
+heat_cols   <- c(onset_cols, cc_cols)
+
+fill_breaks <- c(names(onset_cols), cc_levels)
+fill_breaks <- intersect(names(heat_cols), fill_breaks)
+cg_fill  <- calc_grid(length(fill_breaks), min_cols = 3L, max_cols = 14L)
+
+# ---- tree (tips colored by Serotype) ----
+p <- ggtree(tr, layout = "rectangular") %<+% anno +
+  geom_tippoint(aes(color = Serotype), size = tip_size) +
+  scale_color_manual(values = sero_cols, na.value = "grey60", name = "Serotype") +
+  theme_tree2() +
+  ggtitle("GBS phylogeny (tips colored by Serotype) with Onset / CC heatmap") +
+  theme(
+    plot.title = element_text(hjust = 0.02, face = "bold"),
+    legend.position = "bottom",
+    legend.title = element_text(size = 8),
+    legend.text  = element_text(size = 6),
+    legend.key.size = unit(0.4, "lines"),
+    legend.box = "vertical",
+    legend.spacing.y = unit(1, "pt"),
+    axis.line.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.title.x = element_blank()
+  ) +
+  guides(
+    color = guide_legend(
+      title = "Serotype",
+      nrow = 2,
+      byrow = TRUE,
+      override.aes = list(size = 2)
+    )
+  )
+
+# ---- heatmap (Onset + CC only) ----
+p_heat <- gheatmap(
+  p, heat_df,
+  offset   = heatmap_offset,
+  width    = heatmap_width,
+  color    = NA,
+  colnames = TRUE,
+  colnames_angle = 90,
+  font.size = 2.8,
+  hjust = 0
+) +
+  scale_fill_manual(values = heat_cols, breaks = fill_breaks, name = NULL) +
+  guides(
+    fill = guide_legend(
+      title = NULL,
+      nrow = cg_fill$nrow,
+      ncol = cg_fill$ncol,
+      byrow = TRUE,
+      override.aes = list(size = 2.5)
+    )
+  ) +
+  theme(
+    legend.position = "bottom",
+    legend.text = element_text(size = 6),
+    legend.key.size = unit(0.4, "lines"),
+    legend.box = "vertical"
+  )
+
+print(p_heat)
+
+
+```
+
+Supplementary Figures
+
+```{r}
+# ---- libraries ----
+library(ape)
+library(ggtree)
+library(ggplot2)
+library(dplyr)
+library(phangorn)
+library(scales)
+
+# ---- inputs ----
+tree_file   <- "GBS_GWAS_FastTree_phylo_rooted_GAS.tre"
+pheno_file  <- "phenotypes_CDC_EOD_LOD_VLOD.txt"   # cols: accession, pheno(0/1), onset_days
+sero_file   <- "Serotype.txt"                      # cols: accession, Serotype
+cc_file     <- "CC_clusters.txt"                   # cols: accession, CC
+out_pattern <- "SRR32569359"
+
+# ---- layout settings ----
+heatmap_offset <- 0.006
+heatmap_width  <- 0.14
+tip_size       <- 0.7
+
+# helper: legend grid
+calc_grid <- function(k, min_cols = 2L, max_cols = 12L) {
+  if (k <= 1L) return(list(nrow = 1L, ncol = 1L))
+  ncol <- max(min_cols, min(max_cols, k))
+  nrow <- ceiling(k / ncol)
+  if (nrow * ncol <= k) ncol <- min(max_cols, ncol + 1L)
+  list(nrow = nrow, ncol = ncol)
+}
+
+# ---- read tree ----
+tr  <- read.tree(tree_file)
+OUT <- grep(out_pattern, tr$tip.label, value = TRUE)[1]
+if (!is.null(tr$root.edge)) tr$root.edge <- NULL
+if (!is.na(OUT) && OUT %in% tr$tip.label) tr <- drop.tip(tr, OUT)
+tr <- phangorn::midpoint(tr)
+tr <- ladderize(tr, right = TRUE)
+
+# ---- read phenotype (now using third column = onset days) ----
+# Expect at least 3 columns; keep first 3
+ph_raw <- read.table(pheno_file, header = TRUE, sep = "", stringsAsFactors = FALSE)
+ph     <- ph_raw[, 1:3]
+colnames(ph) <- c("accession", "pheno_bin", "onset_days")
+
+# Make 7-day bins: [0,7), [7,14), ...
+max_days   <- suppressWarnings(max(ph$onset_days, na.rm = TRUE))
+max_days   <- ifelse(is.finite(max_days), max_days, 0)
+breaks     <- seq(0, ceiling((max_days + 1)/7) * 7, by = 7)  # right-open bins
+labels_wk  <- paste0(breaks[-length(breaks)], "\u2013", breaks[-1] - 1, "d")  # e.g., "0–6d"
+ph <- ph %>%
+  mutate(
+    WeekBin = cut(onset_days, breaks = breaks, labels = labels_wk, right = FALSE),
+    WeekBin = addNA(WeekBin)
+  )
+levels(ph$WeekBin)[is.na(levels(ph$WeekBin))] <- "Unknown"
+
+# ---- read Serotype & CC ----
+sero_tab <- read.table(sero_file, header = FALSE, sep = "", stringsAsFactors = FALSE)
+colnames(sero_tab) <- c("accession", "Serotype")
+
+cc_tab <- read.table(cc_file, header = FALSE, sep = "", stringsAsFactors = FALSE)
+colnames(cc_tab) <- c("accession", "CC")
+
+# ---- merge ----
+anno <- data.frame(label = tr$tip.label, stringsAsFactors = FALSE) %>%
+  left_join(ph[, c("accession","WeekBin")], by = c("label" = "accession")) %>%
+  left_join(sero_tab, by = c("label" = "accession")) %>%
+  left_join(cc_tab,   by = c("label" = "accession"))
+
+# ---- heatmap data: WeekBin + CC ----
+heat_df <- anno %>% transmute(label, WeekBin, CC)
+row.names(heat_df) <- heat_df$label
+heat_df <- heat_df[tr$tip.label, c("WeekBin", "CC"), drop = FALSE]
+
+# ---- palettes ----
+# Tips colored by Serotype
+sero_levels <- sort(unique(na.omit(anno$Serotype)))
+sero_cols   <- setNames(hue_pal()(length(sero_levels)), sero_levels)
+
+# Heatmap palettes
+week_levels <- levels(heat_df$WeekBin)
+week_cols   <- setNames(hue_pal()(length(week_levels)), week_levels)
+if ("Unknown" %in% names(week_cols)) week_cols["Unknown"] <- "#bdbdbd"
+
+cc_levels   <- sort(unique(na.omit(heat_df$CC)))
+cc_cols     <- setNames(hue_pal()(length(cc_levels)), cc_levels)
+
+heat_cols   <- c(week_cols, cc_cols)
+fill_breaks <- c(week_levels, cc_levels)
+cg_fill     <- calc_grid(length(fill_breaks), min_cols = 4L, max_cols = 14L)
+
+# ---- tree (tips colored by Serotype) ----
+p <- ggtree(tr, layout = "rectangular") %<+% anno +
+  geom_tippoint(aes(color = Serotype), size = tip_size) +
+  scale_color_manual(values = sero_cols, na.value = "grey60", name = "Serotype") +
+  theme_tree2() +
+  ggtitle("GBS phylogeny (tips colored by Serotype) with 7-day onset bins & CC heatmap") +
+  theme(
+    plot.title = element_text(hjust = 0.02, face = "bold"),
+    legend.position = "bottom",
+    legend.title = element_text(size = 8),
+    legend.text  = element_text(size = 6),
+    legend.key.size = unit(0.4, "lines"),
+    legend.box = "vertical",
+    legend.spacing.y = unit(1, "pt"),
+    axis.line.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.title.x = element_blank()
+  ) +
+  guides(
+    color = guide_legend(
+      title = "Serotype",
+      nrow = 2,
+      byrow = TRUE,
+      override.aes = list(size = 2)
+    )
+  )
+
+# ---- heatmap (WeekBin + CC) ----
+p_heat <- gheatmap(
+  p, heat_df,
+  offset   = heatmap_offset,
+  width    = heatmap_width,
+  color    = NA,
+  colnames = TRUE,
+  colnames_angle = 90,
+  font.size = 2.8,
+  hjust = 0
+) +
+  scale_fill_manual(values = heat_cols, breaks = fill_breaks, name = NULL) +
+  guides(
+    fill = guide_legend(
+      title = NULL,
+      nrow = cg_fill$nrow,
+      ncol = cg_fill$ncol,
+      byrow = TRUE,
+      override.aes = list(size = 2.5)
+    )
+  ) +
+  theme(
+    legend.position = "bottom",
+    legend.text = element_text(size = 6),
+    legend.key.size = unit(0.4, "lines"),
+    legend.box = "vertical"
+  )
+
+print(p_heat)
+
+```
+
