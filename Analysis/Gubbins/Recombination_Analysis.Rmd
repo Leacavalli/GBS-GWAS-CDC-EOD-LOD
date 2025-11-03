@@ -41,22 +41,22 @@ Fasttree_SC10 <- keep.tip(Fasttree_VLOD_DP_mid, SCs |> filter(SC ==10) |> pull(S
 
 # Save SC sample lists 
 setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins")
-write.table(SCs |> filter(SC ==1) |> select(Sample), "SC1_Samples.txt", col.names = F, row.names = F, quote = F )
-write.table(SCs |> filter(SC ==2) |> select(Sample), "SC2_Samples.txt", col.names = F, row.names = F, quote = F )
-write.table(SCs |> filter(SC ==3) |> select(Sample), "SC3_Samples.txt", col.names = F, row.names = F, quote = F )
-write.table(SCs |> filter(SC ==4) |> select(Sample), "SC4_Samples.txt", col.names = F, row.names = F, quote = F )
-write.table(SCs |> filter(SC ==5) |> select(Sample), "SC5_Samples.txt", col.names = F, row.names = F, quote = F )
-write.table(SCs |> filter(SC ==6) |> select(Sample), "SC6_Samples.txt", col.names = F, row.names = F, quote = F )
-write.table(SCs |> filter(SC ==7) |> select(Sample), "SC7_Samples.txt", col.names = F, row.names = F, quote = F )
-write.table(SCs |> filter(SC ==8) |> select(Sample), "SC8_Samples.txt", col.names = F, row.names = F, quote = F )
-write.table(SCs |> filter(SC ==9) |> select(Sample), "SC9_Samples.txt", col.names = F, row.names = F, quote = F )
-write.table(SCs |> filter(SC ==10) |> select(Sample), "SC10_Samples.txt", col.names = F, row.names = F, quote = F )
+write.table(SCs |> filter(SC ==1) |> dplyr::select(Sample), "SC1_Samples.txt", col.names = F, row.names = F, quote = F )
+write.table(SCs |> filter(SC ==2) |> dplyr::select(Sample), "SC2_Samples.txt", col.names = F, row.names = F, quote = F )
+write.table(SCs |> filter(SC ==3) |> dplyr::select(Sample), "SC3_Samples.txt", col.names = F, row.names = F, quote = F )
+write.table(SCs |> filter(SC ==4) |> dplyr::select(Sample), "SC4_Samples.txt", col.names = F, row.names = F, quote = F )
+write.table(SCs |> filter(SC ==5) |> dplyr::select(Sample), "SC5_Samples.txt", col.names = F, row.names = F, quote = F )
+write.table(SCs |> filter(SC ==6) |> dplyr::select(Sample), "SC6_Samples.txt", col.names = F, row.names = F, quote = F )
+write.table(SCs |> filter(SC ==7) |> dplyr::select(Sample), "SC7_Samples.txt", col.names = F, row.names = F, quote = F )
+write.table(SCs |> filter(SC ==8) |> dplyr::select(Sample), "SC8_Samples.txt", col.names = F, row.names = F, quote = F )
+write.table(SCs |> filter(SC ==9) |> dplyr::select(Sample), "SC9_Samples.txt", col.names = F, row.names = F, quote = F )
+write.table(SCs |> filter(SC ==10) |> dplyr::select(Sample), "SC10_Samples.txt", col.names = F, row.names = F, quote = F )
 ```
 
 # recombination-free full tree
 ```{r}
 # Load recombination-free tree
-Gubbins_tree <- read.tree("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/Fulltree_nostarttree/gubbins_fulltree_nostarttree.final_tree.tre")
+Gubbins_tree <- read.tree("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/Fulltree/gubbins_fulltree_nostarttree.final_tree.tre")
 Gubbins_tree_mid <- midpoint.root(Gubbins_tree)
 
 
@@ -72,27 +72,404 @@ phenotypes <- phenotypes |>
                           ifelse(continuous<=89, "LOD", "VLOD")))
 
 # Prep metadata for tree
-fewer5_SC <- which(table(SCs$SC)<=10)
+fewer5_SC <- which(table(SCs$SC)<=7)
 metadata_tree <- SCs |>
   mutate(SC2= ifelse(SC %in% fewer5_SC, "other", SC))|>
-  mutate(SC2= factor(SC2, level=c(1:14, "other")))|> 
+  mutate(SC2= factor(SC2, level=c(1:12, "other")))|> 
   rename("label" = "Sample")|> 
   filter(label %in% Gubbins_tree_mid$tip.label)
 
 # Join metadata and tree 
 Gubbins_tree_mid_metadata <- full_join(keep.tip(Gubbins_tree_mid, metadata_tree$label), metadata_tree , by = 'label')
+Gubbins_tree_mid_Nsub  <- Gubbins_tree_mid
+Gubbins_tree_mid_Nsub$edge.length  <- Gubbins_tree_mid$edge.length/2231314
+Gubbins_tree_mid_metadata_Nsub  <- full_join(keep.tip(Gubbins_tree_mid_Nsub, metadata_tree$label), metadata_tree , by = 'label')
 
 # Prepare colors for phylo
-SC_colors <- c("#dbdb8d", "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd","#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf", "#f7b6d2",  "#c5b0d5", "#c49c94", "black")
+SC_colors <- c("#dbdb8d", "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd","#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf", "#f7b6d2",  "black")
+names(SC_colors) <- c(1:12, "other")
 
 # SC tips
+# Scale: Number of substitutions 
 Gubbins_tree_p1 <- ggtree(Gubbins_tree_mid_metadata, ladderize = T, lwd=0.1) + 
   geom_tippoint(aes(color=as.factor(SC2)),size=1.5)+
-  scale_colour_manual(name="SC", values=SC_colors)
+  scale_colour_manual(name="SC", values=SC_colors)+ 
+  geom_treescale(x=0, y=1400, width=2000, color='red', fontsize=6, linesize=2, offset=20)
 Gubbins_tree_p1
+
+# Scale: Rate of substitutions / Site
+Gubbins_tree_p1_Nsub <- ggtree(Gubbins_tree_mid_metadata_Nsub, ladderize = T, lwd=0.1) + 
+  geom_tippoint(aes(color=as.factor(SC2)),size=1.5)+
+  scale_colour_manual(name="SC", values=SC_colors)+ 
+  geom_treescale(x=0, y=1400, width=round(2000/2231314,5), color='red', fontsize=6, linesize=2, offset=20)
+Gubbins_tree_p1_Nsub
+
+```
+# Investigate long branches
+```{r}
+# Load CC data
+setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Phylogenies/EOD_LOD_VLOD_CDC_NL_TW")
+serotypes <- read.delim("Serotypes.txt", header=T)|>
+  mutate(Serotype2 = str_remove(str_remove(GBS.SBG,"\\*"),"\\?"))|>
+  mutate(Serotype2 = ifelse(grepl("III-", Serotype2), "III", Serotype2))|>
+  mutate(Serotype2 = factor(Serotype2, levels=c("Ia", "Ib","II", "III", "IV", "V","VI", "VIII")))|>
+  select(-GBS.SBG)|> 
+  rename(label =Sample)
+CCs <- read.csv("combined_results_with_cc.txt") |> dplyr::select(Sample, clonal_complex) |> rename(label =Sample)
+metadata_tree_CC <- left_join(left_join(metadata_tree, CCs), serotypes)
+
+# Prepare color schemes
+Serotype_colors <- c(color("muted")(9),"#D55E00" , "grey")
+names(Serotype_colors) <- levels(metadata_tree_CC$Serotype2)
+CC_colors <- carto.pal(pal1 = "pastel.pal" ,n1 = 13)
+
+# List samples on long branches 
+longbranch1 <- c("SRR31467404", "SRR7283255", "SRR31467109", "SRR5063775", "SRR7283371", "SRR9082816")
+longbranch2 <- c("SRR9088511", "SRR9088770", "SRR29447292", "SRR29508528", "SRR29491156")
+
+# Zoom on CC1
+CC1_other_metadata <- metadata_tree_CC |> filter(clonal_complex =="cc1" | label %in% longbranch1) 
+CC1_other_tree <- keep.tip(Gubbins_tree_mid, c(CC1_other_metadata |> pull(label), longbranch1))
+CC1_other_tree_metadata <- full_join(keep.tip(CC1_other_tree, CC1_other_metadata$label), CC1_other_metadata , by = 'label')
+## Prepare heatmap data for phylo: SC
+cc1_Metadata_SC= CC1_other_metadata |> dplyr::select(SC) |>  mutate(SC = as.factor(SC))
+row.names(cc1_Metadata_SC) <-  CC1_other_metadata$label
+colnames(cc1_Metadata_SC)= c("SC")
+## Prepare heatmap data for phylo: Serotype
+CC1_Metadata_Serotype = CC1_other_metadata |> dplyr::select(Serotype2)
+row.names(CC1_Metadata_Serotype) <-  CC1_other_metadata$label
+colnames(CC1_Metadata_Serotype)= c("1")
+## Prepare heatmap data for phylo: CC
+CC1_Metadata_CC= CC1_other_metadata |> dplyr::select(clonal_complex)
+row.names(CC1_Metadata_CC) <-  CC1_other_metadata$label
+colnames(CC1_Metadata_CC)= c("2")
+## SC tips
+CC1_p1 <- ggtree(CC1_other_tree_metadata, ladderize = T, lwd=0.1) + 
+  geom_tippoint(aes(color=as.factor(SC2)),size=1.5)+
+  scale_colour_manual(name="SC", values=SC_colors)
+## SC
+cc1_p0 <- gheatmap(CC1_p1 + new_scale_fill(), cc1_Metadata_SC ,  width=0.15, offset=0.0005, 
+               font.size = 5, colnames_offset_y = -10, color=NA)
+## Serotype
+CC1_p2 <- gheatmap(cc1_p0 + new_scale_fill(), CC1_Metadata_Serotype ,  width=0.15, offset=1000, 
+               font.size = 5, colnames_offset_y = -10, color=NA)+
+  scale_fill_manual(values = Serotype_colors, name="1: Serotype")
+## CCs
+CC1_p3 <- gheatmap(CC1_p2 + new_scale_fill(), CC1_Metadata_CC,  width=0.15, offset=2000,
+               font.size = 5, colnames_offset_y = -10, color=NA)+
+  scale_fill_manual(values = CC_colors, name="2: CC")
+CC1_p3
+
+# Zoom on cc22
+cc22_other_metadata <- metadata_tree_CC |> filter(clonal_complex =="cc22" | clonal_complex =="cc26" | label %in% longbranch2) 
+cc22_other_tree <- keep.tip(Gubbins_tree_mid, c(cc22_other_metadata |> pull(label), longbranch2))
+cc22_other_tree_metadata <- full_join(keep.tip(cc22_other_tree, cc22_other_metadata$label), cc22_other_metadata , by = 'label')
+## Prepare heatmap data for phylo: SC
+cc22_Metadata_SC= cc22_other_metadata |> dplyr::select(SC) |>  mutate(SC = as.factor(SC))
+row.names(cc22_Metadata_SC) <-  cc22_other_metadata$label
+colnames(cc22_Metadata_SC)= c("SC")
+## Prepare heatmap data for phylo: Serotype
+cc22_Metadata_Serotype = cc22_other_metadata |> dplyr::select(Serotype2)
+row.names(cc22_Metadata_Serotype) <-  cc22_other_metadata$label
+colnames(cc22_Metadata_Serotype)= c("1")
+## Prepare heatmap data for phylo: CC
+cc22_Metadata_CC= cc22_other_metadata |> dplyr::select(clonal_complex)
+row.names(cc22_Metadata_CC) <-  cc22_other_metadata$label
+colnames(cc22_Metadata_CC)= c("2")
+## SC tips
+cc22_p1 <- ggtree(cc22_other_tree_metadata, ladderize = T, lwd=0.1) + 
+  geom_tippoint(aes(color=as.factor(SC2)),size=1.5)+
+  scale_colour_manual(name="SC", values=SC_colors)
+## SC
+cc22_p0 <- gheatmap(cc22_p1 + new_scale_fill(), cc22_Metadata_SC ,  width=0.15, offset=0.0005, 
+               font.size = 5, colnames_offset_y = -10, color=NA)
+## Serotype
+cc22_p2 <- gheatmap(cc22_p0 + new_scale_fill(), cc22_Metadata_Serotype ,  width=0.15, offset=1500, 
+               font.size = 5, colnames_offset_y = -10, color=NA)+
+  scale_fill_manual(values = Serotype_colors, name="1: Serotype")
+## CCs
+cc22_p3 <- gheatmap(cc22_p2 + new_scale_fill(), cc22_Metadata_CC,  width=0.15, offset=3000,
+               font.size = 5, colnames_offset_y = -10, color=NA)+
+  scale_fill_manual(values = CC_colors, name="2: CC")
+cc22_p3
+
+# Investigate the recombination events they are involved in 
+# Load Branch statistics
+recomb_predictions <- read.gff("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/Fulltree/gubbins_fulltree_nostarttree.recombination_predictions.gff", na.strings = c(".", "?"), GFF3 = TRUE)
+# Subset recombination blocks involving samples on long branches
+longbranch_1_1_df <- recomb_predictions |> 
+  filter(grepl("SRR7283255|SRR31467109|SRR5063775|SRR7283371|SRR9082816|SRR31467404", attributes))
+longbranch_1_2_df <-recomb_predictions |> 
+  filter(grepl("SRR7283255|SRR31467109|SRR5063775|SRR7283371|SRR9082816", attributes))
+longbranch_2_1_df <-recomb_predictions |> 
+  filter(grepl("SRR9088511|SRR9088770|SRR29447292|SRR29508528", attributes))
+longbranch_2_2_df <-recomb_predictions |> 
+  filter(grepl("SRR9088511|SRR9088770|SRR29447292|SRR29508528|SRR29491156", attributes))
+# Plot Recombination blocks
+plot_recomb_block <- function(data){
+  data %>%
+  mutate(mid = (start + end) / 2) %>%
+  ggplot() +
+  geom_histogram(aes(x = mid), bins = 500, 
+                 fill = "grey80", color = "black") +
+  geom_rect(
+    data = shaded_regions,
+    aes(xmin = start, xmax = end, ymin = -Inf, ymax = Inf, fill = region_type, alpha = alpha),
+    color = NA,
+    inherit.aes = FALSE
+  ) +
+  scale_fill_manual(
+    name = "Region", 
+    values = c("Accessory region" = "red", "cps locus" = "blue")
+  ) +
+  scale_alpha_identity() +  # use the alpha values directly
+  theme_classic()
+}
+
+plot_recomb_block(longbranch_1_1_df)
+plot_recomb_block(longbranch_1_2_df)
+plot_recomb_block(longbranch_2_1_df)
+plot_recomb_block(longbranch_2_2_df)
+
+# Check recombination block characteristics
+summary(recomb_predictions |>
+  separate_wider_delim(attributes, 
+                       delim = ";", 
+                       names = c("node","neg_log_likelihood","taxa","snp_count","extra"),
+                       too_few = "align_start") %>%
+  mutate(across(where(is.character), ~gsub('.*="(.*)"', '\\1', .)), 
+         snp_count = as.numeric(snp_count)) %>%
+  pull(snp_count))
+
+summary(longbranch_1_1_df |>
+  separate_wider_delim(attributes, 
+                       delim = ";", 
+                       names = c("node","neg_log_likelihood","taxa","snp_count","extra"),
+                       too_few = "align_start") %>%
+  mutate(across(where(is.character), ~gsub('.*="(.*)"', '\\1', .)), 
+         snp_count = as.numeric(snp_count)) %>%
+  pull(snp_count))
+
+summary(longbranch_1_2_df |>
+  separate_wider_delim(attributes, 
+                       delim = ";", 
+                       names = c("node","neg_log_likelihood","taxa","snp_count","extra"),
+                       too_few = "align_start") %>%
+  mutate(across(where(is.character), ~gsub('.*="(.*)"', '\\1', .)), 
+         snp_count = as.numeric(snp_count)) %>%
+  pull(snp_count))
+
+summary(longbranch_2_1_df |>
+  separate_wider_delim(attributes, 
+                       delim = ";", 
+                       names = c("node","neg_log_likelihood","taxa","snp_count","extra"),
+                       too_few = "align_start") %>%
+  mutate(across(where(is.character), ~gsub('.*="(.*)"', '\\1', .)), 
+         snp_count = as.numeric(snp_count)) %>%
+  pull(snp_count))
+
+summary(longbranch_2_2_df |>
+  separate_wider_delim(attributes, 
+                       delim = ";", 
+                       names = c("node","neg_log_likelihood","taxa","snp_count","extra"),
+                       too_few = "align_start") %>%
+  mutate(across(where(is.character), ~gsub('.*="(.*)"', '\\1', .)), 
+         snp_count = as.numeric(snp_count)) %>%
+  pull(snp_count))
+
+
 ```
 
+
+# Plot distribution of Recombination block and regions, highlighting accessory regions and the cps locus
+```{r}
+# Load Branch statistics
+recomb_predictions <- read.gff("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/Fulltree/gubbins_fulltree_nostarttree.recombination_predictions.gff", na.strings = c(".", "?"), GFF3 = TRUE)
+  
+# Get accessory regions from Missingness proportion 
+Missingness_Prop <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/Missingness_Prop.txt")
+Accesory_region_POS <- Missingness_Prop |> filter(V2>=0.05) |> pull(V1)
+Core_region_POS <- Missingness_Prop |> filter(V2<0.05) |> pull(V1)
+
+# Get cps locus
+cps_POS <- 1205397:1207538 
+
+
+# merge consecutive positions into ranges
+get_ranges <- function(pos) {
+  if (length(pos) == 0) return(data.frame(start=integer(), end=integer()))
+  pos <- sort(pos)
+  split <- c(0, cumsum(diff(pos) != 1))
+  do.call(rbind, lapply(split(pos, split), function(x) data.frame(start=min(x), end=max(x))))
+}
+
+# Preparing shading data
+accessory_df <- get_ranges(Accesory_region_POS)
+cps_df <- get_ranges(cps_POS)
+accessory_df$region_type <- "Accessory region"
+cps_df$region_type <- "cps locus"
+shaded_regions <- bind_rows(accessory_df, cps_df)
+shaded_regions <- shaded_regions %>%
+  mutate(alpha = ifelse(region_type == "Accessory region", 0.2, 1))
+
+# Plot Recombination blocks
+p_recomb_block <- recomb_predictions %>%
+  mutate(mid = (start + end) / 2) %>%
+  ggplot() +
+  geom_histogram(aes(x = mid), bins = 500, 
+                 fill = "grey80", color = "black") +
+  geom_rect(
+    data = shaded_regions,
+    aes(xmin = start, xmax = end, ymin = -Inf, ymax = Inf, fill = region_type, alpha = alpha),
+    color = NA,
+    inherit.aes = FALSE
+  ) +
+  scale_fill_manual(
+    name = "Region", 
+    values = c("Accessory region" = "red", "cps locus" = "blue")
+  ) +
+  scale_alpha_identity() +  # use the alpha values directly
+  theme_classic()
+p_recomb_block
+
+# Plot The number of Recombination blocks spanning each genomic position
+deconvoluted_df <- recomb_predictions %>%
+  rowwise() %>%
+  mutate(position = list(seq(start, end))) %>%   # List of positions for each row
+  unnest(position) %>%
+  ungroup()
+
+p_recomb_pos <- deconvoluted_df %>%
+  ggplot() +
+  geom_histogram(aes(x = position), bins = 500, 
+                 fill = "grey80", color = "black") +
+  geom_rect(
+    data = shaded_regions,
+    aes(xmin = start, xmax = end, ymin = -Inf, ymax = Inf, fill = region_type, alpha = alpha),
+    color = NA,
+    inherit.aes = FALSE
+  ) +
+  scale_fill_manual(
+    name = "Region", 
+    values = c("Accessory region" = "red", "cps locus" = "blue")
+  ) +
+  scale_alpha_identity() +  # use the alpha values directly
+  theme_classic()
+p_recomb_pos
+
+```
+# Investigate the large peak or recombination 
+```{r}
+library(dplyr)
+
+# Step 1: Compute the midpoint for each interval
+recomb_predictions <- recomb_predictions %>%
+  mutate(mid = (start + end) / 2)
+
+# Step 2: Define the bin breaks
+bin_breaks <- seq(min(recomb_predictions$mid), 
+                  max(recomb_predictions$mid), 
+                  length.out = 501) # 500 bins means 501 breaks
+
+# Step 3: Assign each 'mid' value to a bin
+# The labels = FALSE option makes bin value an integer for grouping
+recomb_binned_table <- recomb_predictions %>%
+  mutate(bin = cut(mid, breaks = bin_breaks, include.lowest = TRUE, labels = FALSE)) %>%
+  group_by(bin) %>%
+  summarise(
+    count = n(),
+    bin_start = bin_breaks[unique(bin)],
+    bin_end = bin_breaks[unique(bin)+1]
+  ) %>%
+  ungroup()
+
+# Preview result
+print(recomb_binned_table, n = 10)
+
+recomb_binned_table |> filter(count >150)
+
+# Check which recombination block is driving the peak
+peak_recomb <- recomb_predictions |> 
+  filter(start %in% 847574:852027 | end %in% 847574:852027)|> 
+  mutate(range= paste0(start, "-", end))
+table(peak_recomb$range)
+
+# Are there any accessory regions nearby ? 
+Missingness_Prop |>  filter(V2>=0.05) |> filter(V1 > 848711 & V1 < 848719)
+Missingness_Prop |>  filter(V2>=0.05) |> filter(V1 > 848000 & V1 < 849000)
+Missingness_Prop |>  filter(V2>=0.05) |> filter(V1 > 845000 & V1 < 860000)
+
+max(Missingness_Prop |>  filter(V2>=0.05) |> filter(V1 < 848711 ) |>  pull(V1))
+min(Missingness_Prop |>  filter(V2>=0.05) |> filter(V1 > 848719 ) |>  pull(V1))
+
+# Where does it fall ?
+# at the very start of
+# complement(848710..849792)
+# gene="yfmL"
+# locus_tag="SAGS_0873"
+# product="putative ATP-dependent RNA helicase YfmL"
+# protein_id="BBG32561.1"
+
+
+# Investigate the dsitribution of this recombination event across the phylogeny
+recomb_848711_848719_event <- recomb_predictions |> 
+  filter(start == 848711 & end == 848719)|>
+  separate_wider_delim(attributes, 
+                       delim = ";", 
+                       names = c("node","neg_log_likelihood","taxa","snp_count","extra"),
+                       too_few = "align_start") %>%
+  mutate(across(where(is.character), ~gsub('.*="(.*)"', '\\1', .))) %>%
+  select(-extra) %>%
+  mutate(n_taxa = str_count(str_trim(taxa), "\\S+"))
+
+table(recomb_848711_848719_event$snp_count) # mostly 5 SNPs
+table(recomb_848711_848719_event$n_taxa)  # many singletons - see where they are in the phylo
+
+
+# Show distribution across phylo
+recomb_848711_848719_taxa <- recomb_848711_848719_event |>
+  separate_rows(taxa, sep = "\\s+")|>
+  filter(taxa != "")|>
+  pull(taxa)
+
+metadata_tree_recomb_event <- metadata_tree |> 
+  mutate(recomb_event = ifelse(label %in% recomb_848711_848719_taxa, 1, 0), 
+         recomb_event = as.factor(recomb_event))
+
+## Prepare heatmap data for phylo: CC
+Metadata_recomb_event = metadata_tree_recomb_event |> dplyr::select(recomb_event)
+row.names(Metadata_recomb_event) <-  metadata_tree_recomb_event$label
+colnames(Metadata_recomb_event)= c("1")
+
+Gubbins_tree_recomb_event <- gheatmap(Gubbins_tree_p1 + new_scale_fill(), Metadata_recomb_event ,  width=0.15, offset=0.0005, 
+               font.size = 5, colnames_offset_y = -10, color=NA)+
+  scale_fill_manual(name="Recombination\nevent", values=c("white", "blue"))
+Gubbins_tree_recomb_event
+
+```
+
+# Get rates of recombination across genome, comparing accessory, core and cps locus
+```{r}
+# Rate in accessory regions
+Accesory_deconvoluted_df <- deconvoluted_df |>  filter(position %in% Accesory_region_POS) 
+r_acc <- nrow(Accesory_deconvoluted_df)/length(Accesory_region_POS)
+# on average, around 34.0 recombination blocks span each genomic position in accessory regions. 
+
+# Rate in Core regions
+Core_deconvoluted_df <- deconvoluted_df |>  filter(position %in% Core_region_POS) 
+r_core <- nrow(Core_deconvoluted_df)/length(Core_region_POS)
+# on average, around 8.4 recombination blocks span each genomic position in accessory regions. 
+
+# Rate in cps locus
+cps_deconvoluted_df <- deconvoluted_df |>  filter(position %in% cps_POS) 
+r_cps <- nrow(cps_deconvoluted_df)/length(cps_POS)
+# on average, around 34.8 recombination blocks span each genomic position in accessory regions. 
+```
+
+
+
 # Get Recombination to point mutation rate
+## Aligned to a single same REF (APO)
 ```{r}
 # Load Branch statistics
 Fulltree_branch_stats <-  read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/Fulltree/gubbins_fulltree_nostarttree.per_branch_statistics.csv")
@@ -109,32 +486,37 @@ SC10_branch_stats <-  read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins
 
 # Overall  r.m 
 # r.m = Number.of.SNPs.Inside.Recombinations/Number.of.SNPs.Outside.Recombination
-Fulltree_r.m <- round(sum(Fulltree_branch_stats$Number.of.SNPs.Inside.Recombinations)/sum(Fulltree_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
-SC1_r.m <- round(sum(SC1_branch_stats$Number.of.SNPs.Inside.Recombinations)/sum(SC1_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
-SC2_r.m <- round(sum(SC2_branch_stats$Number.of.SNPs.Inside.Recombinations)/sum(SC2_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
-SC3_r.m <- round(sum(SC3_branch_stats$Number.of.SNPs.Inside.Recombinations)/sum(SC3_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
-SC4_r.m <- round(sum(SC4_branch_stats$Number.of.SNPs.Inside.Recombinations)/sum(SC4_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
-SC5_r.m <- round(sum(SC5_branch_stats$Number.of.SNPs.Inside.Recombinations)/sum(SC5_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
-SC6_r.m <- round(sum(SC6_branch_stats$Number.of.SNPs.Inside.Recombinations)/sum(SC6_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
-SC7_r.m <- round(sum(SC7_branch_stats$Number.of.SNPs.Inside.Recombinations)/sum(SC7_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
-SC8_r.m <- round(sum(SC8_branch_stats$Number.of.SNPs.Inside.Recombinations)/sum(SC8_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
-SC9_r.m <- round(sum(SC9_branch_stats$Number.of.SNPs.Inside.Recombinations)/sum(SC9_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
-SC10_r.m <- round(sum(SC10_branch_stats$Number.of.SNPs.Inside.Recombinations)/sum(SC10_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
+r.m_calc <- function(data){
+  round(sum(data$Number.of.SNPs.Inside.Recombinations)/sum(data$Number.of.SNPs.Outside.Recombination), 2)
+}
+Fulltree_r.m <- r.m_calc(Fulltree_branch_stats)
+SC1_r.m <- r.m_calc(SC1_branch_stats)
+SC2_r.m <- r.m_calc(SC2_branch_stats)
+SC3_r.m <- r.m_calc(SC3_branch_stats)
+SC4_r.m <- r.m_calc(SC4_branch_stats)
+SC5_r.m <- r.m_calc(SC5_branch_stats)
+SC6_r.m <- r.m_calc(SC6_branch_stats)
+SC7_r.m <- r.m_calc(SC7_branch_stats)
+SC8_r.m <-  r.m_calc(SC8_branch_stats)
+SC9_r.m <-  r.m_calc(SC9_branch_stats)
+SC10_r.m <- r.m_calc(SC10_branch_stats)
 
 # Overall  rho.theta 
 # rho.theta = Number.of.Recombination.Blocks/Number.of.SNPs.Outside.Recombination
-Fulltree_rho.theta <- round(sum(Fulltree_branch_stats$Number.of.Recombination.Blocks)/sum(Fulltree_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
-SC1_rho.theta <- round(sum(SC1_branch_stats$Number.of.Recombination.Blocks)/sum(SC1_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
-SC2_rho.theta <- round(sum(SC2_branch_stats$Number.of.Recombination.Blocks)/sum(SC2_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
-SC3_rho.theta <- round(sum(SC3_branch_stats$Number.of.Recombination.Blocks)/sum(SC3_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
-SC4_rho.theta <- round(sum(SC4_branch_stats$Number.of.Recombination.Blocks)/sum(SC4_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
-SC5_rho.theta <- round(sum(SC5_branch_stats$Number.of.Recombination.Blocks)/sum(SC5_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
-SC6_rho.theta <- round(sum(SC6_branch_stats$Number.of.Recombination.Blocks)/sum(SC6_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
-SC7_rho.theta <- round(sum(SC7_branch_stats$Number.of.Recombination.Blocks)/sum(SC7_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
-SC8_rho.theta <- round(sum(SC8_branch_stats$Number.of.Recombination.Blocks)/sum(SC8_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
-SC9_rho.theta <- round(sum(SC9_branch_stats$Number.of.Recombination.Blocks)/sum(SC9_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
-SC10_rho.theta <- round(sum(SC10_branch_stats$Number.of.Recombination.Blocks)/sum(SC10_branch_stats$Number.of.SNPs.Outside.Recombination), 2)
-
+rho.theta_calc <- function(data){
+  round(sum(data$Number.of.Recombination.Blocks)/sum(data$Number.of.SNPs.Outside.Recombination), 2)
+}
+Fulltree_rho.theta <- rho.theta_calc(Fulltree_branch_stats)
+SC1_rho.theta <- rho.theta_calc(SC1_branch_stats)
+SC2_rho.theta <- rho.theta_calc(SC2_branch_stats)
+SC3_rho.theta <- rho.theta_calc(SC3_branch_stats)
+SC4_rho.theta <- rho.theta_calc(SC4_branch_stats)
+SC5_rho.theta <- rho.theta_calc(SC5_branch_stats)
+SC6_rho.theta <- rho.theta_calc(SC6_branch_stats)
+SC7_rho.theta <- rho.theta_calc(SC7_branch_stats)
+SC8_rho.theta <-  rho.theta_calc(SC8_branch_stats)
+SC9_rho.theta <-  rho.theta_calc(SC9_branch_stats)
+SC10_rho.theta <- rho.theta_calc(SC10_branch_stats)
 
 # Put results together
 df_r.m_rho.theta <- data.frame(SC = c("Fulltree", paste0("SC", 1:10)), 
@@ -144,52 +526,52 @@ df_r.m_rho.theta
 ```
 
 
-# 
+
+## Each SC aligned to specific REF
 ```{r}
 # Load Branch statistics
-recomb_predictions <- read.gff("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/Fulltree/gubbins_fulltree_nostarttree.recombination_predictions.gff", na.strings = c(".", "?"), GFF3 = TRUE)
+SC1_branch_stats_REFd <-  read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/SC1/gubbins_REFd_SC1_out.per_branch_statistics.csv")
+SC2_branch_stats_REFd <-  read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/SC2/gubbins_REFd_SC2_out.per_branch_statistics.csv")
+SC3_branch_stats_REFd <-  read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/SC3/gubbins_REFd_SC3_out.per_branch_statistics.csv")
+SC4_branch_stats_REFd <-  read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/SC4/gubbins_REFd_SC4_out.per_branch_statistics.csv")
+SC5_branch_stats_REFd <-  read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/SC5/gubbins_REFd_SC5_out.per_branch_statistics.csv")
+SC6_branch_stats_REFd <-  read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/SC6/gubbins_REFd_SC6_out.per_branch_statistics.csv")
+SC7_branch_stats_REFd <-  read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/SC7/gubbins_REFd_SC7_out.per_branch_statistics.csv")
+SC8_branch_stats_REFd <-  read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/SC8/gubbins_REFd_SC8_out.per_branch_statistics.csv")
+SC9_branch_stats_REFd <-  read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/SC9/gubbins_REFd_SC9_out.per_branch_statistics.csv")
+SC10_branch_stats_REFd <-  read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/SC10/gubbins_REFd_SC10_out.per_branch_statistics.csv")
 
-(recomb_predictions) 
+# Overall  r.m 
+# r.m = Number.of.SNPs.Inside.Recombinations/Number.of.SNPs.Outside.Recombination
+SC1_r.m_REFd <- r.m_calc(SC1_branch_stats_REFd)
+SC2_r.m_REFd <- r.m_calc(SC2_branch_stats_REFd)
+SC3_r.m_REFd <- r.m_calc(SC3_branch_stats_REFd)
+SC4_r.m_REFd <- r.m_calc(SC4_branch_stats_REFd)
+SC5_r.m_REFd <- r.m_calc(SC5_branch_stats_REFd)
+SC6_r.m_REFd <- r.m_calc(SC6_branch_stats_REFd)
+SC7_r.m_REFd <- r.m_calc(SC7_branch_stats_REFd)
+SC8_r.m_REFd <-  r.m_calc(SC8_branch_stats_REFd)
+SC9_r.m_REFd <-  r.m_calc(SC9_branch_stats_REFd)
+SC10_r.m_REFd <- r.m_calc(SC10_branch_stats_REFd)
 
+# Overall  rho.theta 
+# rho.theta = Number.of.Recombination.Blocks/Number.of.SNPs.Outside.Recombination
+SC1_rho.theta_REFd <- rho.theta_calc(SC1_branch_stats_REFd)
+SC2_rho.theta_REFd <- rho.theta_calc(SC2_branch_stats_REFd)
+SC3_rho.theta_REFd <- rho.theta_calc(SC3_branch_stats_REFd)
+SC4_rho.theta_REFd <- rho.theta_calc(SC4_branch_stats_REFd)
+SC5_rho.theta_REFd <- rho.theta_calc(SC5_branch_stats_REFd)
+SC6_rho.theta_REFd <- rho.theta_calc(SC6_branch_stats_REFd)
+SC7_rho.theta_REFd <- rho.theta_calc(SC7_branch_stats_REFd)
+SC8_rho.theta_REFd <-  rho.theta_calc(SC8_branch_stats_REFd)
+SC9_rho.theta_REFd <-  rho.theta_calc(SC9_branch_stats_REFd)
+SC10_rho.theta_REFd <- rho.theta_calc(SC10_branch_stats_REFd)
 
-
-recomb_predictions |> 
-  ggplot()+
-  geom_histogram(aes(x= start), bins =500)+
-  geom_line(aes(x= start), bins =500)+
-  theme_classic()
-  
-
-
-# Create bins and compute counts
-binned <- recomb_predictions |> 
-  mutate(bin = cut(start, breaks = 100)) |> 
-  group_by(bin) |>
-  summarise(count = n(), 
-            start = mean(start, na.rm=TRUE)) # mean position for each bin
-
-ggplot() +
-  geom_histogram(data = recomb_predictions, aes(x = start), bins = 500, fill = "grey80", color = "black") +
-  geom_line(data = binned, aes(x = start, y = count), color = "red") +
-  theme_classic()
-
-
-recomb_predictions|> 
-  filter(start %in% 1205397:1207538 | end %in% 1205397:1207538 )
-
-
-recomb_predictions
-
-
-
-```
-
-
-
-```{r}
-# Load VCF
-VCF <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/merged_max5missing.vcf" )
-
+# Put results together
+df_r.m_rho.theta_REFd <- data.frame(SC = c("Fulltree", paste0("SC", 1:10)), 
+           r.m = c(NA, SC1_r.m_REFd,SC2_r.m_REFd,SC3_r.m_REFd,SC4_r.m_REFd,SC5_r.m_REFd,SC6_r.m_REFd,SC7_r.m_REFd,SC8_r.m_REFd,SC9_r.m_REFd,SC10_r.m_REFd), 
+           rho.theta = c(NA,SC1_rho.theta_REFd,SC2_rho.theta_REFd,SC3_rho.theta_REFd,SC4_rho.theta_REFd,SC5_rho.theta_REFd,SC6_rho.theta_REFd,SC7_rho.theta_REFd,SC8_rho.theta_REFd,SC9_rho.theta_REFd,SC10_rho.theta_REFd))
+df_r.m_rho.theta_REFd
 ```
 
 

@@ -27,24 +27,16 @@ library(khroma)
 # PLot phylogeny 
 ```{r}
 # Import tree
-setwd("/Users/ruchita/Documents/Harvard/Lab/CDC/GBS GWAS/")
-tr  <- read.tree("GBS_GWAS_FastTree_phylo_rooted_GAS.tre")
-OUT <- grep("SRR32569359", tr$tip.label, value = TRUE)[1]
-if (!is.null(tr$root.edge)) tr$root.edge <- NULL
-if (!is.na(OUT) && OUT %in% tr$tip.label) tr <- drop.tip(tr, OUT)
-tr <- phangorn::midpoint(tr)
-tr <- ladderize(tr, right = TRUE)
-
-
+tr  <-midpoint.root(read.tree("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Phylogenies/EOD_LOD_VLOD_CDC/Fastree_DP.tre"))
 
 # Load metadata
-setwd("/Users/ruchita/Documents/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC")
+setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC")
 serotypes <- read.table("Serotypes.txt", header=T)
 CCs <- read.csv("combined_results_with_cc.txt")
 SCs <- read.csv("GBS_GWAS_db_core_clusters.csv") |> rename(Sample=Taxon, SC=Cluster)
 
 # Load phenotypes
-setwd("/Users/ruchita/Documents/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC")
+setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC")
 phenotypes <- read.table("phenotypes.txt", header=T)
 phenotypes <- phenotypes |>
   rename(Sample =samples ) |> 
@@ -160,17 +152,17 @@ Fasttre_p4_leg <- gheatmap(Fasttre_p1_noleg + new_scale_fill(), Metadata_Age_cat
   legend.key.width   = unit(6, "mm")
 )
 
-ggsave(
-  filename = file.path(
-    "/Users/ruchita/Documents/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC",
-    paste0("phylo_SC", sc, ".pdf")
-  ),
-  plot = Fasttre_p4_leg,
-  width = 7.5,
-  height = 5.2,
-  units = "in",
-  device = "pdf"   # ← simple and reliable
-)
+# ggsave(
+#   filename = file.path(
+#     "~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC",
+#     paste0("phylo_SC", sc, ".pdf")
+#   ),
+#   plot = Fasttre_p4_leg,
+#   width = 7.5,
+#   height = 5.2,
+#   units = "in",
+#   device = "pdf"   # ← simple and reliable
+# )
 
 ```
 
@@ -189,7 +181,7 @@ library(readr)
 library(RColorBrewer)   # for CC palette
 
 ## ---- I/O paths ----
-setwd("/Users/ruchita/Documents/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC")
+setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC")
 tr  <- read.tree("GBS_GWAS_FastTree_phylo_rooted_GAS.tre")
 
 # root/drop outgroup, midpoint, ladderize
@@ -200,7 +192,7 @@ tr <- phangorn::midpoint(tr)
 tr <- ladderize(tr, right = TRUE)
 
 ## ---- metadata ----
-setwd("/Users/ruchita/Documents/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC")
+setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC")
 serotypes <- read.table("Serotypes.txt", header=TRUE)
 CCs       <- read.csv("combined_results_with_cc.txt")
 SCs       <- read.csv("GBS_GWAS_db_core_clusters.csv") |>
@@ -312,7 +304,7 @@ plots_by_sc <- lapply(main_SCs, function(sc) {
   # Save each plot to your specified folder
 ggsave(
   filename = file.path(
-    "/Users/ruchita/Documents/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC",
+    "~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC",
     paste0("phylo_SC", sc, ".pdf")
   ),
   plot = p,
@@ -695,8 +687,6 @@ for (i in 1:ncol(df_complete_V2)) {
   }
 }
 
-sim_matrix
-
 # Heatmap
 library(reshape2)
 sim_long <- melt(sim_matrix)
@@ -722,7 +712,6 @@ ggplot(sim_long_tri, aes(x = Var1, y = Var2, fill = value)) +
   )
 
 
-
 # Suppose `line` is your data.frame or matrix
 chisq_matrix_stat <- matrix(NA, ncol(df_complete_V2), ncol(df_complete_V2),
                      dimnames = list(colnames(df_complete_V2), colnames(df_complete_V2)))
@@ -739,8 +728,6 @@ for (i in 1:ncol(df_complete_V2)) {
   }
 }
 
-chisq_matrix_stat
-chisq_matrix_p
 
 # Heatmap
 chisq_matrix_stat_long <- melt(chisq_matrix_stat)
@@ -803,74 +790,36 @@ ggplot(chisq_matrix_p_long_tri, aes(x = Var1, y = Var2, fill = -log10(p_bonf))) 
   )
 
 
+# Check stats
+chisq_matrix_p_long_tri
+chisq_matrix_p_long_tri |>  filter(p_bonf < 0.05)
+
 # Linkage BLock 1
 table(df_complete$T1206469C, df_complete$T1216249C)
-chisq.test(df_complete$T1206469C, df_complete$T1216249C)
-
 table(df_complete$T1206469C, df_complete$Unitig_1)
-chisq.test(df_complete$T1206469C, df_complete$Unitig_1)
-
 table(df_complete$T1216249C, df_complete$Unitig_2)
-chisq.test(df_complete$T1216249C, df_complete$Unitig_2)
 
 # Linkage BLock 2
-block2_df <- df_complete |>
-  mutate(block2= paste0(C1249780T,C1250385A,A1250938G))
-table(block2_df$block2)
 table(df_complete$C1249780T, df_complete$C1250385A)
-chisq.test(df_complete$C1249780T, df_complete$C1250385A)
-
 table(df_complete$C1249780T, df_complete$A1250938G)
-chisq.test(df_complete$C1249780T, df_complete$A1250938G)
 
 # Linkage BLock 3
 table(df_complete$Unitig_4, df_complete$Unitig_5)
-chisq.test(df_complete$Unitig_4, df_complete$Unitig_5)
-
-chisq.test(df_complete$Unitig_4, df_complete$Unitig_12)
-chisq.test(df_complete$Unitig_5, df_complete$Unitig_12)
-
+table(df_complete$Unitig_4, df_complete$Unitig_12)
 table(df_complete$Unitig_7, df_complete$Unitig_8)
-chisq.test(df_complete$Unitig_7, df_complete$Unitig_8)
-
 table(df_complete$Unitig_7, df_complete$Unitig_4)
-chisq.test(df_complete$Unitig_7, df_complete$Unitig_8)
-
 table(df_complete$Unitig_8, df_complete$Unitig_4)
-
-
-block3_df <- df_complete |>
-  mutate(block3= paste0(Unitig_4,Unitig_5,Unitig_12, Unitig_7, Unitig_8))
-table(block3_df$block3)
 
 # Linkage BLock 4
 table(df_complete$Unitig_10, df_complete$Unitig_11)
-chisq.test(df_complete$Unitig_10, df_complete$Unitig_11)
-
 table(df_complete$Unitig_10, df_complete$Unitig_9)
 table(df_complete$Unitig_11, df_complete$Unitig_9)
-
 table(df_complete$Unitig_11, df_complete$arnC)
 table(df_complete$Unitig_10, df_complete$arnC)
 table(df_complete$Unitig_9, df_complete$arnC)
-
-
 table(df_complete$Unitig_9, df_complete$Unitig_6)
 table(df_complete$Unitig_10, df_complete$Unitig_6)
 table(df_complete$Unitig_11, df_complete$Unitig_6)
-
-block4_df <- df_complete |>
-  mutate(block4= paste0(Unitig_6, Unitig_9,Unitig_10,Unitig_11, arnC))
-table(block4_df$block4)
-
-
-# Singletons ? 
-table(df_complete$Unitig_3, df_complete$T1206469C)
-chisq.test(df_complete$Unitig_3, df_complete$T1206469C)
-
-table(df_complete$Unitig_3, df_complete$C1249780T)
-chisq.test(df_complete$Unitig_3, df_complete$T1206469C)
-
 ```
 
 # Pairwise distances
@@ -920,47 +869,124 @@ df_complete <- left_join(left_join(left_join(metadata_tree_v0 ,
   mutate(across(11:29, ~replace(., . == "absent", 0))) |>
   mutate(across(11:29, ~replace(., . == "present", 1)))
 
-# Block 1
-chisq.test(df_complete$T1206469C, df_complete$Serotype2, simulate.p.value = T)
-summary(glm(as.numeric(T1206469C) ~ Serotype2, family = binomial, data = df_complete))
-# positively associated with II and V, negatively associated with Ia and III
-chisq.test(df_complete$T1216249C, df_complete$Serotype2, simulate.p.value = T)
-summary(glm(as.numeric(T1216249C) ~ Serotype2, family = binomial, data = df_complete))
-# positively associated with V, negatively associated with Ia and III
-chisq.test(df_complete$Unitig_1, df_complete$Serotype2, simulate.p.value = T)
-summary(glm(as.numeric(Unitig_1) ~ Serotype2, family = binomial, data = df_complete))
+# Check association of each variant with serotype 
+test_variants_serotype <- function(df, variant_columns, serotype_column) {
+  results <- data.frame(
+    Variant = character(),
+    Statistic = numeric(),
+    PValue = numeric(),
+    stringsAsFactors = FALSE
+  )
+  
+  for (variant in variant_columns) {
+    res <- chisq.test(df[[variant]], df[[serotype_column]], simulate.p.value = TRUE, B = 10000)
+    results <- rbind(
+      results,
+      data.frame(
+        Variant = variant,
+        Statistic = res$statistic,
+        PValue = res$p.value,
+        stringsAsFactors = FALSE
+      )
+    )
+  }
+  
+  return(results)
+}
 
-chisq.test(df_complete$Unitig_2, df_complete$Serotype2, simulate.p.value = T)
-summary(glm(as.numeric(Unitig_2) ~ Serotype2, family = binomial, data = df_complete))
+# Run
+SNP_variant_cols <- c("T1206469C", "T1216249C", "C1249780T", "C1250385A", "A1250938G") 
+Unitig_variant_cols <- paste0("Unitig_", 1:12) 
+Genes_variant_cols <- c("arnC", "group_1981") 
+variant_cols <- c(SNP_variant_cols, Unitig_variant_cols, Genes_variant_cols) 
+result_table <- test_variants_serotype(df_complete, variant_cols, "Serotype2")
+result_table$Bonferroni_P <- p.adjust(result_table$PValue, method = "bonferroni")
+print(result_table)
+
+save_res_tab <- result_table |> 
+  mutate(pval= ifelse(Bonferroni_P < 0.01, "p-val <0.01"), 
+         Xsq = paste0("X=", round(Statistic), ", ", pval)) |> 
+  select(Variant, Xsq)
+
+# Subset to one element by linkage block 
+variant_subset_cols <- c("T1206469C", "C1249780T", "Unitig_4", "Unitig_9", "Unitig_3", "group_1981") 
+result_subset_table <- test_variants_serotype(df_complete, variant_subset_cols, "Serotype2")
+result_subset_table$Bonferroni_P <- p.adjust(result_subset_table$PValue, method = "bonferroni")
+print(result_subset_table)
 
 
-chisq.test(df_complete$C1249780T, df_complete$Serotype2, simulate.p.value = T)
-summary(glm(as.numeric(C1249780T) ~ Serotype2, family = binomial, data = df_complete))
-# positively associated with II and V, negatively associated with Ia and III
-summary(glm(as.numeric(C1250385A) ~ Serotype2, family = binomial, data = df_complete))
-# positively associated with II and V, negatively associated with Ia and III
-summary(glm(as.numeric(A1250938G) ~ Serotype2, family = binomial, data = df_complete))
-# positively associated with II and V, negatively associated with Ia and III
+# Logistic regression
+# Due to Perfect separation (or quasi-complete separation) between each variant and serotypes in many cases, logistic regression fails to converge.
 
 
-# Unitigs 
-summary(glm(as.numeric(Unitig_1) ~ Serotype2, family = binomial, data = df_complete))
-summary(glm(as.numeric(Unitig_2) ~ Serotype2, family = binomial, data = df_complete))
-summary(glm(as.numeric(Unitig_3) ~ Serotype2, family = binomial, data = df_complete))
-summary(glm(as.numeric(Unitig_4) ~ Serotype2, family = binomial, data = df_complete))
-summary(glm(as.numeric(Unitig_5) ~ Serotype2, family = binomial, data = df_complete))
-summary(glm(as.numeric(Unitig_6) ~ Serotype2, family = binomial, data = df_complete))
-summary(glm(as.numeric(Unitig_7) ~ Serotype2, family = binomial, data = df_complete))
-summary(glm(as.numeric(Unitig_8) ~ Serotype2, family = binomial, data = df_complete))
-summary(glm(as.numeric(Unitig_9) ~ Serotype2, family = binomial, data = df_complete))
-summary(glm(as.numeric(Unitig_10) ~ Serotype2, family = binomial, data = df_complete))
-summary(glm(as.numeric(Unitig_11) ~ Serotype2, family = binomial, data = df_complete))
-summary(glm(as.numeric(Unitig_12) ~ Serotype2, family = binomial, data = df_complete))
 
-# Unitigs 
-chisq.test(df_complete$arnC, df_complete$Serotype2)
-summary(glm(as.numeric(arnC) ~ Serotype2, family = binomial, data = df_complete))
-chisq.test(df_complete$group_1981, df_complete$Serotype2, simulate.p.value = T)
-summary(glm(as.numeric(group_1981) ~ Serotype2, family = binomial, data = df_complete))
+# Table of serotype proportions: 
+variant_proportion_table <- function(df, variant_cols, serotype_col, block_list = NULL) {
+  # 1. Calculate and round the proportion table as before
+  result <- lapply(variant_cols, function(vname) {
+    prop <- tapply(df[[vname]], df[[serotype_col]], function(x) mean(x == 1, na.rm = TRUE))
+    prop <- prop[sort(names(prop))]
+    paste0(round(100 * as.numeric(prop)), "%")
+  })
+  prop_df <- do.call(rbind, result)
+  colnames(prop_df) <- sort(unique(df[[serotype_col]]))
+  rownames(prop_df) <- variant_cols
+
+  # 2. Add total sample counts as first row
+  total_counts <- table(df[[serotype_col]])
+  total_counts <- as.numeric(total_counts[sort(names(total_counts))])
+  prop_df <- rbind(Total_N = total_counts, prop_df)
+  
+  prop_df <- as.data.frame(prop_df)
+
+  # 3. If block_list is given, reorder rows accordingly
+  if(!is.null(block_list)) {
+    block_order <- c("Total_N", unlist(block_list))
+    present <- block_order[block_order %in% rownames(prop_df)]
+    prop_df <- prop_df[present, , drop = FALSE]
+  }
+  
+  prop_df
+}
+
+# ---- Define your blocks ----
+Block1     <- c("T1206469C", "T1216249C","Unitig_1" , "Unitig_2")
+Block2     <- c("C1249780T", "C1250385A", "A1250938G") 
+Block3     <- c("Unitig_4", "Unitig_5", "Unitig_12", "Unitig_7", "Unitig_8") 
+Block4     <- c("Unitig_6", "Unitig_9", "Unitig_10", "Unitig_11", "arnC") 
+Singleton1 <- "Unitig_3" 
+Singleton2 <- "group_1981" 
+block_list <- list(Block1=Block1, Block2=Block2, Block3=Block3, Block4=Block4, Singleton1=Singleton1, Singleton2=Singleton2)
+
+# ---- List all variants used in table ----
+variant_cols <- unlist(block_list)
+
+# ---- Run the function ----
+prop_table_multi <- variant_proportion_table(df_complete, variant_cols, "Serotype2", block_list = block_list)
+
+print(prop_table_multi)
+
+library(dplyr)
+
+# Move row names to a column
+prop_table_multi_annot <- prop_table_multi
+prop_table_multi_annot$Variant <- rownames(prop_table_multi_annot)
+
+# Separate out Total_N for special handling
+total_n_row <- prop_table_multi_annot %>% filter(Variant == "Total_N")
+var_rows    <- prop_table_multi_annot %>% filter(Variant != "Total_N")
+
+# Now left_join to add Xsq annotation
+joined_table <- var_rows %>%
+  left_join(save_res_tab, by = "Variant")
+
+# Place Total_N row on top (if you want it to appear first)
+final_table <- bind_rows(total_n_row, joined_table)
+
+# Reorder columns to put Variant, Xsq at the front if desired
+col_order <- c("Variant", "Xsq", setdiff(names(final_table), c("Variant", "Xsq")))
+final_table <- final_table[, col_order]
+
+print(final_table)
 ```
 

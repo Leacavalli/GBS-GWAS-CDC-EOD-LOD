@@ -133,13 +133,13 @@ SNPGWAS_sig <-SNPGWAS_data_Fasttree_LMM |>
 # Load SNP distribution across samples
 sig_SNPs <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/Sig_SNP.txt")
 sig_SNPs_df <- sig_SNPs  |> 
-  select(- X.CHROM, -ID, -QUAL, -FILTER, -INFO, -FORMAT)|>
+  dplyr::select(- X.CHROM, -ID, -QUAL, -FILTER, -INFO, -FORMAT)|>
   mutate(across(4:1543, ~ ifelse(grepl("1/1", .), 1, 0)))|>
   mutate(Sum = rowSums(across(4:1543), na.rm = TRUE),
          Proportion = round(Sum / 1540, 3))|>
   mutate(across(4:1543, ~ ifelse(grepl("1", .), "present", "absent")))|>
   mutate(MUT= paste0(REF, POS, ALT), .before = 1)|> 
-  select(-POS, -REF, -ALT)
+  dplyr::select(-POS, -REF, -ALT)
 df_t <- as.data.frame(t(sig_SNPs_df[,-1]))
 colnames(df_t) <- sig_SNPs_df[[1]]
 

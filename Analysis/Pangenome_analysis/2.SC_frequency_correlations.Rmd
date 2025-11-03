@@ -16,45 +16,26 @@ library(xlsx)
 
 # Load metadata
 SCs <- read.csv("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Phylogenies/EOD_LOD_VLOD_CDC_NL_TW/GBS_GWAS_db_core_clusters.csv") |> rename(Sample=Taxon, SC=Cluster)
+serotypes <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Phylogenies/EOD_LOD_VLOD_CDC_NL_TW/Serotypes.txt", header=T) |> mutate(GBS.SBG = ifelse(GBS.SBG=="", NA, GBS.SBG)) |>
+  mutate(Serotype = str_remove(str_remove(GBS.SBG,"\\*"),"\\?"))|>
+  mutate(Serotype = ifelse(grepl("III-", Serotype), "III", Serotype))|>
+  mutate(Serotype = factor(Serotype, levels=c("Ia", "Ib","II", "III", "IV", "V","VI","VII","VIII", "IX")))|>
+  dplyr::select(-GBS.SBG)
+CCs <- read.csv("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Phylogenies/EOD_LOD_VLOD_CDC_NL_TW/combined_results_with_cc.txt") |> dplyr::select(Sample, clonal_complex)
+
 
 # List samples from each dataset
 NL_metadata <- read.xlsx("~/GitHub/GBS-GWAS-CDC-EOD-LOD/0.Raw_data/Netherlands_Sanger_metadata.xlsx", 1) 
-NLD_samples <- NL_metadata |> filter(ENA.lane.accession %in% SCs$Sample) |> pull(ENA.lane.accession)
+NL_samples <- NL_metadata |> filter(ENA.lane.accession %in% SCs$Sample) |> pull(ENA.lane.accession)
 CDC_metadata <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC/phenotypes.txt", header=T) 
 CDC_samples <- CDC_metadata |> filter(samples %in% SCs$Sample) |> pull(samples)
 
 # Add country to metadata
-metadata <- SCs |> 
-  mutate(Country= ifelse(Sample %in% NLD_samples, "NL", 
-                         ifelse(Sample %in% CDC_samples, "USA", "TW")) )|> 
-  filter(Country != "TW")
+metadata <- left_join(left_join(SCs, serotypes), CCs) |> 
+  mutate(Country= ifelse(Sample %in% NL_samples, "NL", 
+                         ifelse(Sample %in% CDC_samples, "USA", "TW")) )
+TW_samples <- metadata |> filter(Country =="TW") |> pull(Sample) 
 
-# Prepare Plot Data 
-fewer5_SC <- names(which(table(metadata$SC)<10))
-SC_Freq_df <- metadata |>
-  group_by(Country)|>
-  dplyr::mutate(N_Country = n())|>
-  ungroup()|>
-  group_by(Country, N_Country, SC)|>
-  summarise(N_SC = n())|>
-  ungroup()|>
-  dplyr::mutate(p_SC = N_SC/N_Country)|>
-  dplyr::select(Country, SC, p_SC)|>
-  pivot_wider(names_from = Country, values_from = p_SC) |>
-  rename(Proportion_NLD=NL, 
-         Proportion_CDC= USA) |>
-  dplyr::mutate(SC= as.factor(SC), 
-         Proportion_NLD = ifelse(is.na(Proportion_NLD), 0, Proportion_NLD), 
-         Proportion_CDC = ifelse(is.na(Proportion_CDC), 0, Proportion_CDC))|> 
-  dplyr::mutate(SC2= ifelse(SC %in% fewer5_SC, "other", SC))|> 
-  dplyr::mutate(SC2= factor(SC2, level=c(1:length(which(table(metadata$SC)>=10)), "other")))
-
-
-```
-
-
-# Plot SC frequencies across countries
-```{r }
 # Create a data frame for shading the region (independent of gene_pres_abs_clean_V2)
 shade_data <- data.frame(x = seq(0, 0.5, by = 0.01))
 shade_data <- shade_data %>%
@@ -71,27 +52,680 @@ shade_data <- shade_data %>%
 SC_colors <- c("#dbdb8d", "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", 
                    "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf",
                    "#f7b6d2", "#c5b0d5", "#c49c94", "black")
+names(SC_colors) <- c(1:14, "other")
+```
+
+
+# 1. Plot SC frequencies across countries
+## 1.1. USA vs NL
+```{r }
+# Prepare Plot Data 
+metadata_NL_USA <- metadata |>  filter(Country %in% c("USA", "NL"))
+fewer5_SC_NL_USA <- names(which(table(metadata_NL_USA$SC)<10))
+SC_Freq_df_NL_USA <- metadata_NL_USA |>
+  group_by(Country)|>
+  dplyr::mutate(N_Country = n())|>
+  ungroup()|>
+  group_by(Country, N_Country, SC)|>
+  summarise(N_SC = n())|>
+  ungroup()|>
+  dplyr::mutate(p_SC = N_SC/N_Country)|>
+  dplyr::select(Country, SC, p_SC)|>
+  pivot_wider(names_from = Country, values_from = p_SC) |>
+  rename(Proportion_NL=NL, 
+         Proportion_CDC= USA) |>
+  dplyr::mutate(SC= as.factor(SC), 
+         Proportion_NL = ifelse(is.na(Proportion_NL), 0, Proportion_NL), 
+         Proportion_CDC = ifelse(is.na(Proportion_CDC), 0, Proportion_CDC))|> 
+  dplyr::mutate(SC2= ifelse(SC %in% fewer5_SC_NL_USA, "other", SC))|> 
+  dplyr::mutate(SC2= factor(SC2, level=c(1:length(which(table(metadata$SC)>=10)), "other")))
+
 # Correlation test 
-cor_test <- cor.test(SC_Freq_df$Proportion_NLD, SC_Freq_df$Proportion_CDC)
-cor_coefficient <- round(cor_test$estimate, 2)
-p_value <- signif(cor_test$p.value, 3)
+cor_test_NL_USA <- cor.test(SC_Freq_df_NL_USA$Proportion_NL, SC_Freq_df_NL_USA$Proportion_CDC)
+cor_coefficient_NL_USA <- round(cor_test_NL_USA$estimate, 2)
+p_value_NL_USA <- signif(cor_test_NL_USA$p.value, 3)
 
 # Plot
-p_SC_all <- ggplot() +
+p_SC_NL_USA <- ggplot() +
   geom_ribbon(data = shade_data, aes(x = x, ymin = ymin_5, ymax = ymax_5), fill = "grey95", alpha = 0.5)+
   geom_ribbon(data = shade_data, aes(x = x, ymin = ymin_25, ymax = ymax_25), fill = "grey95", alpha = 0.5)+
-  geom_point(data= SC_Freq_df, aes(x = Proportion_NLD, y = Proportion_CDC, color = SC2), size=3) +
+  geom_point(data= SC_Freq_df_NL_USA, aes(x = Proportion_NL, y = Proportion_CDC, color = SC2), size=3) +
   geom_abline(slope = 1, intercept = 0, color = "black") +  
   theme_classic() +
-  xlab(paste0("SC frequencies in Netherlands (n=", length(NLD_samples), ")")) +
+  xlab(paste0("SC frequencies in Netherlands (n=", length(NL_samples), ")")) +
   ylab(paste0("SC frequencies in USA (n=", length(CDC_samples), ")")) +
-  annotate("text", x = 0.02, y = 0.45, hjust = 0, label = paste("Pearson's correlation:\nr =", cor_coefficient, ", p ", ifelse(p_value< 0.001, "< 0.001", paste("=",p_value))), size = 4, color = "black") +
+  annotate("text", x = 0.02, y = 0.45, hjust = 0, label = paste("Pearson's correlation:\nr =", cor_coefficient_NL_USA, ", p ", ifelse(p_value_NL_USA< 0.001, "< 0.001", paste("=",p_value_NL_USA))), size = 4, color = "black") +
   scale_color_manual(values=SC_colors)+
   scale_x_continuous(limits = c(0, 0.5), expand=c(0.02, 0)) +
   scale_y_continuous(limits = c(0, 0.5), expand=c(0.02, 0)) +
-  ggtitle(paste0("Infant Invasive Disease (n=", (length(NLD_samples)+length(CDC_samples)), ")"))
-p_SC_all
+  ggtitle(paste0("Infant Invasive Disease (n=", (length(NL_samples)+length(CDC_samples)), ")"))
+p_SC_NL_USA
 
 # Save
-ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pangenome_analysis/2.SC_freq_correlations.png", plot = p_SC_all, width = 7, height = 6, dpi = 300, units = "in", bg = "white")
+# ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pangenome_analysis/2.SC_freq_correlations.png", plot = p_SC_all, width = 7, height = 6, dpi = 300, units = "in", bg = "white")
+```
+## 1.2. USA vs TW
+```{r }
+# Prepare Plot Data 
+metadata_TW_USA <- metadata |>  filter(Country %in% c("USA", "TW"))
+fewer5_SC_TW_USA <- names(which(table(metadata_TW_USA$SC)<10))
+SC_Freq_df_TW_USA <- metadata_TW_USA |>
+  group_by(Country)|>
+  dplyr::mutate(N_Country = n())|>
+  ungroup()|>
+  group_by(Country, N_Country, SC)|>
+  summarise(N_SC = n())|>
+  ungroup()|>
+  dplyr::mutate(p_SC = N_SC/N_Country)|>
+  dplyr::select(Country, SC, p_SC)|>
+  pivot_wider(names_from = Country, values_from = p_SC) |>
+  rename(Proportion_TW=TW, 
+         Proportion_CDC= USA) |>
+  dplyr::mutate(SC= as.factor(SC), 
+         Proportion_TW = ifelse(is.na(Proportion_TW), 0, Proportion_TW), 
+         Proportion_CDC = ifelse(is.na(Proportion_CDC), 0, Proportion_CDC))|> 
+  dplyr::mutate(SC2= ifelse(SC %in% fewer5_SC_TW_USA, "other", SC))|> 
+  dplyr::mutate(SC2= factor(SC2, level=c(1:length(which(table(metadata$SC)>=10)), "other")))
+
+# Correlation test 
+cor_test_TW_USA <- cor.test(SC_Freq_df_TW_USA$Proportion_TW, SC_Freq_df_TW_USA$Proportion_CDC)
+cor_coefficient_TW_USA <- round(cor_test_TW_USA$estimate, 2)
+p_value_TW_USA <- signif(cor_test_TW_USA$p.value, 3)
+
+# Plot
+p_SC_TW_USA <- ggplot() +
+  geom_ribbon(data = shade_data, aes(x = x, ymin = ymin_5, ymax = ymax_5), fill = "grey95", alpha = 0.5)+
+  geom_ribbon(data = shade_data, aes(x = x, ymin = ymin_25, ymax = ymax_25), fill = "grey95", alpha = 0.5)+
+  geom_point(data= SC_Freq_df_TW_USA, aes(x = Proportion_TW, y = Proportion_CDC, color = SC2), size=3) +
+  geom_abline(slope = 1, intercept = 0, color = "black") +  
+  theme_classic() +
+  xlab(paste0("SC frequencies in Netherlands (n=", length(NL_samples), ")")) +
+  ylab(paste0("SC frequencies in USA (n=", length(CDC_samples), ")")) +
+  annotate("text", x = 0.02, y = 0.45, hjust = 0, label = paste("Pearson's correlation:\nr =", cor_coefficient_TW_USA, ", p ", ifelse(p_value_TW_USA< 0.001, "< 0.001", paste("=",p_value_TW_USA))), size = 4, color = "black") +
+  scale_color_manual(values=SC_colors)+
+  scale_x_continuous(limits = c(0, 0.5), expand=c(0.02, 0)) +
+  scale_y_continuous(limits = c(0, 0.5), expand=c(0.02, 0)) +
+  ggtitle(paste0("Infant Invasive Disease (n=", (length(NL_samples)+length(CDC_samples)), ")"))
+p_SC_TW_USA
+
+# Save
+# ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pangenome_analysis/2.SC_freq_correlations.png", plot = p_SC_all, width = 7, height = 6, dpi = 300, units = "in", bg = "white")
+```
+## 1.3. NL vs TW
+```{r }
+# Prepare Plot Data 
+metadata_TW_NL <- metadata |>  filter(Country %in% c("NL", "TW"))
+fewer5_SC_TW_NL <- names(which(table(metadata_TW_NL$SC)<10))
+SC_Freq_df_TW_NL <- metadata_TW_NL |>
+  group_by(Country)|>
+  dplyr::mutate(N_Country = n())|>
+  ungroup()|>
+  group_by(Country, N_Country, SC)|>
+  summarise(N_SC = n())|>
+  ungroup()|>
+  dplyr::mutate(p_SC = N_SC/N_Country)|>
+  dplyr::select(Country, SC, p_SC)|>
+  pivot_wider(names_from = Country, values_from = p_SC) |>
+  rename(Proportion_TW=TW, 
+         Proportion_CDC= NL) |>
+  dplyr::mutate(SC= as.factor(SC), 
+         Proportion_TW = ifelse(is.na(Proportion_TW), 0, Proportion_TW), 
+         Proportion_CDC = ifelse(is.na(Proportion_CDC), 0, Proportion_CDC))|> 
+  dplyr::mutate(SC2= ifelse(SC %in% fewer5_SC_TW_NL, "other", SC))|> 
+  dplyr::mutate(SC2= factor(SC2, level=c(1:length(which(table(metadata$SC)>=10)), "other")))
+
+# Correlation test 
+cor_test_TW_NL <- cor.test(SC_Freq_df_TW_NL$Proportion_TW, SC_Freq_df_TW_NL$Proportion_CDC)
+cor_coefficient_TW_NL <- round(cor_test_TW_NL$estimate, 2)
+p_value_TW_NL <- signif(cor_test_TW_NL$p.value, 3)
+
+# Plot
+p_SC_TW_NL <- ggplot() +
+  geom_ribbon(data = shade_data, aes(x = x, ymin = ymin_5, ymax = ymax_5), fill = "grey95", alpha = 0.5)+
+  geom_ribbon(data = shade_data, aes(x = x, ymin = ymin_25, ymax = ymax_25), fill = "grey95", alpha = 0.5)+
+  geom_point(data= SC_Freq_df_TW_NL, aes(x = Proportion_TW, y = Proportion_CDC, color = SC2), size=3) +
+  geom_abline(slope = 1, intercept = 0, color = "black") +  
+  theme_classic() +
+  xlab(paste0("SC frequencies in Netherlands (n=", length(NL_samples), ")")) +
+  ylab(paste0("SC frequencies in NL (n=", length(CDC_samples), ")")) +
+  annotate("text", x = 0.02, y = 0.45, hjust = 0, label = paste("Pearson's correlation:\nr =", cor_coefficient_TW_NL, ", p ", ifelse(p_value_TW_NL< 0.001, "< 0.001", paste("=",p_value_TW_NL))), size = 4, color = "black") +
+  scale_color_manual(values=SC_colors)+
+  scale_x_continuous(limits = c(0, 0.5), expand=c(0.02, 0)) +
+  scale_y_continuous(limits = c(0, 0.5), expand=c(0.02, 0)) +
+  ggtitle(paste0("Infant Invasive Disease (n=", (length(NL_samples)+length(CDC_samples)), ")"))
+p_SC_TW_NL
+
+# Save
+# ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pangenome_analysis/2.SC_freq_correlations.png", plot = p_SC_all, width = 7, height = 6, dpi = 300, units = "in", bg = "white")
+```
+
+
+# 2. Compare SC dsitribution across countries AND age cat
+## 2.0. BarPlot SC in EOD vs LOD/VLOD across countries
+```{r}
+# Load phenotypes
+phenotypes <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Phylogenies/EOD_LOD_VLOD_CDC_NL_TW/phenotypes_filtered_clean.txt", header=T)|>
+  rename(Sample =samples ) |> 
+  mutate(Age_cat = ifelse(binary==0, "EOD", "LOD/VLOD"))
+
+metadata_phenotypes_df <- left_join(metadata, phenotypes)
+fewer5_SC <- names(which(table(metadata_phenotypes_df$SC)<10))
+metadata_phenotypes <- metadata_phenotypes_df |>
+  mutate(SC2= ifelse(SC %in% fewer5_SC, "other", SC))|> 
+  mutate(SC2= factor(SC2, levels= c(1:14, "other")))
+
+# prepate stats for plot
+metadata_phenotypes_USA_NL_EOD <- metadata_phenotypes |> filter(Country %in% c("USA", "NL"), Age_cat =="EOD")
+metadata_phenotypes_USA_NL_LOD <- metadata_phenotypes |> filter(Country %in% c("USA", "NL"), Age_cat =="LOD/VLOD")
+metadata_phenotypes_USA_TW_EOD <- metadata_phenotypes |> filter(Country %in% c("USA", "TW"), Age_cat =="EOD")
+metadata_phenotypes_USA_TW_LOD <- metadata_phenotypes |> filter(Country %in% c("USA", "TW"), Age_cat =="LOD/VLOD")
+metadata_phenotypes_NL_TW_EOD <- metadata_phenotypes |> filter(Country %in% c("NL", "TW"), Age_cat =="EOD")
+metadata_phenotypes_NL_TW_LOD <- metadata_phenotypes |> filter(Country %in% c("NL", "TW"), Age_cat =="LOD/VLOD")
+
+p_USA_NL_EOD    <- chisq.test(metadata_phenotypes_USA_NL_EOD$SC, metadata_phenotypes_USA_NL_EOD$Country, simulate.p.value = T, B=5000)$p.value
+p_USA_NL_LOD    <- chisq.test(metadata_phenotypes_USA_NL_LOD$SC, metadata_phenotypes_USA_NL_LOD$Country, simulate.p.value = T, B=5000)$p.value
+p_USA_TW_EOD    <- chisq.test(metadata_phenotypes_USA_TW_EOD$SC, metadata_phenotypes_USA_TW_EOD$Country, simulate.p.value = T, B=5000)$p.value
+p_USA_TW_LOD    <- chisq.test(metadata_phenotypes_USA_TW_LOD$SC, metadata_phenotypes_USA_TW_LOD$Country, simulate.p.value = T, B=5000)$p.value
+p_NL_TW_EOD     <- chisq.test(metadata_phenotypes_NL_TW_EOD$SC, metadata_phenotypes_NL_TW_EOD$Country, simulate.p.value = T, B=5000)$p.value
+p_NL_TW_LOD     <- chisq.test(metadata_phenotypes_NL_TW_LOD$SC, metadata_phenotypes_NL_TW_LOD$Country, simulate.p.value = T, B=5000)$p.value
+
+# Format them for text display
+format_p <- function(pval) {
+  if (pval < 0.001) "p < 0.001" else paste0("p = ", signif(pval, 2))
+}
+
+# Suppose we want annotations for Age_cat == "EOD":
+bracket_df <- data.frame(
+  Age_cat = c("EOD", "EOD", "EOD"),
+  xstart = c(1, 1, 2),    # USA vs NL, USA vs TW, NL vs TW
+  xend = c(2, 3, 3),
+    y = c(1.05, 1.12, 1.19),
+  label = c(format_p(p_USA_NL_EOD), format_p(p_USA_TW_EOD), format_p(p_NL_TW_EOD))
+)
+
+# Add for LOD/VLOD as well:
+bracket_df <- bind_rows(
+  bracket_df,
+  data.frame(
+    Age_cat = c("LOD/VLOD", "LOD/VLOD", "LOD/VLOD"),
+    xstart = c(1, 1, 2),
+    xend = c(2, 3, 3),
+    y = c(1.05, 1.12, 1.19),
+    label = c(format_p(p_USA_NL_LOD), format_p(p_USA_TW_LOD), format_p(p_NL_TW_LOD))
+  )
+)
+
+# Main Plot
+p_dist <- metadata_phenotypes %>%
+  mutate(Country= factor(Country, levels= c("USA", "NL", "TW"))) %>%
+  ggplot(aes(x=Country, fill=SC2)) +
+  geom_bar(position = "fill") +
+  facet_grid(Age_cat ~ .) +
+  scale_fill_manual(values=SC_colors, name="SC") +
+  theme_classic() +
+  # Add brackets
+  geom_segment(
+    data = bracket_df,
+    aes(x = xstart, xend = xend, y = y+ 0.02, yend = y+ 0.02, group=interaction(Age_cat, xstart, xend)),
+    inherit.aes = FALSE
+  ) +
+  # Left verticals
+  geom_segment(
+    data = bracket_df,
+    aes(x = xstart, xend = xstart, y = y+ 0.02, yend = y+0.02),
+    inherit.aes = FALSE
+  ) +
+  # Right verticals
+  geom_segment(
+    data = bracket_df,
+    aes(x = xend, xend = xend, y = y+ 0.02, yend = y+0.02),
+    inherit.aes = FALSE
+  ) +
+  # P-value text
+  geom_text(
+    data = bracket_df,
+    aes(x = (xstart + xend)/2, y = y + 0.05, label = label),
+    size = 3.5,
+    inherit.aes = FALSE
+  )
+p_dist
+
+```
+
+## 2.1. Plot SC % Correlation - EOD 
+## 2.1.1. USA vs NL
+```{r }
+# Prepare Plot Data 
+metadata_NL_USA_EOD <- metadata_phenotypes |> filter(Country %in% c("USA", "NL"), Age_cat =="EOD")
+SC_Freq_df_NL_USA_EOD <- metadata_NL_USA_EOD |>
+  group_by(Country)|>
+  dplyr::mutate(N_Country = n())|>
+  ungroup()|>
+  group_by(Country, N_Country, SC)|>
+  summarise(N_SC = n())|>
+  ungroup()|>
+  dplyr::mutate(p_SC = N_SC/N_Country)|>
+  dplyr::select(Country, SC, p_SC)|>
+  pivot_wider(names_from = Country, values_from = p_SC) |>
+  rename(Proportion_NL=NL, 
+         Proportion_CDC= USA) |>
+  dplyr::mutate(SC= as.factor(SC), 
+         Proportion_NL = ifelse(is.na(Proportion_NL), 0, Proportion_NL), 
+         Proportion_CDC = ifelse(is.na(Proportion_CDC), 0, Proportion_CDC))|> 
+  dplyr::mutate(SC2= ifelse(SC %in% fewer5_SC, "other", SC))|> 
+  dplyr::mutate(SC2= factor(SC2, level=c(1:length(which(table(metadata$SC)>=10)), "other")))
+
+# Correlation test 
+cor_test_NL_USA_EOD <- cor.test(SC_Freq_df_NL_USA_EOD$Proportion_NL, SC_Freq_df_NL_USA_EOD$Proportion_CDC)
+cor_coefficient_NL_USA_EOD <- round(cor_test_NL_USA_EOD$estimate, 2)
+p_value_NL_USA_EOD <- signif(cor_test_NL_USA_EOD$p.value, 3)
+
+# Plot
+p_SC_NL_USA_EOD <- ggplot() +
+  geom_ribbon(data = shade_data, aes(x = x, ymin = ymin_5, ymax = ymax_5), fill = "grey95", alpha = 0.5)+
+  geom_ribbon(data = shade_data, aes(x = x, ymin = ymin_25, ymax = ymax_25), fill = "grey95", alpha = 0.5)+
+  geom_point(data= SC_Freq_df_NL_USA_EOD, aes(x = Proportion_NL, y = Proportion_CDC, color = SC2), size=3) +
+  geom_abline(slope = 1, intercept = 0, color = "black") +  
+  theme_classic() +
+  xlab(paste0("SC frequencies in Netherlands (n=", length(NL_samples), ")")) +
+  ylab(paste0("SC frequencies in USA (n=", length(CDC_samples), ")")) +
+  annotate("text", x = 0.02, y = 0.45, hjust = 0, label = paste("Pearson's correlation:\nr =", cor_coefficient_NL_USA_EOD, ", p ", ifelse(p_value_NL_USA_EOD< 0.001, "< 0.001", paste("=",p_value_NL_USA_EOD))), size = 4, color = "black") +
+  scale_color_manual(values=SC_colors)+
+  scale_x_continuous(limits = c(0, 0.5), expand=c(0.02, 0)) +
+  scale_y_continuous(limits = c(0, 0.5), expand=c(0.02, 0)) +
+  ggtitle(paste0("Infant Invasive Disease (n=", (length(NL_samples)+length(CDC_samples)), ")"))
+p_SC_NL_USA_EOD
+
+# Save
+# ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pangenome_analysis/2.SC_freq_correlations.png", plot = p_SC_all, width = 7, height = 6, dpi = 300, units = "in", bg = "white")
+```
+
+## 2.1.2. USA vs TW
+```{r }
+# Prepare Plot Data 
+metadata_TW_USA_EOD <- metadata_phenotypes |> filter(Country %in% c("USA", "TW"), Age_cat =="EOD")
+SC_Freq_df_TW_USA_EOD <- metadata_TW_USA_EOD |>
+  group_by(Country)|>
+  dplyr::mutate(N_Country = n())|>
+  ungroup()|>
+  group_by(Country, N_Country, SC)|>
+  summarise(N_SC = n())|>
+  ungroup()|>
+  dplyr::mutate(p_SC = N_SC/N_Country)|>
+  dplyr::select(Country, SC, p_SC)|>
+  pivot_wider(names_from = Country, values_from = p_SC) |>
+  rename(Proportion_TW=TW, 
+         Proportion_CDC= USA) |>
+  dplyr::mutate(SC= as.factor(SC), 
+         Proportion_TW = ifelse(is.na(Proportion_TW), 0, Proportion_TW), 
+         Proportion_CDC = ifelse(is.na(Proportion_CDC), 0, Proportion_CDC))|> 
+  dplyr::mutate(SC2= ifelse(SC %in% fewer5_SC, "other", SC))|> 
+  dplyr::mutate(SC2= factor(SC2, level=c(1:length(which(table(metadata$SC)>=10)), "other")))
+
+# Correlation test 
+cor_test_TW_USA_EOD <- cor.test(SC_Freq_df_TW_USA_EOD$Proportion_TW, SC_Freq_df_TW_USA_EOD$Proportion_CDC)
+cor_coefficient_TW_USA_EOD <- round(cor_test_TW_USA_EOD$estimate, 2)
+p_value_TW_USA_EOD <- signif(cor_test_TW_USA_EOD$p.value, 3)
+
+# Plot
+p_SC_TW_USA_EOD <- ggplot() +
+  geom_ribbon(data = shade_data, aes(x = x, ymin = ymin_5, ymax = ymax_5), fill = "grey95", alpha = 0.5)+
+  geom_ribbon(data = shade_data, aes(x = x, ymin = ymin_25, ymax = ymax_25), fill = "grey95", alpha = 0.5)+
+  geom_point(data= SC_Freq_df_TW_USA_EOD, aes(x = Proportion_TW, y = Proportion_CDC, color = SC2), size=3) +
+  geom_abline(slope = 1, intercept = 0, color = "black") +  
+  theme_classic() +
+  xlab(paste0("SC frequencies in Netherlands (n=", length(TW_samples), ")")) +
+  ylab(paste0("SC frequencies in USA (n=", length(CDC_samples), ")")) +
+  annotate("text", x = 0.02, y = 0.45, hjust = 0, label = paste("Pearson's correlation:\nr =", cor_coefficient_TW_USA_EOD, ", p ", ifelse(p_value_TW_USA_EOD< 0.001, "< 0.001", paste("=",p_value_TW_USA_EOD))), size = 4, color = "black") +
+  scale_color_manual(values=SC_colors)+
+  scale_x_continuous(limits = c(0, 0.5), expand=c(0.02, 0)) +
+  scale_y_continuous(limits = c(0, 0.5), expand=c(0.02, 0)) +
+  ggtitle(paste0("Infant Invasive Disease (n=", (length(TW_samples)+length(CDC_samples)), ")"))
+p_SC_TW_USA_EOD
+
+# Save
+# ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pangenome_analysis/2.SC_freq_correlations.png", plot = p_SC_all, width = 7, height = 6, dpi = 300, units = "in", bg = "white")
+```
+
+## 2.1.3. NL vs TW
+```{r }
+# Prepare Plot Data 
+metadata_TW_NL_EOD <- metadata_phenotypes |> filter(Country %in% c("NL", "TW"), Age_cat =="EOD")
+SC_Freq_df_TW_NL_EOD <- metadata_TW_NL_EOD |>
+  group_by(Country)|>
+  dplyr::mutate(N_Country = n())|>
+  ungroup()|>
+  group_by(Country, N_Country, SC)|>
+  summarise(N_SC = n())|>
+  ungroup()|>
+  dplyr::mutate(p_SC = N_SC/N_Country)|>
+  dplyr::select(Country, SC, p_SC)|>
+  pivot_wider(names_from = Country, values_from = p_SC) |>
+  rename(Proportion_TW=TW, 
+         Proportion_CDC= NL) |>
+  dplyr::mutate(SC= as.factor(SC), 
+         Proportion_TW = ifelse(is.na(Proportion_TW), 0, Proportion_TW), 
+         Proportion_CDC = ifelse(is.na(Proportion_CDC), 0, Proportion_CDC))|> 
+  dplyr::mutate(SC2= ifelse(SC %in% fewer5_SC, "other", SC))|> 
+  dplyr::mutate(SC2= factor(SC2, level=c(1:length(which(table(metadata$SC)>=10)), "other")))
+
+# Correlation test 
+cor_test_TW_NL_EOD <- cor.test(SC_Freq_df_TW_NL_EOD$Proportion_TW, SC_Freq_df_TW_NL_EOD$Proportion_CDC)
+cor_coefficient_TW_NL_EOD <- round(cor_test_TW_NL_EOD$estimate, 2)
+p_value_TW_NL_EOD <- signif(cor_test_TW_NL_EOD$p.value, 3)
+
+# Plot
+p_SC_TW_NL_EOD <- ggplot() +
+  geom_ribbon(data = shade_data, aes(x = x, ymin = ymin_5, ymax = ymax_5), fill = "grey95", alpha = 0.5)+
+  geom_ribbon(data = shade_data, aes(x = x, ymin = ymin_25, ymax = ymax_25), fill = "grey95", alpha = 0.5)+
+  geom_point(data= SC_Freq_df_TW_NL_EOD, aes(x = Proportion_TW, y = Proportion_CDC, color = SC2), size=3) +
+  geom_abline(slope = 1, intercept = 0, color = "black") +  
+  theme_classic() +
+  xlab(paste0("SC frequencies in Netherlands (n=", length(TW_samples), ")")) +
+  ylab(paste0("SC frequencies in NL (n=", length(CDC_samples), ")")) +
+  annotate("text", x = 0.02, y = 0.45, hjust = 0, label = paste("Pearson's correlation:\nr =", cor_coefficient_TW_NL_EOD, ", p ", ifelse(p_value_TW_NL_EOD< 0.001, "< 0.001", paste("=",p_value_TW_NL_EOD))), size = 4, color = "black") +
+  scale_color_manual(values=SC_colors)+
+  scale_x_continuous(limits = c(0, 0.5), expand=c(0.02, 0)) +
+  scale_y_continuous(limits = c(0, 0.5), expand=c(0.02, 0)) +
+  ggtitle(paste0("Infant Invasive Disease (n=", (length(TW_samples)+length(CDC_samples)), ")"))
+p_SC_TW_NL_EOD
+
+# Save
+# ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pangenome_analysis/2.SC_freq_correlations.png", plot = p_SC_all, width = 7, height = 6, dpi = 300, units = "in", bg = "white")
+```
+
+
+
+## 2.2. Plot SC % Correlation - LOD/VLOD
+### 2.2.1. USA vs NL
+```{r }
+# Prepare Plot Data 
+metadata_NL_USA_LOD <- metadata_phenotypes |> filter(Country %in% c("USA", "NL"), Age_cat =="LOD/VLOD")
+SC_Freq_df_NL_USA_LOD <- metadata_NL_USA_LOD |>
+  group_by(Country)|>
+  dplyr::mutate(N_Country = n())|>
+  ungroup()|>
+  group_by(Country, N_Country, SC)|>
+  summarise(N_SC = n())|>
+  ungroup()|>
+  dplyr::mutate(p_SC = N_SC/N_Country)|>
+  dplyr::select(Country, SC, p_SC)|>
+  pivot_wider(names_from = Country, values_from = p_SC) |>
+  rename(Proportion_NL=NL, 
+         Proportion_CDC= USA) |>
+  dplyr::mutate(SC= as.factor(SC), 
+         Proportion_NL = ifelse(is.na(Proportion_NL), 0, Proportion_NL), 
+         Proportion_CDC = ifelse(is.na(Proportion_CDC), 0, Proportion_CDC))|> 
+  dplyr::mutate(SC2= ifelse(SC %in% fewer5_SC, "other", SC))|> 
+  dplyr::mutate(SC2= factor(SC2, level=c(1:length(which(table(metadata$SC)>=10)), "other")))
+
+# Correlation test 
+cor_test_NL_USA_LOD <- cor.test(SC_Freq_df_NL_USA_LOD$Proportion_NL, SC_Freq_df_NL_USA_LOD$Proportion_CDC)
+cor_coefficient_NL_USA_LOD <- round(cor_test_NL_USA_LOD$estimate, 2)
+p_value_NL_USA_LOD <- signif(cor_test_NL_USA_LOD$p.value, 3)
+
+# Plot
+p_SC_NL_USA_LOD <- ggplot() +
+  geom_ribbon(data = shade_data, aes(x = x, ymin = ymin_5, ymax = ymax_5), fill = "grey95", alpha = 0.5)+
+  geom_ribbon(data = shade_data, aes(x = x, ymin = ymin_25, ymax = ymax_25), fill = "grey95", alpha = 0.5)+
+  geom_point(data= SC_Freq_df_NL_USA_LOD, aes(x = Proportion_NL, y = Proportion_CDC, color = SC2), size=3) +
+  geom_abline(slope = 1, intercept = 0, color = "black") +  
+  theme_classic() +
+  xlab(paste0("SC frequencies in Netherlands (n=", length(NL_samples), ")")) +
+  ylab(paste0("SC frequencies in USA (n=", length(CDC_samples), ")")) +
+  annotate("text", x = 0.02, y = 0.45, hjust = 0, label = paste("Pearson's correlation:\nr =", cor_coefficient_NL_USA_LOD, ", p ", ifelse(p_value_NL_USA_LOD< 0.001, "< 0.001", paste("=",p_value_NL_USA_LOD))), size = 4, color = "black") +
+  scale_color_manual(values=SC_colors)+
+  scale_x_continuous(limits = c(0, 0.5), expand=c(0.02, 0)) +
+  scale_y_continuous(limits = c(0, 0.5), expand=c(0.02, 0)) +
+  ggtitle(paste0("Infant Invasive Disease (n=", (length(NL_samples)+length(CDC_samples)), ")"))
+p_SC_NL_USA_LOD
+
+# Save
+# ggsave("~/GitHub/GBS-GWAS-CDC-LOD-LOD/Analysis/Pangenome_analysis/2.SC_freq_correlations.png", plot = p_SC_all, width = 7, height = 6, dpi = 300, units = "in", bg = "white")
+```
+
+### 2.2.2. USA vs TW
+```{r }
+# Prepare Plot Data 
+metadata_TW_USA_LOD <- metadata_phenotypes |> filter(Country %in% c("USA", "TW"), Age_cat =="LOD/VLOD")
+SC_Freq_df_TW_USA_LOD <- metadata_TW_USA_LOD |>
+  group_by(Country)|>
+  dplyr::mutate(N_Country = n())|>
+  ungroup()|>
+  group_by(Country, N_Country, SC)|>
+  summarise(N_SC = n())|>
+  ungroup()|>
+  dplyr::mutate(p_SC = N_SC/N_Country)|>
+  dplyr::select(Country, SC, p_SC)|>
+  pivot_wider(names_from = Country, values_from = p_SC) |>
+  rename(Proportion_TW=TW, 
+         Proportion_CDC= USA) |>
+  dplyr::mutate(SC= as.factor(SC), 
+         Proportion_TW = ifelse(is.na(Proportion_TW), 0, Proportion_TW), 
+         Proportion_CDC = ifelse(is.na(Proportion_CDC), 0, Proportion_CDC))|> 
+  dplyr::mutate(SC2= ifelse(SC %in% fewer5_SC, "other", SC))|> 
+  dplyr::mutate(SC2= factor(SC2, level=c(1:length(which(table(metadata$SC)>=10)), "other")))
+
+# Correlation test 
+cor_test_TW_USA_LOD <- cor.test(SC_Freq_df_TW_USA_LOD$Proportion_TW, SC_Freq_df_TW_USA_LOD$Proportion_CDC)
+cor_coefficient_TW_USA_LOD <- round(cor_test_TW_USA_LOD$estimate, 2)
+p_value_TW_USA_LOD <- signif(cor_test_TW_USA_LOD$p.value, 3)
+
+# Plot
+p_SC_TW_USA_LOD <- ggplot() +
+  geom_ribbon(data = shade_data, aes(x = x, ymin = ymin_5, ymax = ymax_5), fill = "grey95", alpha = 0.5)+
+  geom_ribbon(data = shade_data, aes(x = x, ymin = ymin_25, ymax = ymax_25), fill = "grey95", alpha = 0.5)+
+  geom_point(data= SC_Freq_df_TW_USA_LOD, aes(x = Proportion_TW, y = Proportion_CDC, color = SC2), size=3) +
+  geom_abline(slope = 1, intercept = 0, color = "black") +  
+  theme_classic() +
+  xlab(paste0("SC frequencies in Netherlands (n=", length(TW_samples), ")")) +
+  ylab(paste0("SC frequencies in USA (n=", length(CDC_samples), ")")) +
+  annotate("text", x = 0.02, y = 0.45, hjust = 0, label = paste("Pearson's correlation:\nr =", cor_coefficient_TW_USA_LOD, ", p ", ifelse(p_value_TW_USA_LOD< 0.001, "< 0.001", paste("=",p_value_TW_USA_LOD))), size = 4, color = "black") +
+  scale_color_manual(values=SC_colors)+
+  scale_x_continuous(limits = c(0, 0.5), expand=c(0.02, 0)) +
+  scale_y_continuous(limits = c(0, 0.5), expand=c(0.02, 0)) +
+  ggtitle(paste0("Infant Invasive Disease (n=", (length(TW_samples)+length(CDC_samples)), ")"))
+p_SC_TW_USA_LOD
+
+# Save
+# ggsave("~/GitHub/GBS-GWAS-CDC-LOD-LOD/Analysis/Pangenome_analysis/2.SC_freq_correlations.png", plot = p_SC_all, width = 7, height = 6, dpi = 300, units = "in", bg = "white")
+```
+
+### 2.2.3. NL vs TW
+```{r }
+# Prepare Plot Data 
+metadata_TW_NL_LOD <- metadata_phenotypes |> filter(Country %in% c("NL", "TW"), Age_cat =="LOD/VLOD")
+SC_Freq_df_TW_NL_LOD <- metadata_TW_NL_LOD |>
+  group_by(Country)|>
+  dplyr::mutate(N_Country = n())|>
+  ungroup()|>
+  group_by(Country, N_Country, SC)|>
+  summarise(N_SC = n())|>
+  ungroup()|>
+  dplyr::mutate(p_SC = N_SC/N_Country)|>
+  dplyr::select(Country, SC, p_SC)|>
+  pivot_wider(names_from = Country, values_from = p_SC) |>
+  rename(Proportion_TW=TW, 
+         Proportion_CDC= NL) |>
+  dplyr::mutate(SC= as.factor(SC), 
+         Proportion_TW = ifelse(is.na(Proportion_TW), 0, Proportion_TW), 
+         Proportion_CDC = ifelse(is.na(Proportion_CDC), 0, Proportion_CDC))|> 
+  dplyr::mutate(SC2= ifelse(SC %in% fewer5_SC, "other", SC))|> 
+  dplyr::mutate(SC2= factor(SC2, level=c(1:length(which(table(metadata$SC)>=10)), "other")))
+
+# Correlation test 
+cor_test_TW_NL_LOD <- cor.test(SC_Freq_df_TW_NL_LOD$Proportion_TW, SC_Freq_df_TW_NL_LOD$Proportion_CDC)
+cor_coefficient_TW_NL_LOD <- round(cor_test_TW_NL_LOD$estimate, 2)
+p_value_TW_NL_LOD <- signif(cor_test_TW_NL_LOD$p.value, 3)
+
+# Plot
+p_SC_TW_NL_LOD <- ggplot() +
+  geom_ribbon(data = shade_data, aes(x = x, ymin = ymin_5, ymax = ymax_5), fill = "grey95", alpha = 0.5)+
+  geom_ribbon(data = shade_data, aes(x = x, ymin = ymin_25, ymax = ymax_25), fill = "grey95", alpha = 0.5)+
+  geom_point(data= SC_Freq_df_TW_NL_LOD, aes(x = Proportion_TW, y = Proportion_CDC, color = SC2), size=3) +
+  geom_abline(slope = 1, intercept = 0, color = "black") +  
+  theme_classic() +
+  xlab(paste0("SC frequencies in Netherlands (n=", length(TW_samples), ")")) +
+  ylab(paste0("SC frequencies in NL (n=", length(CDC_samples), ")")) +
+  annotate("text", x = 0.02, y = 0.45, hjust = 0, label = paste("Pearson's correlation:\nr =", cor_coefficient_TW_NL_LOD, ", p ", ifelse(p_value_TW_NL_LOD< 0.001, "< 0.001", paste("=",p_value_TW_NL_LOD))), size = 4, color = "black") +
+  scale_color_manual(values=SC_colors)+
+  scale_x_continuous(limits = c(0, 0.5), expand=c(0.02, 0)) +
+  scale_y_continuous(limits = c(0, 0.5), expand=c(0.02, 0)) +
+  ggtitle(paste0("Infant Invasive Disease (n=", (length(TW_samples)+length(CDC_samples)), ")"))
+p_SC_TW_NL_LOD
+
+# Save
+# ggsave("~/GitHub/GBS-GWAS-CDC-LOD-LOD/Analysis/Pangenome_analysis/2.SC_freq_correlations.png", plot = p_SC_all, width = 7, height = 6, dpi = 300, units = "in", bg = "white")
+```
+
+
+# 3. Compare CC dsitribution across countries AND age cat
+## 3.0. BarPlot CC in EOD vs LOD/VLOD across countries
+```{r}
+# Get association with country
+p_USA_NL_EOD_CC   <- chisq.test(metadata_phenotypes_USA_NL_EOD$clonal_complex, metadata_phenotypes_USA_NL_EOD$Country, simulate.p.value = T, B=5000)$p.value
+p_USA_NL_LOD_CC    <- chisq.test(metadata_phenotypes_USA_NL_LOD$clonal_complex, metadata_phenotypes_USA_NL_LOD$Country, simulate.p.value = T, B=5000)$p.value
+p_USA_TW_EOD_CC    <- chisq.test(metadata_phenotypes_USA_TW_EOD$clonal_complex, metadata_phenotypes_USA_TW_EOD$Country, simulate.p.value = T, B=5000)$p.value
+p_USA_TW_LOD_CC    <- chisq.test(metadata_phenotypes_USA_TW_LOD$clonal_complex, metadata_phenotypes_USA_TW_LOD$Country, simulate.p.value = T, B=5000)$p.value
+p_NL_TW_EOD_CC     <- chisq.test(metadata_phenotypes_NL_TW_EOD$clonal_complex, metadata_phenotypes_NL_TW_EOD$Country, simulate.p.value = T, B=5000)$p.value
+p_NL_TW_LOD_CC     <- chisq.test(metadata_phenotypes_NL_TW_LOD$clonal_complex, metadata_phenotypes_NL_TW_LOD$Country, simulate.p.value = T, B=5000)$p.value
+
+# Format them for text display
+format_p <- function(pval) {
+  if (pval < 0.001) "p < 0.001" else paste0("p = ", signif(pval, 2))
+}
+
+# Suppose we want annotations for Age_cat == "EOD":
+bracket_df_CC <- data.frame(
+  Age_cat = c("EOD", "EOD", "EOD"),
+  xstart = c(1, 1, 2),    # USA vs NL, USA vs TW, NL vs TW
+  xend = c(2, 3, 3),
+    y = c(1.05, 1.12, 1.19),
+  label = c(format_p(p_USA_NL_EOD_CC), format_p(p_USA_TW_EOD_CC), format_p(p_NL_TW_EOD_CC))
+)
+
+# Add for LOD/VLOD as well:
+bracket_df_CC <- bind_rows(
+  bracket_df_CC,
+  data.frame(
+    Age_cat = c("LOD/VLOD", "LOD/VLOD", "LOD/VLOD"),
+    xstart = c(1, 1, 2),
+    xend = c(2, 3, 3),
+    y = c(1.05, 1.12, 1.19),
+    label = c(format_p(p_USA_NL_LOD_CC), format_p(p_USA_TW_LOD_CC), format_p(p_NL_TW_LOD_CC))
+  )
+)
+
+# Main Plot
+CC_colors <- carto.pal(pal1 = "pastel.pal" ,n1 = 13)
+p_dist_CC <- metadata_phenotypes %>%
+  mutate(Country= factor(Country, levels= c("USA", "NL", "TW"))) %>%
+  ggplot(aes(x=Country, fill=clonal_complex)) +
+  geom_bar(position = "fill") +
+  facet_grid(Age_cat ~ .) +
+  scale_fill_manual(values=CC_colors, name="CC") +
+  theme_classic() +
+  # Add brackets
+  geom_segment(
+    data = bracket_df_CC,
+    aes(x = xstart, xend = xend, y = y+ 0.02, yend = y+ 0.02, group=interaction(Age_cat, xstart, xend)),
+    inherit.aes = FALSE
+  ) +
+  # Left verticals
+  geom_segment(
+    data = bracket_df_CC,
+    aes(x = xstart, xend = xstart, y = y+ 0.02, yend = y+0.02),
+    inherit.aes = FALSE
+  ) +
+  # Right verticals
+  geom_segment(
+    data = bracket_df_CC,
+    aes(x = xend, xend = xend, y = y+ 0.02, yend = y+0.02),
+    inherit.aes = FALSE
+  ) +
+  # P-value text
+  geom_text(
+    data = bracket_df_CC,
+    aes(x = (xstart + xend)/2, y = y + 0.05, label = label),
+    size = 3.5,
+    inherit.aes = FALSE
+  )
+p_dist_CC
+
+```
+
+
+# 4. Compare Serotype distribution across countries AND age cat
+## 4.0. BarPlot Serotype in EOD vs LOD/VLOD across countries
+```{r}
+# Get association with country
+p_USA_NL_EOD_Sero   <- chisq.test(metadata_phenotypes_USA_NL_EOD$Serotype, metadata_phenotypes_USA_NL_EOD$Country, simulate.p.value = T, B=5000)$p.value
+p_USA_NL_LOD_Sero    <- chisq.test(metadata_phenotypes_USA_NL_LOD$Serotype, metadata_phenotypes_USA_NL_LOD$Country, simulate.p.value = T, B=5000)$p.value
+p_USA_TW_EOD_Sero    <- chisq.test(metadata_phenotypes_USA_TW_EOD$Serotype, metadata_phenotypes_USA_TW_EOD$Country, simulate.p.value = T, B=5000)$p.value
+p_USA_TW_LOD_Sero    <- chisq.test(metadata_phenotypes_USA_TW_LOD$Serotype, metadata_phenotypes_USA_TW_LOD$Country, simulate.p.value = T, B=5000)$p.value
+p_NL_TW_EOD_Sero     <- chisq.test(metadata_phenotypes_NL_TW_EOD$Serotype, metadata_phenotypes_NL_TW_EOD$Country, simulate.p.value = T, B=5000)$p.value
+p_NL_TW_LOD_Sero     <- chisq.test(metadata_phenotypes_NL_TW_LOD$Serotype, metadata_phenotypes_NL_TW_LOD$Country, simulate.p.value = T, B=5000)$p.value
+
+# Format them for text display
+format_p <- function(pval) {
+  if (pval < 0.001) "p < 0.001" else paste0("p = ", signif(pval, 2))
+}
+
+# Suppose we want annotations for Age_cat == "EOD":
+bracket_df_Sero <- data.frame(
+  Age_cat = c("EOD", "EOD", "EOD"),
+  xstart = c(1, 1, 2),    # USA vs NL, USA vs TW, NL vs TW
+  xend = c(2, 3, 3),
+    y = c(1.05, 1.12, 1.19),
+  label = c(format_p(p_USA_NL_EOD_Sero), format_p(p_USA_TW_EOD_Sero), format_p(p_NL_TW_EOD_Sero))
+)
+
+# Add for LOD/VLOD as well:
+bracket_df_Sero <- bind_rows(
+  bracket_df_Sero,
+  data.frame(
+    Age_cat = c("LOD/VLOD", "LOD/VLOD", "LOD/VLOD"),
+    xstart = c(1, 1, 2),
+    xend = c(2, 3, 3),
+    y = c(1.05, 1.12, 1.19),
+    label = c(format_p(p_USA_NL_LOD_Sero), format_p(p_USA_TW_LOD_Sero), format_p(p_NL_TW_LOD_Sero))
+  )
+)
+
+# Main Plot
+CC_colors <- carto.pal(pal1 = "pastel.pal" ,n1 = 13)
+p_dist_Sero <- metadata_phenotypes %>%
+  mutate(Country= factor(Country, levels= c("USA", "NL", "TW"))) %>%
+  ggplot(aes(x=Country, fill=Serotype)) +
+  geom_bar(position = "fill") +
+  facet_grid(Age_cat ~ .) +
+  scale_fill_manual(values=CC_colors, name="CC") +
+  theme_classic() +
+  # Add brackets
+  geom_segment(
+    data = bracket_df_Sero,
+    aes(x = xstart, xend = xend, y = y+ 0.02, yend = y+ 0.02, group=interaction(Age_cat, xstart, xend)),
+    inherit.aes = FALSE
+  ) +
+  # Left verticals
+  geom_segment(
+    data = bracket_df_Sero,
+    aes(x = xstart, xend = xstart, y = y+ 0.02, yend = y+0.02),
+    inherit.aes = FALSE
+  ) +
+  # Right verticals
+  geom_segment(
+    data = bracket_df_Sero,
+    aes(x = xend, xend = xend, y = y+ 0.02, yend = y+0.02),
+    inherit.aes = FALSE
+  ) +
+  # P-value text
+  geom_text(
+    data = bracket_df_Sero,
+    aes(x = (xstart + xend)/2, y = y + 0.05, label = label),
+    size = 3.5,
+    inherit.aes = FALSE
+  )
+p_dist_Sero
+
 ```

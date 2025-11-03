@@ -31,7 +31,7 @@ rmvd %in% Fasttree_VLOD_DP_mid$tip.label
 # Load metadata
 setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC")
 serotypes <- read.table("Serotypes.txt", header=T)
-CCs <- read.csv("combined_results_with_cc.txt") |> select(Sample, clonal_complex)
+CCs <- read.csv("combined_results_with_cc.txt") |> dplyr::select(Sample, clonal_complex)
 SCs <- read.csv("GBS_GWAS_db_core_clusters.csv") |> rename(Sample=Taxon, SC=Cluster)
 STs <- read.delim("ST_results.txt") |>
   mutate(ST2 = str_remove(str_remove(ST,"\\*"),"\\?"))
@@ -45,7 +45,7 @@ phenotypes <- phenotypes |>
   mutate(Age_cat = ifelse(continuous<=7, "EOD", 
                           ifelse(continuous<=89, "LOD", "VLOD")))
 # Prep metadata for tree
-typing_data <- left_join(left_join(left_join(left_join(serotypes, CCs ), SCs), phenotypes), (STs |> select(Sample, ST, ST2)))
+typing_data <- left_join(left_join(left_join(left_join(serotypes, CCs ), SCs), phenotypes), (STs |> dplyr::select(Sample, ST, ST2)))
 fewer5_SC <- which(table(typing_data$SC)<=5)
 metadata_tree <- typing_data |>
   mutate(SC2= ifelse(SC %in% fewer5_SC, "other", SC))|>
@@ -57,11 +57,11 @@ metadata_tree <- typing_data |>
   filter(label %in% Fasttree_VLOD_DP_mid$tip.label)
 
 # Fix missing CCs
-ref_ST_cc_df <- rbind(unique(metadata_tree|> filter(!grepl("\\*", ST), !grepl("\\?", ST)) |> select(ST, clonal_complex)), 
+ref_ST_cc_df <- rbind(unique(metadata_tree|> filter(!grepl("\\*", ST), !grepl("\\?", ST)) |> dplyr::select(ST, clonal_complex)), 
                        data.frame(ST= c(1750, 2107, 137, 1809, 235, 482, 1946, 2106, 234),
                                   clonal_complex=c("cc17", "cc17", "cc17", "cc23", "cc1", "cc17", "cc17", "cc19", "cc23")))
 
-metadata_tree_v0 <- left_join(metadata_tree |> select(-clonal_complex), ref_ST_cc_df |> rename(ST2=ST)) |> 
+metadata_tree_v0 <- left_join(metadata_tree |> dplyr::select(-clonal_complex), ref_ST_cc_df |> rename(ST2=ST)) |> 
   mutate(clonal_complex = case_when(
     label == "SRR29440471" ~ "cc19",
     label == "SRR29458952" ~ "cc17",
@@ -82,20 +82,23 @@ metadata_tree_v0 <- left_join(metadata_tree |> select(-clonal_complex), ref_ST_c
 
 
 # Join metadata and tree 
-Fasttree_VLOD_DP_mid_metadata <- full_join(keep.tip(Fasttree_VLOD_DP_mid, metadata_tree_v0$label), metadata_tree_v0 , by = 'label')
+Fasttree_mid_metadata <- full_join(keep.tip(Fasttree_VLOD_DP_mid, metadata_tree_v0$label), metadata_tree_v0 , by = 'label')
+Fasttree_mid_Nsub <- Fasttree_VLOD_DP_mid
+Fasttree_mid_Nsub$edge.length <- Fasttree_VLOD_DP_mid$edge.length*2231314
+Fasttree_mid_Nsub_metadata <- full_join(keep.tip(Fasttree_mid_Nsub, metadata_tree_v0$label), metadata_tree_v0 , by = 'label')
 
 
 # Prepare heatmap data for phylo
 ## Serotype
-Metadata_Serotype = metadata_tree_v0 |> select(Serotype2)
+Metadata_Serotype = metadata_tree_v0 |> dplyr::select(Serotype2)
 row.names(Metadata_Serotype) <-  metadata_tree_v0$label
 colnames(Metadata_Serotype)= c("1")
 ## CC
-Metadata_CC= metadata_tree_v0 |> select(clonal_complex)
+Metadata_CC= metadata_tree_v0 |> dplyr::select(clonal_complex)
 row.names(Metadata_CC) <-  metadata_tree_v0$label
 colnames(Metadata_CC)= c("2")
 ## Age category
-Metadata_Age_cat= metadata_tree_v0 |> select(Age_cat)
+Metadata_Age_cat= metadata_tree_v0 |> dplyr::select(Age_cat)
 row.names(Metadata_Age_cat) <-  metadata_tree_v0$label
 colnames(Metadata_Age_cat)= c("3")
 
@@ -109,7 +112,7 @@ Age_cat_colors <- c("#004488", "#DDAA33", "#BB5566")
 # Save clean version of data
 setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Phylogenies/EOD_LOD_VLOD_CDC")
 write.csv(metadata_tree_v0 |> 
-  select(-GBS.SBG, -SC2, -ST)|>
+  dplyr::select(-GBS.SBG, -SC2, -ST)|>
   rename(Serotype = Serotype2, 
          ST = ST2), "Clean_Typing_data.csv", quote = F, row.names = F)
 ```
@@ -126,13 +129,13 @@ metadata_tree_v1 <- left_join(left_join(metadata_tree_v0, Serotype_original), ST
 
 metadata_tree_v1 |> 
   filter(ST2 != ST_original)|>  
-  select(label, ST, ST2, ST_original) 
+  dplyr::select(label, ST, ST2, ST_original) 
 
 metadata_tree_v1 |> 
   mutate(Serotype_original= str_replace(Serotype_original, "A", "a")) |> 
   mutate(Serotype_original= str_replace(Serotype_original, "B", "b")) |> 
   filter(Serotype2 != Serotype_original)|>  
-  select(label, Serotype2, Serotype_original)  
+  dplyr::select(label, Serotype2, Serotype_original)  
 
 
 # Some descriptive numbers 
@@ -149,13 +152,13 @@ metadata_tree_v0 |>
 ## Isolates with New STs
 STs |> 
   filter(grepl("NF", ST2))|> 
-  select(-ST2)|> 
+  dplyr::select(-ST2)|> 
   mutate(depth= round(depth, 1),
          maxMAF= round(maxMAF, 1))
 
 metadata_tree_v0 |> 
   filter(grepl("NF", ST2))|> 
-  select(label, ST2, clonal_complex, SC)
+  dplyr::select(label, ST2, clonal_complex, SC)
 
 ## CC distribution
 table(metadata_tree_v0$clonal_complex)
@@ -164,6 +167,23 @@ round(100*prop.table(table(metadata_tree_v0$clonal_complex)))
 ## Isolates with No CCs
 metadata_tree_v0 |> filter(clonal_complex =="No_CC")
 STs |> filter(ST2 %in% c(4, 16, 932))
+
+```
+# Plot only tree with scale 
+```{r}
+# Scale: Number of substitutions 
+Fasttre_full_sp_pscale_Nsub <- ggtree(Fasttree_mid_Nsub_metadata, ladderize = T, lwd=0.1) + 
+  geom_tippoint(aes(color=as.factor(SC2)),size=1.5)+
+  scale_colour_manual(name="SC", values=SC_colors)+ 
+  geom_treescale(x=0, y=1400, width=2000, color='red', fontsize=6, linesize=2, offset=20)
+Fasttre_full_sp_pscale_Nsub
+
+# Scale: Rate of substitutions / Site
+Fasttre_full_sp_pscale <- ggtree(Fasttree_mid_metadata, ladderize = T, lwd=0.1) + 
+  geom_tippoint(aes(color=as.factor(SC2)),size=1.5)+
+  scale_colour_manual(name="SC", values=SC_colors)+ 
+  geom_treescale(x=0, y=1400, width=round(2000/2231314,5), color='red', fontsize=6, linesize=2, offset=20)
+Fasttre_full_sp_pscale
 
 ```
 
@@ -197,7 +217,7 @@ Fasttre_full_sp_p4
 ```{r}
 # Prepare your data as before:
 barplot_data <- metadata_tree_v0 |> 
-  select(label, clonal_complex, SC2, Serotype2, binary, continuous, Age_cat) |>
+  dplyr::select(label, clonal_complex, SC2, Serotype2, binary, continuous, Age_cat) |>
   mutate(binary = factor(binary, levels = c(0,1), labels = c("EOD", "LOD+VLOD")))
 
 p_to_stars <- function(p) {
