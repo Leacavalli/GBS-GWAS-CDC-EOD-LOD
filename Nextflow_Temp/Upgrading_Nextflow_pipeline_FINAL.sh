@@ -280,30 +280,56 @@ sbatch -p fasse_bigmem -t 7-00:00:00 --mem=490000 --wrap=" /n/hanage_gbs_gwas_l3
 
 
 
-# Remove recombination
+# Run CDC-NDL-TW pipeline with correct phenotypes
+cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW/
 module load python
-# conda create -n gubbins
-source activate gubbins
-#conda config --add channels r
-#conda config --add channels defaults
-#conda config --add channels conda-forge
-#conda config --add channels bioconda
-#conda install gubbins
-gubbins -h
+source activate pyseer
+sbatch -p fasse -t 0-12:00 --mem=100000 --wrap="pyseer --lmm --phenotypes ../../Files/phenotypes_filtered_clean.txt --phenotype-column binary --vcf ../../11.SNIPPY_MULTI/merged.vcf --similarity FastTree_phylogeny_K.tsv > SNPGWAS_Fasttree_LMM.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="pyseer --lmm --phenotypes ../../Files/phenotypes_filtered_clean.txt --phenotype-column binary --kmers ../../14.UNITIGS/unitigs.txt --uncompressed --similarity FastTree_phylogeny_K.tsv > DBGWAS_Fasttree_LMM.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="pyseer --min-af 0.05 --max-af 0.95 --lmm --phenotypes ../../Files/phenotypes_filtered_clean.txt --phenotype-column binary --pres ../../13.Pangenome_analysis/13.1.Panaroo/gene_presence_absence.Rtab --similarity FastTree_phylogeny_K.tsv > PanGWAS_Panaroo_Fasttree_LMM.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="annotate_hits_pyseer DBGWAS_Fasttree_LMM.txt ../../Files/DBGWAS_references.txt DBGWAS_Fasttree_LMM_annotation.txt"
 
-cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC/11.SNIPPY_MULTI
-sbatch -p fasse_bigmem -c 48 -t 7-00:00:00 --mem=490000 --wrap="run_gubbins.py --prefix gubbins_out --threads 48 --starting-tree ../12.Phylogeny/12.1.FastTree_DP/EOD_LOD_VLOD_CDC_FastTree_DP.tre --model GTRGAMMA clean.full.aln"
-# slurm-6217863.out
+# Run CDC-NDL-TW pipeline with core genome phylo
+cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW/13.Pangenome_analysis/13.1.Panaroo/
+sbatch -p fasse_bigmem -t 7-00:00:00 --mem=490000 --wrap="../../Files/FastTree_DUSE_DOUBLE -nt -gtr -gamma core_gene_alignment.aln > FastTree_Core.tre"
 
-# Full alignment
-cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC/16.Gubbins/Fulltree_Gubbins
-../seqtk/seqtk subseq ../../11.SNIPPY_MULTI/clean.full.aln Full_samples.txt > Full.fasta
-sbatch -p fasse_bigmem -c 48 -t 7-00:00:00 --mem=490000 --wrap="run_gubbins.py --prefix /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC/16.Gubbins/Fulltree_Gubbins/gubbins_fulltree_out --threads 48 --starting-tree /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC/12.Phylogeny/12.1.FastTree_DP/EOD_LOD_VLOD_CDC_FastTree_DP.tre --model GTRGAMMA Full.fasta"
+module load python
+source activate pyseer
+sbatch -p fasse -t 0-12:00 --mem=50000 --wrap="python ../../Files/pyseer/scripts/phylogeny_distance.py --lmm FastTree_Core.tre > FastTree_Core_K.tsv"
+sbatch -p fasse -t 0-01:00 --mem=100000 --wrap="pyseer --lmm --phenotypes ../../Files/phenotypes_filtered_clean.txt --phenotype-column binary --vcf ../../11.SNIPPY_MULTI/merged.vcf --similarity FastTree_Core_K.tsv > SNPGWAS_Core.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="pyseer --lmm --phenotypes ../../Files/phenotypes_filtered_clean.txt --phenotype-column binary --kmers ../../14.UNITIGS/unitigs.txt --uncompressed --similarity FastTree_Core_K.tsv > DBGWAS_Core.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="pyseer --min-af 0.05 --max-af 0.95 --lmm --phenotypes ../../Files/phenotypes_filtered_clean.txt --phenotype-column binary --pres ../../13.Pangenome_analysis/13.1.Panaroo/gene_presence_absence.Rtab --similarity FastTree_Core_K.tsv > PanGWAS_Core.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="annotate_hits_pyseer DBGWAS_Core.txt ../../Files/DBGWAS_references.txt DBGWAS_Core_annotation.txt"
 
-# Need to subset to each major SC ?
-## SC1
-cd
-../seqtk/seqtk subseq ../../11.SNIPPY_MULTI/clean.full.aln SC1_Samples.txt > SC1.fasta
-sbatch -p fasse_bigmem -c 48 -t 7-00:00:00 --mem=490000 --wrap="run_gubbins.py --prefix /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC/16.Gubbins/SC1_Gubbins/gubbins_SC1_out --threads 48 --model GTRGAMMA /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC/11.SNIPPY_MULTI/clean.full.aln"
 
-Ok also, I have regenarate the plots for the branchwater and pushed to github. They are in . But I am missing the strainGST results for one sample : SRR17284135. I also could not find it in /n/holylabs/LABS/hanage_lab/Lab/rbalasubramanian/GI_Vaginal/Sourmash_Strainge. Although I do have its relative abundance so we presumably did run metaphlan on it, bur perhaps not strainGE ?... I believe this may be a sample we had previously excluded but are now including after your recategorization of body site of isolation... Could you let me know if you find strainGST
+# Run CDC-NDL-TW pipeline with recombination-free phylo
+cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW/16.Gubbins
+sbatch -p fasse_bigmem -c 48 -t 7-00:00:00 --mem=490000 --wrap="run_gubbins.py --prefix gubbins_fulltree_nostarttree --threads 48 --model GTRGAMMA /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW/11.SNIPPY_MULTI/clean.full.aln"
+
+module load python
+source activate pyseer
+sbatch -p fasse -t 0-12:00 --mem=50000 --wrap="python ../Files/pyseer/scripts/phylogeny_distance.py --lmm gubbins_fulltree_nostarttree.final_tree.tre > gubbins_fulltree_K.tsv"
+sbatch -p fasse -t 0-01:00 --mem=100000 --wrap="pyseer --lmm --phenotypes ../Files/phenotypes_filtered_clean.txt --phenotype-column binary --vcf ../11.SNIPPY_MULTI/merged.vcf --similarity gubbins_fulltree_K.tsv > SNPGWAS_Gubbins.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="pyseer --lmm --phenotypes ../Files/phenotypes_filtered_clean.txt --phenotype-column binary --kmers ../14.UNITIGS/unitigs.txt --uncompressed --similarity gubbins_fulltree_K.tsv > DBGWAS_Gubbins.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="pyseer --min-af 0.05 --max-af 0.95 --lmm --phenotypes ../Files/phenotypes_filtered_clean.txt --phenotype-column binary --pres ../13.Pangenome_analysis/13.1.Panaroo/gene_presence_absence.Rtab --similarity gubbins_fulltree_K.tsv > PanGWAS_Gubbins.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="annotate_hits_pyseer DBGWAS_Gubbins.txt ../Files/DBGWAS_references.txt DBGWAS_Gubbins_annotation.txt"
+
+
+# CDC-NDL-TW : Root with SP
+cd /n/hanage_gbs_gwas_l3/Lab/GBS-GWAS-pipeline/Nextflow_pipeline_EOD_LOD_NL/12.Phylogeny/FastTree_Rooted
+source activate sra-tools
+sbatch -p fasse -t 1-00:00 --mem=100000 --wrap="prefetch ERR1453441"
+sbatch -p fasse -t 0-00:10 --mem=10000 --wrap="fasterq-dump --split-files ERR1453441/*sra"
+source activate snippy
+sbatch -p fasse -t 1-00:00:00 --mem=10000 --wrap="snippy --outdir SNIPPY_OUT/ERR1453441 --R1 ERR1453441_1.fastq --R2 ERR1453441_2.fastq --ref AP018935.1.fa"
+sbatch -p fasse -t 1-00:00:00 --mem=10000 --wrap="snippy-core --ref AP018935.1.fa SNIPPY_OUT/ERR1453441/ ../../4.SNIPPY/*RR*"
+sbatch -p fasse -t 1-00:00:00 --mem=10000 --wrap="snippy-clean_full_aln core.full.aln > clean.full.aln"
+sbatch -p fasse_bigmem -t 7-00:00:00 --mem=490000 --wrap="../../Files/FastTree_DUSE_DOUBLE -nt -gtr -gamma clean.full.aln > FastTree_Rooted.tre"
+# DONE
+module load python
+source activate pyseer
+sbatch -p fasse -t 0-01:00 --mem=50000 --wrap="python ../../Files/pyseer/scripts/phylogeny_distance.py --lmm FastTree_Rooted.tre > FastTree_Rooted_K.tsv"
+sbatch -p fasse -t 0-01:00 --mem=100000 --wrap="pyseer --lmm --phenotypes ../Files/phenotypes_filtered_clean.txt --phenotype-column binary --vcf ../11.SNIPPY_MULTI/merged.vcf --similarity gubbins_fulltree_K.tsv > SNPGWAS_Gubbins.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="pyseer --lmm --phenotypes ../Files/phenotypes_filtered_clean.txt --phenotype-column binary --kmers ../14.UNITIGS/unitigs.txt --uncompressed --similarity gubbins_fulltree_K.tsv > DBGWAS_Gubbins.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="pyseer --min-af 0.05 --max-af 0.95 --lmm --phenotypes ../Files/phenotypes_filtered_clean.txt --phenotype-column binary --pres ../13.Pangenome_analysis/13.1.Panaroo/gene_presence_absence.Rtab --similarity gubbins_fulltree_K.tsv > PanGWAS_Gubbins.txt"
+sbatch -p fasse -t 0-01:00 --mem=10000 --wrap="annotate_hits_pyseer DBGWAS_Gubbins.txt ../Files/DBGWAS_references.txt DBGWAS_Gubbins_annotation.txt"

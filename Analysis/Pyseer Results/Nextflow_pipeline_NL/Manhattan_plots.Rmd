@@ -152,9 +152,21 @@ DBGWAS_FastTree_annotations |>
     P_value = formatC(lrt.pvalue, format = "e", digits = 2)
   ) |> 
   arrange(-POS)|> 
-  select(core_accessory, coord_range, af, OR_CI, P_value, gene)
+  dplyr::select(core_accessory, coord_range, af, OR_CI, P_value, gene) |> 
+  arrange(P_value)
 
-DBGWAS_FastTree_annotations |> arrange(lrt.pvalue)
+DBGWAS_FastTree_annotations |>
+    filter(lrt.pvalue == min(DBGWAS_FastTree_annotations$lrt.pvalue) | variant =="AAAATGTCATCTATATATGACACTCTTCTTA")|>
+  mutate(
+    OR = exp(beta),
+    OR_lower = exp(beta - 1.96 * beta.std.err),
+    OR_upper = exp(beta + 1.96 * beta.std.err),
+    OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+    P_value = formatC(lrt.pvalue, format = "e", digits = 2)
+  )|> 
+  dplyr::select(variant, core_accessory, contig_position, af, OR_CI, P_value, gene)
+
+DBGWAS_FastTree_annotations |>  filter(variant =="AAAATGTCATCTATATATGACACTCTTCTTA")
 
 # QQ plot 
 DBGWAS_FastTree_qqplot <- QQ_plot(DBGWAS_FastTree_annotations, "DBGWAS")
@@ -179,7 +191,7 @@ PanGWAS_FastTree_sig <- PanGWAS_FastTree |>
     OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
     P_value = formatC(lrt.pvalue, format = "e", digits = 2)
   ) |>
-  select(variant, OR_CI, P_value)
+  dplyr::select(variant, af, OR_CI, P_value)
 PanGWAS_FastTree_sig
 
 # QQ plot 
@@ -188,3 +200,8 @@ PanGWAS_FastTree_qqplot
 ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_NL/15.1.Main_analysis/PanGWAS_QQplot.png", plot = PanGWAS_FastTree_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
 
 ```
+
+
+# Information about significant hit from NDL study: 
+#  SNP	Position	Pvalue	Qvalue	OddsRatio	StatisticalSignificance	Variant	Genome	MatchLength	GenomeStart	GenomeEnd	GeneStart	GeneEnd	GeneID	LocusTag	Product	Evalue	MostCommonFeatureInOtherGenomes	Sequence
+# SEQ448320	125168	1,38E-07	0,30784032	0,756845572	Suggestive	SEQ448320	FO393392.1	31	1006831	1006861	N/A	N/A		Intergenic region	Intergenic region	1,23E-09	Intergenic region	AAAATGTCATCTATATATGACACTCTTCTTA

@@ -49,19 +49,19 @@ final_df_lt7 <- rbind(SNPGWAS_lt7_sig |>
          CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
          CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
          lt7= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
-  select(variant, lt7),
+  dplyr::select(variant, lt7),
 DBGWAS_lt7_sig |> 
   mutate(OR= round(exp(beta), 2),
          CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
          CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
          lt7= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
-  select(variant, lt7),
+  dplyr::select(variant, lt7),
 PanGWAS_lt7_sig |> 
   mutate(OR= round(exp(beta), 2),
          CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
          CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
          lt7= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
-  select(variant, lt7))
+  dplyr::select(variant, lt7))
 
 final_df_lt7
 ```
@@ -97,19 +97,19 @@ final_df_lt14 <- rbind(SNPGWAS_lt14_sig |>
          CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
          CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
          lt14= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
-  select(variant, lt14),
+  dplyr::select(variant, lt14),
 DBGWAS_lt14_sig |> 
   mutate(OR= round(exp(beta), 2),
          CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
          CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
          lt14= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
-  select(variant, lt14),
+  dplyr::select(variant, lt14),
 PanGWAS_lt14_sig |> 
   mutate(OR= round(exp(beta), 2),
          CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
          CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
          lt14= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
-  select(variant, lt14))
+  dplyr::select(variant, lt14))
 
 final_df_lt14
 ```
@@ -144,19 +144,19 @@ final_df_lt30 <- rbind(SNPGWAS_lt30_sig |>
          CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
          CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
          lt30= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
-  select(variant, lt30),
+  dplyr::select(variant, lt30),
 DBGWAS_lt30_sig |> 
   mutate(OR= round(exp(beta), 2),
          CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
          CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
          lt30= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
-  select(variant, lt30),
+  dplyr::select(variant, lt30),
 PanGWAS_lt30_sig |> 
   mutate(OR= round(exp(beta), 2),
          CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
          CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
          lt30= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
-  select(variant, lt30))
+  dplyr::select(variant, lt30))
 final_df_lt30
 ```
 
@@ -190,24 +190,233 @@ final_df_lt60 <- rbind(SNPGWAS_lt60_sig |>
          CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
          CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
          lt60= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
-  select(variant, lt60),
+  dplyr::select(variant, lt60),
 DBGWAS_lt60_sig |> 
   mutate(OR= round(exp(beta), 2),
          CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
          CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
          lt60= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
-  select(variant, lt60),
+  dplyr::select(variant, lt60),
 PanGWAS_lt60_sig |> 
   mutate(OR= round(exp(beta), 2),
          CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
          CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
          lt60= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
-  select(variant, lt60))
+  dplyr::select(variant, lt60))
 final_df_lt60
 ```
 
+# Join all results in final table
 ```{r}
 final_df <- left_join(left_join(left_join(final_df_lt7, final_df_lt14), final_df_lt30), final_df_lt60)
-final_df
+final_df |> 
+  
+  
 ```
+
+# Plot the proportion  of significant hits across treshold weeks
+```{r}
+# Load SNP distribution across samples
+sig_SNPs <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/Sig_SNP.txt")
+sig_SNPs_df <- sig_SNPs  |> 
+  dplyr::select(- X.CHROM, -ID, -QUAL, -FILTER, -INFO, -FORMAT)|>
+  mutate(across(4:1543, ~ ifelse(grepl("1/1", .), 1, 0)))|>
+  mutate(Sum = rowSums(across(4:1543), na.rm = TRUE),
+         Proportion = round(Sum / 1540, 3))|>
+  mutate(across(4:1543, ~ ifelse(grepl("1", .), "present", "absent")))|>
+  mutate(MUT= paste0(REF, POS, ALT), .before = 1)|> 
+  dplyr::select(-POS, -REF, -ALT)
+df_t <- as.data.frame(t(sig_SNPs_df[,-1]))
+colnames(df_t) <- sig_SNPs_df[[1]]
+df_t <- df_t|>
+  mutate(samples = rownames(df_t))
+
+# Load Unitig distribution across samples
+Sig_Unitig <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/Sig_Unitig.txt", sep=" ", header=F)|>
+  dplyr::select(-V2)
+Sig_Unitig[] <- lapply(Sig_Unitig, function(x) gsub(":1", "", x)) 
+order_unitigs <- c("ATCTTTTAAAATAGAAACTGTTATTTTTTGCA", "TTGTTGATCATTATGTCCTAGACCTAAAGCATGTCCTAA", "AATATTTCGTTTAACAAAAAAAATACTTTGCGAGGTCTCCATGCAGA", "AGCGACGTTTATGAATGCAGTTTCTAAAGGAAAAAAA", "TTTATGAATGCAGTTTCTAAAGGAAAAAAAACTATTGTGG", "TGTAGATATTGAAAGGTTACAAAATGTAGTCTATGAGGG", "TCGGTTCGAATGTGGGATAACACATTCGTCCAC", "GACGAATGTGTTATCCCACATTCGAACCGACCTGTT", "AAAAATGTTTGAATTAGGTAGTAATATTGACA", "TGATAATAGTGGAGAAATTTGTGATAATTTATCTCA", "AAATTATCACAAATTTCTCCACTATTATCAGTGGATCCATCAT", "TTTAGAAACTGCATTCATAAACGTCGCTGGGCCGCCATGTGTGAT" )
+Sig_Unitig <- Sig_Unitig |>
+  filter(V1 %in% order_unitigs) |>
+  mutate(V1 = factor(V1, levels = order_unitigs)) |>
+  arrange(V1)
+
+Unitig_sig_t <- df_t|> dplyr::select(samples)
+for(i in 1:nrow(Sig_Unitig)){
+  present_samples <- as.vector(unlist(Sig_Unitig[i, -1]))
+  new_var <- ifelse(Unitig_sig_t$samples %in% present_samples, "present", "absent")
+  Unitig_sig_t[[paste0("Unitig_", i)]] <- new_var
+}
+Unitig_sig_t <- Unitig_sig_t[,-1]
+Unitig_sig_t <- Unitig_sig_t|>
+  mutate(samples = rownames(Unitig_sig_t))
+
+
+# Load Gene distribution across samples
+gene_presence_absence <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/gene_presence_absence.Rtab", header=T)
+gene_sig <- gene_presence_absence |> 
+  filter(Gene %in% c("arnC", "group_1981"))
+gene_sig_Sum_prop <- gene_sig|>
+  mutate(Sum = rowSums(across(2:ncol(gene_sig)), na.rm = TRUE),
+         Proportion = round(Sum / (ncol(gene_sig)-1), 3))|>
+  dplyr::select(Gene, Sum, Proportion)
+gene_sig_Sum_prop
+gene_sig <- gene_sig |>
+  mutate(across(2:1541, ~ ifelse(grepl("1", .), "present", "absent")))
+gene_sig_t <- as.data.frame(t(gene_sig[,-1])) 
+colnames(gene_sig_t) <- gene_sig[[1]] 
+gene_sig_t <- gene_sig_t|>
+  mutate(samples = rownames(gene_sig_t))
+
+# Load phenotypes
+setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC")
+phenotypes <- read.table("phenotypes.txt", header=T)
+
+# Join 
+df_variant_pheno <- left_join(left_join(left_join(phenotypes, gene_sig_t), Unitig_sig_t), df_t)|>
+  filter(! is.na(arnC)) |> 
+  mutate(lt7 = ifelse(continuous<=7, "EOD",  "LOD/VLOD"), 
+         lt14 = ifelse(continuous<=14, "pre14",  "post14"), 
+         lt14 = factor(lt14, levels=c( "pre14",  "post14")), 
+         lt30 = ifelse(continuous<=30, "pre30",  "post30"), 
+         lt60 = ifelse(continuous<=60, "pre60",  "post60"))%>%
+  mutate(week = (continuous - 1) %/% 7 + 1)  %>%
+  mutate(week = ifelse(week ==0, 1, week)) %>%
+  mutate(week4 = ifelse(week>=4, ">=4", week), 
+         week4 = factor(week4, levels=c( "1",  "2","3",  ">=4")))
+
+
+library(dplyr)
+library(ggplot2)
+library(rlang)
+
+plot_stacked_bar_prop <- function(df, group_var, fill_palette = "Set2", x_var = week4, plot_title = NULL) {
+  # Tidy select with {{}}: evaluate 'group_var' and 'x_var' as arguments
+  group_var <- enquo(group_var)
+  x_var <- enquo(x_var)
+  
+  # Summarise for percent labels
+  df_sum <- df %>%
+    group_by(!!x_var, !!group_var) %>%
+    summarise(n = n(), .groups = "drop_last") %>%
+    mutate(
+      total = sum(n),
+      prop = n / total,
+      lab = paste0(sprintf("%.0f", prop * 100), "%")
+    ) %>%
+    ungroup()
+
+  df_sum_total <- df_sum %>%
+    group_by(!!x_var) %>%
+    summarise(total = unique(total), .groups = "drop")
+  
+  # Use rlang::as_name to convert group_var to string for aes_string
+  group_var_str <- rlang::as_name(group_var)
+  x_var_str <- rlang::as_name(x_var)
+  
+  p <- ggplot(df, aes(x = !!x_var, fill = !!group_var)) + 
+    geom_bar(position = "fill", stat = "count") +
+    labs(
+      x = as.character(x_var_str),
+      y = "Proportion"
+    ) +
+    theme_minimal() +
+    guides(fill = "none") +
+    scale_fill_brewer(palette = fill_palette) +
+    geom_text(
+      data = df_sum,
+      aes(
+        x = !!x_var,
+        y = prop,
+        label = lab,
+        group = !!group_var
+      ),
+      position = position_fill(vjust = 0.5),
+      size = 5,
+      color = "white"
+    ) +
+    geom_text(
+      data = df_sum_total,
+      aes(
+        x = !!x_var,
+        y = 1.05, # above the bar
+        label = paste0("n=", total)
+      ),
+      inherit.aes = FALSE,
+      size = 5,
+      vjust = 0
+    )
+  
+  if (!is.null(plot_title)) {
+    p <- p + ggtitle(plot_title)
+  }
+  
+  p
+}
+
+# For arnC:
+setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.5.EOD_LOD_Threshold")
+
+plot_T1206469C <- plot_stacked_bar_prop(df_variant_pheno, T1206469C, plot_title = "T1206469C")
+ggsave("T1206469C_Age_Dist.png", plot = plot_T1206469C, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+plot_T1216249C <- plot_stacked_bar_prop(df_variant_pheno, T1216249C, plot_title = "T1216249C")
+ggsave("plot_T1216249C_Age_Dist.png", plot = plot_T1216249C, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+plot_C1249780T <- plot_stacked_bar_prop(df_variant_pheno, C1249780T, plot_title = "C1249780T")
+ggsave("plot_C1249780T_Age_Dist.png", plot = plot_C1249780T, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+plot_C1250385A <- plot_stacked_bar_prop(df_variant_pheno, C1250385A, plot_title = "C1250385A")
+ggsave("plot_C1250385A_Age_Dist.png", plot = plot_C1250385A, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+plot_A1250938G <- plot_stacked_bar_prop(df_variant_pheno, A1250938G, plot_title = "A1250938G")
+ggsave("plot_A1250938G_Age_Dist.png", plot = plot_A1250938G, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+
+plot_Unitig_1 <- plot_stacked_bar_prop(df_variant_pheno, Unitig_1, plot_title = "Unitig_1")
+ggsave("plot_Unitig_1_Age_Dist.png", plot = plot_Unitig_1, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+plot_Unitig_2 <- plot_stacked_bar_prop(df_variant_pheno, Unitig_2, plot_title = "Unitig_2")
+ggsave("plot_Unitig_2_Age_Dist.png", plot = plot_Unitig_2, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+plot_Unitig_3 <- plot_stacked_bar_prop(df_variant_pheno, Unitig_3, plot_title = "Unitig_3")
+ggsave("plot_Unitig_3_Age_Dist.png", plot = plot_Unitig_3, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+plot_Unitig_4 <- plot_stacked_bar_prop(df_variant_pheno, Unitig_4, plot_title = "Unitig_4")
+ggsave("plot_Unitig_4_Age_Dist.png", plot = plot_Unitig_4, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+plot_Unitig_5 <- plot_stacked_bar_prop(df_variant_pheno, Unitig_5, plot_title = "Unitig_5")
+ggsave("plot_Unitig_5_Age_Dist.png", plot = plot_Unitig_5, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+plot_Unitig_6 <- plot_stacked_bar_prop(df_variant_pheno, Unitig_6, plot_title = "Unitig_6")
+ggsave("plot_Unitig_6_Age_Dist.png", plot = plot_Unitig_6, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+plot_Unitig_7 <- plot_stacked_bar_prop(df_variant_pheno, Unitig_7, plot_title = "Unitig_7")
+ggsave("plot_Unitig_7_Age_Dist.png", plot = plot_Unitig_7, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+plot_Unitig_8 <- plot_stacked_bar_prop(df_variant_pheno, Unitig_8, plot_title = "Unitig_8")
+ggsave("plot_Unitig_8_Age_Dist.png", plot = plot_Unitig_8, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+plot_Unitig_9 <- plot_stacked_bar_prop(df_variant_pheno, Unitig_9, plot_title = "Unitig_9")
+ggsave("plot_Unitig_9_Age_Dist.png", plot = plot_Unitig_9, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+plot_Unitig_10 <- plot_stacked_bar_prop(df_variant_pheno, Unitig_10, plot_title = "Unitig_10")
+ggsave("plot_Unitig_10_Age_Dist.png", plot = plot_Unitig_10, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+plot_Unitig_11 <- plot_stacked_bar_prop(df_variant_pheno, Unitig_11, plot_title = "Unitig_11")
+ggsave("plot_Unitig_11_Age_Dist.png", plot = plot_Unitig_11, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+plot_Unitig_12 <- plot_stacked_bar_prop(df_variant_pheno, Unitig_12, plot_title = "Unitig_12")
+ggsave("plot_Unitig_12_Age_Dist.png", plot = plot_Unitig_12, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+
+plot_arnC <- plot_stacked_bar_prop(df_variant_pheno, arnC, plot_title = "arnC")
+ggsave("plot_arnC_Age_Dist.png", plot = plot_arnC, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+plot_group_1981 <- plot_stacked_bar_prop(df_variant_pheno, group_1981, plot_title = "group_1981")
+ggsave("plot_group_1981_Age_Dist.png", plot = plot_group_1981, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
+
+
+```
+
 

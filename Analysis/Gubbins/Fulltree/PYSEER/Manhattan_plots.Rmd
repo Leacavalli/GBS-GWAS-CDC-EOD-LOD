@@ -90,18 +90,22 @@ QQ_plot <- function(data, type){
 SNPGWAS_data_gubbins <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/Fulltree/PYSEER/SNPGWAS_gubbins.txt", sep = "\t", header=T)|>
   filter(af>=0.05, af <0.95)|> 
   mutate(POS=as.integer(str_split(as.character(variant), "_", simplify = T)[,2]), 
-         OR = exp(beta), 
+         OR = exp(beta),
+    OR_lower = exp(beta - 1.96 * beta.std.err),
+    OR_upper = exp(beta + 1.96 * beta.std.err),
+    OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+    P_value = formatC(lrt.pvalue, format = "e", digits = 2), 
          OR_pos =ifelse(OR<1, "OR<1", "OR>1"))
 
-# # Load Annotations
-# SNPGWAS_data_gubbins_ann <- read.csv("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/Fulltree/PYSEER/SNP_annotations.csv", header=F)
-# colnames(SNPGWAS_data_gubbins_ann) <- c("POS", "REF", "ALT", "FUNCLASS", "IMPACT", "gene", "nt_change", "aa_change")
-# SNPGWAS_data_gubbins_ann_df <- left_join(SNPGWAS_data_gubbins,
-#   SNPGWAS_data_gubbins_ann |>
-#   mutate(variant = paste("AP018935.1", POS, REF, ALT, sep="_")))
+# Load Annotations
+SNPGWAS_data_Fasttree_LMM_ann <- read.csv("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/SNP_annotations.csv", header=F)
+colnames(SNPGWAS_data_Fasttree_LMM_ann) <- c("POS", "REF", "ALT", "FUNCLASS", "IMPACT", "gene", "nt_change", "aa_change")
+SNPGWAS_data_gubbins_ann_df <- left_join(SNPGWAS_data_gubbins,
+  SNPGWAS_data_Fasttree_LMM_ann |>
+  mutate(variant = paste("AP018935.1", POS, REF, ALT, sep="_")))
 
 # Manhattan Plot
-SNPGWAS_data_gubbins_manplot <- manhattan_plot(SNPGWAS_data_gubbins, SNPGWAS_data_gubbins, "SNPGWAS", ann=F)
+SNPGWAS_data_gubbins_manplot <- manhattan_plot(SNPGWAS_data_gubbins_ann_df, SNPGWAS_data_gubbins, "SNPGWAS", ann=T)
 SNPGWAS_data_gubbins_manplot
 ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/Fulltree/PYSEER/SNPGWAS_manplot.png", plot = SNPGWAS_data_gubbins_manplot, width = 9, height = 6, dpi = 300, units = "in")
 
@@ -111,8 +115,9 @@ SNPGWAS_data_gubbins_qqplot
 ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Gubbins/Fulltree/PYSEER/SNPGWAS_QQplot.png", plot = SNPGWAS_data_gubbins_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
 
 # Results table 
-SNPGWAS_FastTree_annotations_sig <- SNPGWAS_data_gubbins |> 
-  filter(lrt.pvalue < 0.05 /nrow(SNPGWAS_data_gubbins))  
+SNPGWAS_FastTree_annotations_sig <- SNPGWAS_data_gubbins_ann_df |> 
+  filter(lrt.pvalue < 0.05 /nrow(SNPGWAS_data_gubbins_ann_df))  |>
+  dplyr::select(POS, REF, ALT, af, OR_CI, lrt.pvalue, FUNCLASS, gene, aa_change)
 SNPGWAS_FastTree_annotations_sig
 ```
 

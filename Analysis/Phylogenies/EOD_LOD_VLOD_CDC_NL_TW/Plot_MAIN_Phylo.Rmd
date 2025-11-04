@@ -94,6 +94,9 @@ metadata_tree_v0 <- unique(left_join(metadata_tree |> dplyr::select(-clonal_comp
 
 # Join metadata and tree 
 Fasttree_mid_metadata <- full_join(keep.tip(Fasttree_mid, metadata_tree_v0$label), metadata_tree_v0 , by = 'label')
+Fasttree_mid_Nsub <- Fasttree_mid
+Fasttree_mid_Nsub$edge.length <- Fasttree_mid$edge.length*2231314
+Fasttree_mid_Nsub_metadata <- full_join(keep.tip(Fasttree_mid_Nsub, metadata_tree_v0$label), metadata_tree_v0 , by = 'label')
 
 
 # Prepare heatmap data for phylo
@@ -130,7 +133,26 @@ Age_cat_colors <- c("#004488", "#DDAA33", "#BB5566")
 #          ST = ST2), "Clean_Typing_data.csv", quote = F, row.names = F)
 ```
 
-# Plot Fasttre full aln tree (double precision)
+# Plot only tree with scale 
+```{r}
+# Scale: Number of substitutions 
+Fasttre_full_sp_pscale_Nsub <- ggtree(Fasttree_mid_Nsub_metadata, ladderize = T, lwd=0.1) + 
+  geom_tippoint(aes(color=as.factor(SC2)),size=1.5)+
+  scale_colour_manual(name="SC", values=SC_colors)+ 
+  geom_treescale(x=0, y=3000, width=2000, color='red', fontsize=6, linesize=2, offset=20)
+Fasttre_full_sp_pscale_Nsub
+
+# Scale: Rate of substitutions / Site
+Fasttre_full_sp_pscale <- ggtree(Fasttree_mid_metadata, ladderize = T, lwd=0.1) + 
+  geom_tippoint(aes(color=as.factor(SC2)),size=1.5)+
+  scale_colour_manual(name="SC", values=SC_colors)+ 
+  geom_treescale(x=0, y=3000, width=round(2000/2231314,5), color='red', fontsize=6, linesize=2, offset=20)
+Fasttre_full_sp_pscale
+
+```
+
+
+# Plot Fasttree full aln tree (double precision)
 ```{r}
 # SC tips
 Fasttre_full_sp_p1 <- ggtree(Fasttree_mid_metadata, ladderize = T, lwd=0.1) + 
@@ -156,6 +178,7 @@ Fasttre_full_sp_p4 <- gheatmap(Fasttre_full_sp_p3 + new_scale_fill(), Metadata_A
 Fasttre_full_sp_p5 <- gheatmap(Fasttre_full_sp_p4 + new_scale_fill(), Metadata_Country,  width=0.15, offset=0.015,
                font.size = 5, colnames_offset_y = -10, color=NA)+
   scale_fill_manual(values = c("orange", "red", "#1f77b4"), name="4: Country")
+
 
 Fasttre_full_sp_p5
 ```
