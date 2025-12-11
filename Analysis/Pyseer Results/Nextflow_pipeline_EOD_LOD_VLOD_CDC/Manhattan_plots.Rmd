@@ -81,6 +81,10 @@ QQ_plot <- function(data, type){
   ylim(0, 10)
 }
 
+# Load table
+setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC")
+Missingness_Prop <- read.delim("Missingness_Prop.txt", header=F, sep=" ")
+colnames(Missingness_Prop) <- c("POS", "Missingness_Proportion")
 ```
 
 # 1. Main Analysis
@@ -137,7 +141,7 @@ DBGWAS_FastTree <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Res
   filter(af >=0.05, af <0.95)
 
 # Load Annotations
-DBGWAS_FastTree_annotations <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/DBGWAS_Fasttree_DP_LMM_annotation.txt", sep = "\t", header=F) 
+DBGWAS_FastTree_annotations <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/DBGWAS_Fasttree_DP_LMM_annotation_V2.txt", sep = "\t", header=F) 
 colnames(DBGWAS_FastTree_annotations) <- colnames(DBGWAS_FastTree)
 DBGWAS_FastTree_annotations <- DBGWAS_FastTree_annotations |> 
   filter(af >=0.05, af <0.95)|>
@@ -171,10 +175,6 @@ DBGWAS_FastTree_annotations_sig_ref <- DBGWAS_FastTree_annotations_sig |>
   arrange(POS)
 
 # Which are in accessory regions ? 
-# Load table
-setwd("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC")
-Missingness_Prop <- read.delim("Missingness_Prop.txt", header=F, sep=" ")
-colnames(Missingness_Prop) <- c("POS", "Missingness_Proportion")
 for (i in 1:nrow(DBGWAS_FastTree_annotations_sig_ref)){
   length_unitig <- length((DBGWAS_FastTree_annotations_sig_ref$start[i]:DBGWAS_FastTree_annotations_sig_ref$end[i])) 
   N_region_missing <- nrow(Missingness_Prop |> filter(Missingness_Proportion>=0.05, POS %in%  (DBGWAS_FastTree_annotations_sig_ref$start[i]:DBGWAS_FastTree_annotations_sig_ref$end[i])))

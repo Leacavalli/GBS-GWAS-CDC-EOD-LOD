@@ -81,14 +81,14 @@ QQ_plot <- function(data, type){
   ylim(0, 10)
 }
 
+# Load Missingness proportion 
+Missingness_Prop <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW/Missingness_Prop.txt")
+Core_region_POS <- Missingness_Prop |> filter(V2<0.05) |> pull(V1)
 ```
 
 # 1. Main Analysis
 # 1.1. SNP-GWAS (Fastree DP LMM, Panaroo, Binary)
 ```{r}
-# Load Missingness proportion 
-Missingness_Prop <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW/Missingness_Prop.txt")
-Core_region_POS <- Missingness_Prop |> filter(V2<0.05) |> pull(V1)
 
 # Load GWAS results
 SNPGWAS_data_Fasttree_LMM <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW/SNPGWAS_Fasttree_LMM.txt", sep = "\t", header=T)|>
@@ -97,13 +97,6 @@ SNPGWAS_data_Fasttree_LMM <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/
          OR = exp(beta), 
          OR_pos =ifelse(OR<1, "OR<1", "OR>1"))|>
   filter(POS %in% Core_region_POS)
-
-# # Load Annotations
-# SNPGWAS_data_Fasttree_LMM_ann <- read.csv("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW/SNP_annotations.csv", header=F)
-# colnames(SNPGWAS_data_Fasttree_LMM_ann) <- c("POS", "REF", "ALT", "FUNCLASS", "IMPACT", "gene", "nt_change", "aa_change")
-# SNPGWAS_data_Fasttree_LMM_ann_df <- left_join(SNPGWAS_data_Fasttree_LMM,
-#   SNPGWAS_data_Fasttree_LMM_ann |>
-#   mutate(variant = paste("AP018935.1", POS, REF, ALT, sep="_")))
 
 # Manhattan Plot
 SNPGWAS_data_Fasttree_LMM_manplot <- manhattan_plot(SNPGWAS_data_Fasttree_LMM, SNPGWAS_data_Fasttree_LMM, "SNPGWAS", ann=F)
@@ -376,3 +369,5 @@ PanGWAS_FastTree_Gubbins_qqplot <- QQ_plot(PanGWAS_FastTree_Gubbins, "PanGWAS")
 PanGWAS_FastTree_Gubbins_qqplot
 ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC_NL_TW/Gubbins/PanGWAS_QQplot.png", plot = PanGWAS_FastTree_qqplot, width = 6, height = 6, dpi = 300, units = "in", bg = "white")
 ```
+
+

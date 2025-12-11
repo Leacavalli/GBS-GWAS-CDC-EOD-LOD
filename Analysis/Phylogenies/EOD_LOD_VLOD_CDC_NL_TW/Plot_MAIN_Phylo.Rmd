@@ -73,7 +73,7 @@ metadata_tree_v0 <- unique(left_join(metadata_tree |> dplyr::select(-clonal_comp
     label == "SRR29440471" ~ "cc19",
     label == "SRR29458952" ~ "cc17",
     label == "SRR29459527" ~ "cc1",
-    label == "SRR29476238" ~ "c459",
+    label == "SRR29476238" ~ "cc459",
     label == "SRR29480489" ~ "cc17",
     label == "SRR29489178" ~ "cc17",
     label == "SRR29489593" ~ "cc1",
@@ -120,9 +120,11 @@ colnames(Metadata_Country)= c("4")
 
 # Prepare colors for phylo
 SC_colors <- c("#dbdb8d", "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd","#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf", "#f7b6d2",  "#c5b0d5", "#c49c94", "black")
+names(SC_colors) <- c(1:14, "other")
 Serotype_colors <- c(color("muted")(9),"#D55E00" , "grey")
 names(Serotype_colors) <- levels(Metadata_Serotype[,1])
 CC_colors <- carto.pal(pal1 = "pastel.pal" ,n1 = 13)
+names(CC_colors) <- c("cc1",   "cc12" , "cc17" , "cc19",  "cc22",  "cc23"  ,"cc26"  ,"cc283", "cc327", "cc452", "cc459" ,"No_CC")
 Age_cat_colors <- c("#004488", "#DDAA33", "#BB5566")
 
 # # Save clean version of data
@@ -181,4 +183,374 @@ Fasttre_full_sp_p5 <- gheatmap(Fasttre_full_sp_p4 + new_scale_fill(), Metadata_C
 
 
 Fasttre_full_sp_p5
+```
+
+# Plot Fasttree by COUNTRY
+## Prepare data
+```{r}
+# Subset metadata by country
+metadata_tree_CDC <- metadata_tree_v0 |> filter(Country =="USA")
+metadata_tree_NL <- metadata_tree_v0 |> filter(Country =="Netherlands")
+metadata_tree_TW <- metadata_tree_v0 |> filter(Country =="Taiwan")
+
+# Subset tree by country
+Fasttree_mid_CDC <- keep.tip(Fasttree_mid, metadata_tree_CDC$label)
+Fasttree_mid_NL<- keep.tip(Fasttree_mid, metadata_tree_NL$label)
+Fasttree_mid_TW <- keep.tip(Fasttree_mid, metadata_tree_TW$label)
+
+# Add tree metadata
+Fasttree_mid_metadata_CDC <- full_join(Fasttree_mid_CDC, metadata_tree_CDC , by = 'label')
+Fasttree_mid_metadata_NL<- full_join(Fasttree_mid_NL_flipped, metadata_tree_NL , by = 'label')
+Fasttree_mid_metadata_TW <- full_join(Fasttree_mid_TW, metadata_tree_TW , by = 'label')
+```
+
+## USA CDC
+```{r}
+
+# SC tips
+Fasttree_CDC_p1 <- ggtree(Fasttree_mid_metadata_CDC, ladderize = T, lwd=0.1) + 
+  geom_tippoint(aes(color=as.factor(SC2)),size=1.5)+
+  scale_colour_manual(name="SC", values=SC_colors) +
+  guides(color = guide_legend(ncol=3))
+
+# Serotype
+Fasttree_CDC_p2 <- gheatmap(Fasttree_CDC_p1 + new_scale_fill(), Metadata_Serotype ,  width=0.15, offset=0.0005, 
+               font.size = 5, colnames_offset_y = -10, color=NA)+
+  scale_fill_manual(values = Serotype_colors, name="1: Serotype")+
+  guides(fill = guide_legend(ncol=2))
+
+# CCs
+Fasttree_CDC_p3 <- gheatmap(Fasttree_CDC_p2 + new_scale_fill(), Metadata_CC,  width=0.15, offset=0.005,
+               font.size = 5, colnames_offset_y = -10, color=NA)+
+  scale_fill_manual(values = CC_colors, name="2: CC")+
+  guides(fill = guide_legend(ncol=2))
+
+#  Age category
+Fasttree_CDC_p4 <- gheatmap(Fasttree_CDC_p3 + new_scale_fill(), Metadata_Age_cat,  width=0.15, offset=0.01,
+               font.size = 5, colnames_offset_y = -10, color=NA)+
+  scale_fill_manual(values = Age_cat_colors, name="3: Age of Onset")+
+  guides(fill = guide_legend(ncol=2))
+
+Fasttree_CDC_p4
+
+# save
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Phylogenies/EOD_LOD_VLOD_CDC_NL_TW/Phylo_CDC.png", plot = Fasttree_CDC_p4, width = 10, height = 10, dpi = 300, units = "in", bg = "white")
+```
+
+## NL 
+```{r}
+# SC tips
+Fasttree_NL_p1 <- ggtree(Fasttree_mid_metadata_NL, ladderize = T, lwd=0.1) + 
+  geom_tippoint(aes(color=as.factor(SC2)),size=1.5)+
+  scale_colour_manual(name="SC", values=SC_colors)+
+  guides(color = guide_legend(ncol=3))
+
+# rotate nodes as needed
+ggtree(Fasttree_mid_metadata_NL) +
+    geom_text2(aes(label = node), hjust = -0.3, size = 2)
+Fasttree_NL_p1_flip <- flip(Fasttree_NL_p1, 1572, 1340)
+Fasttree_NL_p1_flip2 <- flip(Fasttree_NL_p1_flip, 1437, 1342)
+
+# Serotype
+Fasttree_NL_p2 <- gheatmap(Fasttree_NL_p1_flip2 + new_scale_fill(), Metadata_Serotype ,  width=0.15, offset=0.0005, 
+               font.size = 5, colnames_offset_y = -10, color=NA)+
+  scale_fill_manual(values = Serotype_colors, name="1: Serotype")+
+  guides(fill = guide_legend(ncol=2))
+
+
+# CCs
+Fasttree_NL_p3 <- gheatmap(Fasttree_NL_p2 + new_scale_fill(), Metadata_CC,  width=0.15, offset=0.005,
+               font.size = 5, colnames_offset_y = -10, color=NA)+
+  scale_fill_manual(values = CC_colors, name="2: CC")+
+  guides(fill = guide_legend(ncol=2))
+
+
+#  Age category
+Fasttree_NL_p4 <- gheatmap(Fasttree_NL_p3 + new_scale_fill(), Metadata_Age_cat,  width=0.15, offset=0.01,
+               font.size = 5, colnames_offset_y = -10, color=NA)+
+  scale_fill_manual(values = Age_cat_colors, name="3: Age of Onset")+
+  guides(fill = guide_legend(ncol=2))
+
+
+Fasttree_NL_p4
+
+
+# save
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Phylogenies/EOD_LOD_VLOD_CDC_NL_TW/Phylo_NL.png", plot = Fasttree_NL_p4, width = 10, height = 10, dpi = 300, units = "in", bg = "white")
+
+
+
+# Load sig 
+Sig_hits_NL <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Phylogenies/EOD_LOD_VLOD_CDC_NL_TW/sig_hits_NL.txt", header=T) 
+# Find columns with 'ERR' in their names
+err_cols <- grep("ERR", names(Sig_hits_NL))
+
+# For each such column, replace '1/1' with 1 and '0/0' with 0
+for(col in err_cols) {
+  Sig_hits_NL[[col]][grepl("1/1", Sig_hits_NL[[col]])] <- 1
+  Sig_hits_NL[[col]][grepl("0/0", Sig_hits_NL[[col]])] <- 0
+  # (optional) Convert column to numeric if only 1s and 0s should remain
+  Sig_hits_NL[[col]] <- as.numeric(Sig_hits_NL[[col]])
+}
+
+Sig_hits_NL_t <- as.data.frame(t(Sig_hits_NL |> select(contains("ERR"))))
+
+Metadata_T1206469C <- data.frame(T1206469C = (Sig_hits_NL_t |> mutate(V1=as.factor(V1))|> select(V1)))
+colnames(Metadata_T1206469C) <- "T1206469C"
+Metadata_T1216249C <- data.frame(T1216249C = (Sig_hits_NL_t |> mutate(V2=as.factor(V2)) |> select(V2)))
+colnames(Metadata_T1216249C) <- "T1216249C"
+Metadata_C1249780T <- data.frame(C1249780T = (Sig_hits_NL_t |> mutate(V3=as.factor(V3))|> select(V3)))
+colnames(Metadata_C1249780T) <- "C1249780T"
+Metadata_C1250385A <- data.frame(C1250385A = (Sig_hits_NL_t |> mutate(V4=as.factor(V4))|> select(V4)))
+colnames(Metadata_C1250385A) <- "C1250385A"
+Metadata_A1250938G <- data.frame(A1250938G = (Sig_hits_NL_t |> mutate(V5=as.factor(V5))|> select(V5)))
+colnames(Metadata_A1250938G) <- "A1250938G"
+
+
+# T1206469C
+Fasttree_NL_p5 <- gheatmap(Fasttree_NL_p4 + new_scale_fill(), Metadata_T1206469C ,  width=0.05, offset=0.018, 
+               font.size = 5, colnames_offset_x = -0.001, colnames_offset_y = -150, color=NA, colnames_angle = 60)+
+  scale_fill_manual(values = c("white", "darkblue"), name="T1206469C") +
+  theme(legend.position = "none") 
+
+# T1216249C
+Fasttree_NL_p6 <- gheatmap(Fasttree_NL_p5 + new_scale_fill(), Metadata_T1216249C,  width=0.05, offset=0.02,
+               font.size = 5, colnames_offset_x = -0.001, colnames_offset_y = -150, color=NA, colnames_angle = 60)+
+  scale_fill_manual(values = c("white", "darkblue"), name="T1216249C")+
+  theme(legend.position = "none") 
+
+# C1249780T
+Fasttree_NL_p7 <- gheatmap(Fasttree_NL_p6 + new_scale_fill(), Metadata_C1249780T,  width=0.05, offset=0.022,
+               font.size = 5, colnames_offset_x = -0.001, colnames_offset_y = -150, color=NA, colnames_angle = 60)+
+  scale_fill_manual(values = c("white", "darkblue"), name="C1249780T")+
+  theme(legend.position = "none") 
+
+# C1250385A
+Fasttree_NL_p8 <- gheatmap(Fasttree_NL_p7 + new_scale_fill(), Metadata_C1250385A,  width=0.05, offset=0.024,
+               font.size = 5, colnames_offset_x = -0.001, colnames_offset_y = -150, color=NA, colnames_angle = 60)+
+  scale_fill_manual(values = c("white", "darkblue"), name="C1250385A")+
+  theme(legend.position = "none") 
+
+# A1250938G
+Fasttree_NL_p9 <- gheatmap(Fasttree_NL_p8 + new_scale_fill(), Metadata_A1250938G,  width=0.05, offset=0.026,
+               font.size = 5, colnames_offset_x = -0.001, colnames_offset_y = -150, color=NA, colnames_angle = 60)+
+  scale_fill_manual(values = c("white", "darkblue"), name="A1250938G")+
+  theme(legend.position = "none") 
+Fasttree_NL_p9
+
+
+
+
+
+Sig_Unitig <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Phylogenies/EOD_LOD_VLOD_CDC_NL_TW/Sig_unitigs.txt", sep=" ", header=F)|>
+  select(-V2)
+Sig_Unitig[] <- lapply(Sig_Unitig, function(x) gsub(":1", "", x)) 
+order_unitigs <- c("ATCTTTTAAAATAGAAACTGTTATTTTTTGCA", "TTGTTGATCATTATGTCCTAGACCTAAAGCATGTCCTAA", "AATATTTCGTTTAACAAAAAAAATACTTTGCGAGGTCTCCATGCAGA", "AGCGACGTTTATGAATGCAGTTTCTAAAGGAAAAAAA", "TTTATGAATGCAGTTTCTAAAGGAAAAAAAACTATTGTGG", "TGTAGATATTGAAAGGTTACAAAATGTAGTCTATGAGGG", "TCGGTTCGAATGTGGGATAACACATTCGTCCAC", "GACGAATGTGTTATCCCACATTCGAACCGACCTGTT", "AAAAATGTTTGAATTAGGTAGTAATATTGACA", "TGATAATAGTGGAGAAATTTGTGATAATTTATCTCA", "AAATTATCACAAATTTCTCCACTATTATCAGTGGATCCATCAT", "TTTAGAAACTGCATTCATAAACGTCGCTGGGCCGCCATGTGTGAT" )
+Sig_Unitig <- Sig_Unitig |>
+  filter(V1 %in% order_unitigs) |>
+  mutate(V1 = factor(V1, levels = order_unitigs)) |>
+  arrange(V1)
+
+Unitig_sig_t <- metadata_tree_v0 %>% select(label)
+for(i in 1:nrow(Sig_Unitig)){
+  present_samples <- as.vector(unlist(Sig_Unitig[i, -1]))
+  new_var <- ifelse(Unitig_sig_t$label %in% present_samples, 1, 0)
+  Unitig_sig_t[[paste0("Unitig_", i)]] <- new_var
+}
+row.names(Unitig_sig_t) <- Unitig_sig_t$label
+Unitig_sig_t <- Unitig_sig_t[,-1]
+round(colMeans(Unitig_sig_t %>% select(starts_with("Unitig_"))),3)
+
+# Prepare heatmap data for phylo
+unitig_cols <- grep("^Unitig_", colnames(Unitig_sig_t), value = TRUE)
+metadata_unitig_list <- lapply(unitig_cols, function(u_col) {
+  df <- Unitig_sig_t |> select(all_of(u_col))
+  df[[u_col]] <- as.factor(df[[u_col]])      # convert column to factor
+  row.names(df) <- row.names(Unitig_sig_t)   # set rownames
+  colnames(df) <- u_col                     # ensure column name matches
+  df
+})
+names(metadata_unitig_list) <- unitig_cols
+##
+Metadata_Unitig_1 <- metadata_unitig_list[["Unitig_1"]]
+Metadata_Unitig_2 <- metadata_unitig_list[["Unitig_2"]]
+Metadata_Unitig_3 <- metadata_unitig_list[["Unitig_3"]]
+Metadata_Unitig_4 <- metadata_unitig_list[["Unitig_4"]]
+Metadata_Unitig_5 <- metadata_unitig_list[["Unitig_5"]]
+Metadata_Unitig_6 <- metadata_unitig_list[["Unitig_6"]]
+Metadata_Unitig_7 <- metadata_unitig_list[["Unitig_7"]]
+# Metadata_Unitig_8 <- metadata_unitig_list[["Unitig_8"]]
+# Metadata_Unitig_9 <- metadata_unitig_list[["Unitig_9"]]
+# Metadata_Unitig_10 <- metadata_unitig_list[["Unitig_10"]]
+# Metadata_Unitig_11 <- metadata_unitig_list[["Unitig_11"]]
+# Metadata_Unitig_12 <- metadata_unitig_list[["Unitig_12"]]
+
+# Unitig_1
+Fasttree_NL_p10 <- gheatmap(Fasttree_NL_p9 + new_scale_fill(), Metadata_Unitig_1, 
+                        width = 0.05, offset = 0.028, 
+                        font.size = 5, colnames_offset_x = -0.002, 
+                        colnames_offset_y = -100, color = NA, colnames_angle = 60) +
+  scale_fill_manual(values = c("white", "darkgreen"), name = "Unitig") 
+
+# Unitig_2
+Fasttree_NL_p11 <- gheatmap(Fasttree_NL_p10 + new_scale_fill(), Metadata_Unitig_2, 
+                        width = 0.05, offset = 0.03, 
+                        font.size = 5, colnames_offset_x = -0.002, 
+                        colnames_offset_y = -100, color = NA, colnames_angle = 60) +
+  scale_fill_manual(values = c("white", "darkgreen"), name = "Unitig")
+
+# Unitig_3
+Fasttree_NL_p12 <- gheatmap(Fasttree_NL_p11 + new_scale_fill(), Metadata_Unitig_3, 
+                        width = 0.05, offset = 0.032, 
+                        font.size = 5, colnames_offset_x = -0.002, 
+                        colnames_offset_y = -100, color = NA, colnames_angle = 60) +
+  scale_fill_manual(values = c("white", "darkgreen"), name = "Unitig")
+
+# Unitig_4
+Fasttree_NL_p13 <- gheatmap(Fasttree_NL_p12 + new_scale_fill(), Metadata_Unitig_4, 
+                         width = 0.05, offset = 0.034, 
+                         font.size = 5, colnames_offset_x = -0.002, 
+                         colnames_offset_y = -100, color = NA, colnames_angle = 60) +
+  scale_fill_manual(values = c("white", "darkgreen"), name = "Unitig")
+
+# Unitig_5
+Fasttree_NL_p14 <- gheatmap(Fasttree_NL_p13 + new_scale_fill(), Metadata_Unitig_5, 
+                         width = 0.05, offset = 0.036, 
+                         font.size = 5, colnames_offset_x = -0.002, 
+                         colnames_offset_y = -100, color = NA, colnames_angle = 60) +
+  scale_fill_manual(values = c("white", "darkgreen"), name = "Unitig")
+
+# Unitig_6
+Fasttree_NL_p15 <- gheatmap(Fasttree_NL_p14 + new_scale_fill(), Metadata_Unitig_6, 
+                         width = 0.05, offset = 0.038, 
+                         font.size = 5, colnames_offset_x = -0.002, 
+                         colnames_offset_y = -100, color = NA, colnames_angle = 60) +
+  scale_fill_manual(values = c("white", "darkgreen"), name = "Unitig")
+
+# Unitig_7
+Fasttree_NL_p16 <- gheatmap(Fasttree_NL_p15 + new_scale_fill(), Metadata_Unitig_7, 
+                         width = 0.05, offset = 0.04, 
+                         font.size = 5, colnames_offset_x = -0.002, 
+                         colnames_offset_y = -100, color = NA, colnames_angle = 60) +
+  scale_fill_manual(values = c("white", "darkgreen"), name = "Unitig")
+Fasttree_NL_p16
+
+# # Unitig_8
+# Fasttree_p17 <- gheatmap(Fasttree_p16 + new_scale_fill(), Metadata_Unitig_8, 
+#                          width = 0.05, offset = 0.042, 
+#                          font.size = 5, colnames_offset_x = -0.002, 
+#                          colnames_offset_y = -100, color = NA, colnames_angle = 60) +
+#   scale_fill_manual(values = c("white", "darkgreen"), name = "Unitig")
+# 
+# # Unitig_9
+# Fasttree_p18 <- gheatmap(Fasttree_p17 + new_scale_fill(), Metadata_Unitig_9, 
+#                          width = 0.05, offset = 0.044, 
+#                          font.size = 5, colnames_offset_x = -0.002, 
+#                          colnames_offset_y = -100, color = NA, colnames_angle = 60) +
+#   scale_fill_manual(values = c("white", "darkgreen"), name = "Unitig")
+# 
+# # Unitig_10
+# Fasttree_p19 <- gheatmap(Fasttree_p18 + new_scale_fill(), Metadata_Unitig_10, 
+#                          width = 0.05, offset = 0.046, 
+#                          font.size = 5, colnames_offset_x = -0.002, 
+#                          colnames_offset_y = -100, color = NA, colnames_angle = 60) +
+#   scale_fill_manual(values = c("white", "darkgreen"), name = "Unitig")
+# 
+# # Unitig_11
+# Fasttree_p20 <- gheatmap(Fasttree_p19 + new_scale_fill(), Metadata_Unitig_11, 
+#                          width = 0.05, offset = 0.048, 
+#                          font.size = 5, colnames_offset_x = -0.002, 
+#                          colnames_offset_y = -100, color = NA, colnames_angle = 60) +
+#   scale_fill_manual(values = c("white", "darkgreen"), name = "Unitig")
+# 
+# # Unitig_12
+# Fasttree_p21 <- gheatmap(Fasttree_p20 + new_scale_fill(), Metadata_Unitig_12, 
+#                          width = 0.05, offset = 0.05, 
+#                          font.size = 5, colnames_offset_x = -0.002, 
+#                          colnames_offset_y = -100, color = NA, colnames_angle = 60) +
+#   scale_fill_manual(values = c("white", "darkgreen"), name = "Unitig")
+
+
+# Load Gene distribution across samples
+gene_presence_absence <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pyseer Results/Nextflow_pipeline_EOD_LOD_VLOD_CDC/15.1.Main_analysis/gene_presence_absence.Rtab", header=T)
+gene_sig <- gene_presence_absence |> 
+  filter(Gene %in% PanGWAS_FastTree_sig$variant)
+gene_sig_Sum_prop <- gene_sig|>
+  mutate(Sum = rowSums(across(2:ncol(gene_sig)), na.rm = TRUE),
+         Proportion = round(Sum / (ncol(gene_sig)-1), 3))|>
+  select(Gene, Sum, Proportion)
+gene_sig_Sum_prop
+gene_sig <- gene_sig |>
+  mutate(across(2:1541, ~ ifelse(grepl("1", .), "present", "absent")))
+gene_sig_t <- as.data.frame(t(gene_sig[,-1]))
+colnames(gene_sig_t) <- gene_sig[[1]]
+
+# Prepare heatmap data for phylo
+## arnC
+Metadata_arnC = gene_sig_t |> select(arnC)
+Metadata_arnC$arnC <- as.factor(Metadata_arnC$arnC)
+row.names(Metadata_arnC) <-  row.names(gene_sig_t)
+colnames(Metadata_arnC)= c("arnC")
+## group_1981
+Metadata_group_1981 = gene_sig_t |> select(group_1981)
+Metadata_group_1981$group_1981 <- as.factor(Metadata_group_1981$group_1981)
+row.names(Metadata_group_1981) <-  row.names(gene_sig_t)
+colnames(Metadata_group_1981)= c("group_1981")
+
+# arnC
+Fasttree_p22 <- gheatmap(Fasttree_p21 + new_scale_fill(), Metadata_arnC ,  width=0.05, offset=0.052, 
+               font.size = 5, colnames_offset_x = -0.002, colnames_offset_y = -100, color=NA, colnames_angle = 60)+
+  scale_fill_manual(values = c("white", "darkred"), name="Gene") +
+  theme(legend.position = "none") 
+
+# group_1981
+Fasttree_p23 <- gheatmap(Fasttree_p22 + new_scale_fill(), Metadata_group_1981,  width=0.05, offset=0.054,
+               font.size = 5, colnames_offset_x = -0.002, colnames_offset_y = -150, color=NA, colnames_angle = 60)+
+  scale_fill_manual(values = c("white", "darkred"), name="group_1981")+
+  theme(legend.position = "none") 
+
+# legend plot:
+Fasttree_PanGWAS_leg <- gheatmap(Fasttre_p1_noleg + new_scale_fill(), Metadata_group_1981,  width=0.05, offset=0.056,
+               font.size = 5, colnames_offset_x = -0.002, colnames_offset_y = -150, color=NA, colnames_angle = 60)+
+  scale_fill_manual(values = c("white", "darkred"), name="Gene")
+```
+
+## TW 
+```{r}
+# SC tips
+Fasttree_TW_p1 <- ggtree(Fasttree_mid_metadata_TW, ladderize = T, lwd=0.1) + 
+  geom_tippoint(aes(color=as.factor(SC2)),size=1.5)+
+  scale_colour_manual(name="SC", values=SC_colors)+
+  guides(color = guide_legend(ncol=3))
+
+# rotate nodes as needed
+ggtree(Fasttree_mid_metadata_TW) +
+    geom_text2(aes(label = node), hjust = -0.3, size = 2)
+Fasttree_TW_p1_flip <- flip(Fasttree_TW_p1, 265, 243)
+
+# Serotype
+Fasttree_TW_p2 <- gheatmap(Fasttree_TW_p1_flip + new_scale_fill(), Metadata_Serotype ,  width=0.15, offset=0.0005, 
+               font.size = 5, colnames_offset_y = -10, color=NA)+
+  scale_fill_manual(values = Serotype_colors, name="1: Serotype")+
+  guides(fill = guide_legend(ncol=2))
+
+
+# CCs
+Fasttree_TW_p3 <- gheatmap(Fasttree_TW_p2 + new_scale_fill(), Metadata_CC,  width=0.15, offset=0.005,
+               font.size = 5, colnames_offset_y = -10, color=NA)+
+  scale_fill_manual(values = CC_colors, name="2: CC")+
+  guides(fill = guide_legend(ncol=2))
+
+
+#  Age category
+Fasttree_TW_p4 <- gheatmap(Fasttree_TW_p3 + new_scale_fill(), Metadata_Age_cat,  width=0.15, offset=0.01,
+               font.size = 5, colnames_offset_y = -10, color=NA)+
+  scale_fill_manual(values = Age_cat_colors, name="3: Age of Onset")+
+  guides(fill = guide_legend(ncol=2))
+
+
+Fasttree_TW_p4
+
+# save
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Phylogenies/EOD_LOD_VLOD_CDC_NL_TW/Phylo_TW.png", plot = Fasttree_TW_p4, width = 10, height = 10, dpi = 300, units = "in", bg = "white")
 ```

@@ -25,8 +25,8 @@ gene_pres_abs <- read.csv("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pangenome_anal
 NL_metadata <- read.xlsx("~/GitHub/GBS-GWAS-CDC-EOD-LOD/0.Raw_data/Netherlands_Sanger_metadata.xlsx", 1) 
 NL_samples <- NL_metadata |> filter(ENA.lane.accession %in% colnames(gene_pres_abs)) |> pull(ENA.lane.accession)
 CDC_metadata <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Typing/EOD_LOD_VLOD_CDC/phenotypes.txt", header=T) 
-CDC_samples_EOD <- CDC_metadata |> filter(samples %in% colnames(gene_pres_abs)) |> pull(samples)
-TW_samples <- metadata |> filter(! Sample %in% c(NL_samples, CDC_samples_EOD)) |> pull(Sample)
+CDC_metadata <- CDC_metadata |> filter(samples %in% colnames(gene_pres_abs)) |> pull(samples)
+TW_samples <- metadata |> filter(! Sample %in% c(NL_samples, CDC_metadata)) |> pull(Sample)
 ```
 
 # 1. Plot gene frequencies Across Countries 
@@ -34,15 +34,15 @@ TW_samples <- metadata |> filter(! Sample %in% c(NL_samples, CDC_samples_EOD)) |
 ```{r}
 # Reformat gene presence/absence data
 gene_pres_abs_clean_USA_NL <- gene_pres_abs |>  
-  dplyr::select(contains(c("Gene", NL_samples, CDC_samples_EOD))) |>
-  mutate(across(all_of(c(NL_samples, CDC_samples_EOD)), ~ ifelse(. == "", 0, 1)))
+  dplyr::select(contains(c("Gene", NL_samples, CDC_metadata))) |>
+  mutate(across(all_of(c(NL_samples, CDC_metadata)), ~ ifelse(. == "", 0, 1)))
 
 # Calculate the Total and proportion of samples carrying a given gene in each population
 gene_pres_abs_clean_USA_NL_V2 <- gene_pres_abs_clean_USA_NL |> 
   mutate(Total_NL = rowSums(across(all_of(NL_samples))), 
-         Total_CDC = rowSums(across(all_of(CDC_samples_EOD))), 
+         Total_CDC = rowSums(across(all_of(CDC_metadata))), 
          Proportion_NL = Total_NL/length(NL_samples), 
-         Proportion_CDC = Total_CDC/length(CDC_samples_EOD)) |> 
+         Proportion_CDC = Total_CDC/length(CDC_metadata)) |> 
   filter(Total_NL +Total_CDC !=0)
 
 # All genes
@@ -89,12 +89,12 @@ p_USA_NL <- ggplot() +
   geom_abline(slope = 1, intercept = 0, color = "black") +  
   theme_classic() +
   xlab(paste0("Gene frequencies in Netherlands (n=", length(NL_samples), ")")) +
-  ylab(paste0("Gene frequencies in USA (n=", length(CDC_samples_EOD), ")")) +
+  ylab(paste0("Gene frequencies in USA (n=", length(CDC_samples), ")")) +
   annotate("text", x = 0.1, y = 0.9, hjust = 0, label = paste("Pearson's correlation:\nAll: r =", cor_coefficient_USA_NL, ", p ", ifelse(p_value_USA_NL==0, "< 0.001", paste("=",p_value_USA_NL)), "\nAccessory both: r =", cor_coefficient_Accessory_USA_NL, ", p ", ifelse(p_value_Accessory_USA_NL==0, "< 0.001", paste("=",p_value_Accessory_USA_NL))), size = 4, color = "black") +
   scale_color_manual(values=c("#364B9A", "#4A7BB7","#98CAE1", "#A50026", "#F67E4B", "#FEDA8B"))+
   scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
   scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
-  ggtitle(paste0("Infant Invasive Disease (n=", (length(NL_samples)+length(CDC_samples_EOD)), ")"))
+  ggtitle(paste0("Infant Invasive Disease (n=", (length(NL_samples)+length(CDC_samples)), ")"))
 
 p_USA_NL
 
@@ -105,15 +105,15 @@ ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pangenome_analysis/1.COG_freq_cor
 ```{r}
 # Reformat gene presence/absence data
 gene_pres_abs_clean_USA_TW <- gene_pres_abs |>  
-  dplyr::select(contains(c("Gene", TW_samples, CDC_samples_EOD))) |>
-  mutate(across(all_of(c(TW_samples, CDC_samples_EOD)), ~ ifelse(. == "", 0, 1)))
+  dplyr::select(contains(c("Gene", TW_samples, CDC_metadata))) |>
+  mutate(across(all_of(c(TW_samples, CDC_metadata)), ~ ifelse(. == "", 0, 1)))
 
 # Calculate the Total and proportion of samples carrying a given gene in each population
 gene_pres_abs_clean_USA_TW_V2 <- gene_pres_abs_clean_USA_TW |> 
   mutate(Total_TW = rowSums(across(all_of(TW_samples))), 
-         Total_CDC = rowSums(across(all_of(CDC_samples_EOD))), 
+         Total_CDC = rowSums(across(all_of(CDC_metadata))), 
          Proportion_TW = Total_TW/length(TW_samples), 
-         Proportion_CDC = Total_CDC/length(CDC_samples_EOD)) |> 
+         Proportion_CDC = Total_CDC/length(CDC_metadata)) |> 
   filter(Total_TW +Total_CDC !=0)
 
 # All genes
@@ -159,13 +159,13 @@ p_USA_TW <- ggplot() +
   geom_hline(yintercept = c(0.05, 0.95), linetype = "dashed", color = "grey") +
   geom_abline(slope = 1, intercept = 0, color = "black") +  
   theme_classic() +
-  xlab(paste0("Gene frequencies in Netherlands (n=", length(TW_samples), ")")) +
-  ylab(paste0("Gene frequencies in USA (n=", length(CDC_samples_EOD), ")")) +
+  xlab(paste0("Gene frequencies in Taiwan (n=", length(TW_samples), ")")) +
+  ylab(paste0("Gene frequencies in USA (n=", length(CDC_metadata), ")")) +
   annotate("text", x = 0.1, y = 0.9, hjust = 0, label = paste("Pearson's correlation:\nAll: r =", cor_coefficient_USA_TW, ", p ", ifelse(p_value_USA_TW==0, "< 0.001", paste("=",p_value_USA_TW)), "\nAccessory both: r =", cor_coefficient_Accessory_USA_TW, ", p ", ifelse(p_value_Accessory_USA_TW==0, "< 0.001", paste("=",p_value_Accessory_USA_TW))), size = 4, color = "black") +
   scale_color_manual(values=c("#364B9A", "#4A7BB7","#98CAE1", "#A50026", "#F67E4B", "#FEDA8B"))+
   scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
   scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
-  ggtitle(paste0("Infant Invasive Disease (n=", (length(TW_samples)+length(CDC_samples_EOD)), ")"))
+  ggtitle(paste0("Infant Invasive Disease (n=", (length(TW_samples)+length(CDC_metadata)), ")"))
 
 p_USA_TW
 
@@ -176,16 +176,16 @@ ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pangenome_analysis/1.COG_freq_cor
 ```{r}
 # Reformat gene presence/absence data
 gene_pres_abs_clean_TW_NL <- gene_pres_abs |>  
-  dplyr::select(contains(c("Gene", NL_samples, CDC_samples_EOD))) |>
-  mutate(across(all_of(c(NL_samples, CDC_samples_EOD)), ~ ifelse(. == "", 0, 1)))
+  dplyr::select(contains(c("Gene", NL_samples, TW_samples))) |>
+  mutate(across(all_of(c(NL_samples, TW_samples)), ~ ifelse(. == "", 0, 1)))
 
 # Calculate the Total and proportion of samples carrying a given gene in each population
 gene_pres_abs_clean_TW_NL_V2 <- gene_pres_abs_clean_TW_NL |> 
   mutate(Total_NL = rowSums(across(all_of(NL_samples))), 
-         Total_CDC = rowSums(across(all_of(CDC_samples_EOD))), 
+         Total_TW = rowSums(across(all_of(TW_samples))), 
          Proportion_NL = Total_NL/length(NL_samples), 
-         Proportion_CDC = Total_CDC/length(CDC_samples_EOD)) |> 
-  filter(Total_NL +Total_CDC !=0)
+         Proportion_TW = Total_TW/length(TW_samples)) |> 
+  filter(Total_NL +Total_TW !=0)
 
 # All genes
 # Create a data frame for shading the region (independent of gene_pres_abs_clean_V2)
@@ -202,21 +202,21 @@ shade_data <- shade_data %>%
 
 # Prepare data
 gene_pres_abs_clean_TW_NL_V3 <- gene_pres_abs_clean_TW_NL_V2 |> 
-  filter(!(Proportion_NL < 0.05 & Proportion_CDC < 0.05)) |> 
+  filter(!(Proportion_NL < 0.05 & Proportion_TW < 0.05)) |> 
   mutate(Type = ifelse(Proportion_NL >= 0.95, 
-                       ifelse(Proportion_CDC >= 0.95, "Core both", "Core NL"), 
-                       ifelse(Proportion_CDC >= 0.95, "Core CDC", 
-                              ifelse((Proportion_NL >= 0.05 & Proportion_CDC >= 0.05), "Accessory both", 
-                                     ifelse((Proportion_NL >= 0.05 & Proportion_CDC < 0.05), "Accessory NL", "Accessory CDC")))))
+                       ifelse(Proportion_TW >= 0.95, "Core both", "Core NL"), 
+                       ifelse(Proportion_TW >= 0.95, "Core TW", 
+                              ifelse((Proportion_NL >= 0.05 & Proportion_TW >= 0.05), "Accessory both", 
+                                     ifelse((Proportion_NL >= 0.05 & Proportion_TW < 0.05), "Accessory NL", "Accessory TW")))))
 
 # Correlation test 
 ## All genes
-cor_test_TW_NL <- cor.test(gene_pres_abs_clean_TW_NL_V3$Proportion_NL, gene_pres_abs_clean_TW_NL_V3$Proportion_CDC)
+cor_test_TW_NL <- cor.test(gene_pres_abs_clean_TW_NL_V3$Proportion_NL, gene_pres_abs_clean_TW_NL_V3$Proportion_TW)
 cor_coefficient_TW_NL <- round(cor_test_TW_NL$estimate, 2)
 p_value_TW_NL <- signif(cor_test_TW_NL$p.value, 3)
 # Accessory in both genes
 gene_pres_abs_clean_TW_NL_V4 <- gene_pres_abs_clean_TW_NL_V3 |>  filter(Type == "Accessory both")
-cor_test_Accessory_TW_NL <- cor.test(gene_pres_abs_clean_TW_NL_V4$Proportion_NL, gene_pres_abs_clean_TW_NL_V4$Proportion_CDC)
+cor_test_Accessory_TW_NL <- cor.test(gene_pres_abs_clean_TW_NL_V4$Proportion_NL, gene_pres_abs_clean_TW_NL_V4$Proportion_TW)
 cor_coefficient_Accessory_TW_NL  <- round(cor_test_Accessory_TW_NL$estimate, 2)
 p_value_Accessory_TW_NL  <- signif(cor_test_Accessory_TW_NL$p.value, 3)
 
@@ -225,18 +225,18 @@ p_value_Accessory_TW_NL  <- signif(cor_test_Accessory_TW_NL$p.value, 3)
 p_TW_NL <- ggplot() +
   geom_ribbon(data = shade_data, aes(x = x, ymin = ymin_5, ymax = ymax_5), fill = "grey70", alpha = 0.5)+
   geom_ribbon(data = shade_data, aes(x = x, ymin = ymin_25, ymax = ymax_25), fill = "grey95", alpha = 0.5)+
-  geom_point(data= gene_pres_abs_clean_TW_NL_V3, aes(x = Proportion_NL, y = Proportion_CDC, color = Type)) +
+  geom_point(data= gene_pres_abs_clean_TW_NL_V3, aes(x = Proportion_NL, y = Proportion_TW, color = Type)) +
   geom_vline(xintercept = c(0.05, 0.95), linetype = "dashed", color = "grey") +
   geom_hline(yintercept = c(0.05, 0.95), linetype = "dashed", color = "grey") +
   geom_abline(slope = 1, intercept = 0, color = "black") +  
   theme_classic() +
   xlab(paste0("Gene frequencies in Netherlands (n=", length(NL_samples), ")")) +
-  ylab(paste0("Gene frequencies in TW (n=", length(CDC_samples_EOD), ")")) +
+  ylab(paste0("Gene frequencies in TW (n=", length(TW_samples), ")")) +
   annotate("text", x = 0.1, y = 0.9, hjust = 0, label = paste("Pearson's correlation:\nAll: r =", cor_coefficient_TW_NL, ", p ", ifelse(p_value_TW_NL==0, "< 0.001", paste("=",p_value_TW_NL)), "\nAccessory both: r =", cor_coefficient_Accessory_TW_NL, ", p ", ifelse(p_value_Accessory_TW_NL==0, "< 0.001", paste("=",p_value_Accessory_TW_NL))), size = 4, color = "black") +
   scale_color_manual(values=c("#364B9A", "#4A7BB7","#98CAE1", "#A50026", "#F67E4B", "#FEDA8B"))+
   scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
   scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
-  ggtitle(paste0("Infant Invasive Disease (n=", (length(NL_samples)+length(CDC_samples_EOD)), ")"))
+  ggtitle(paste0("Infant Invasive Disease (n=", (length(NL_samples)+length(TW_samples)), ")"))
 
 p_TW_NL
 
@@ -329,14 +329,14 @@ ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pangenome_analysis/1.COG_freq_cor
 ```{r}
 # Reformat gene presence/absence data
 gene_pres_abs_clean_USA_TW_EOD <- gene_pres_abs |>  
-  dplyr::select(contains(c("Gene", TW_samples, CDC_samples_EOD))) |>
-  mutate(across(all_of(c(TW_samples, CDC_samples_EOD)), ~ ifelse(. == "", 0, 1)))
+  dplyr::select(contains(c("Gene", TW_samples_EOD, CDC_samples_EOD))) |>
+  mutate(across(all_of(c(TW_samples_EOD, CDC_samples_EOD)), ~ ifelse(. == "", 0, 1)))
 
 # Calculate the Total and proportion of samples carrying a given gene in each population
 gene_pres_abs_clean_USA_TW_EOD_V2 <- gene_pres_abs_clean_USA_TW_EOD |> 
-  mutate(Total_TW = rowSums(across(all_of(TW_samples))), 
+  mutate(Total_TW = rowSums(across(all_of(TW_samples_EOD))), 
          Total_CDC = rowSums(across(all_of(CDC_samples_EOD))), 
-         Proportion_TW = Total_TW/length(TW_samples), 
+         Proportion_TW = Total_TW/length(TW_samples_EOD), 
          Proportion_CDC = Total_CDC/length(CDC_samples_EOD)) |> 
   filter(Total_TW +Total_CDC !=0)
 
@@ -383,13 +383,13 @@ p_USA_TW_EOD <- ggplot() +
   geom_hline(yintercept = c(0.05, 0.95), linetype = "dashed", color = "grey") +
   geom_abline(slope = 1, intercept = 0, color = "black") +  
   theme_classic() +
-  xlab(paste0("Gene frequencies in Netherlands (n=", length(TW_samples), ")")) +
+  xlab(paste0("Gene frequencies in Taiwan (n=", length(TW_samples_EOD), ")")) +
   ylab(paste0("Gene frequencies in USA (n=", length(CDC_samples_EOD), ")")) +
   annotate("text", x = 0.1, y = 0.9, hjust = 0, label = paste("Pearson's correlation:\nAll: r =", cor_coefficient_USA_TW_EOD, ", p ", ifelse(p_value_USA_TW_EOD==0, "< 0.001", paste("=",p_value_USA_TW_EOD)), "\nAccessory both: r =", cor_coefficient_Accessory_USA_TW_EOD, ", p ", ifelse(p_value_Accessory_USA_TW_EOD==0, "< 0.001", paste("=",p_value_Accessory_USA_TW_EOD))), size = 4, color = "black") +
   scale_color_manual(values=c("#364B9A", "#4A7BB7","#98CAE1", "#A50026", "#F67E4B", "#FEDA8B"))+
   scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
   scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
-  ggtitle(paste0("Infant Invasive Disease (n=", (length(TW_samples)+length(CDC_samples_EOD)), ")"))
+  ggtitle(paste0("Infant Invasive Disease (n=", (length(TW_samples_EOD)+length(CDC_samples_EOD)), ")"))
 
 p_USA_TW_EOD
 
@@ -400,16 +400,16 @@ ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pangenome_analysis/1.COG_freq_cor
 ```{r}
 # Reformat gene presence/absence data
 gene_pres_abs_clean_TW_NL_EOD <- gene_pres_abs |>  
-  dplyr::select(contains(c("Gene", NL_samples_EOD, CDC_samples_EOD))) |>
-  mutate(across(all_of(c(NL_samples_EOD, CDC_samples_EOD)), ~ ifelse(. == "", 0, 1)))
+  dplyr::select(contains(c("Gene", NL_samples_EOD, TW_samples_EOD))) |>
+  mutate(across(all_of(c(NL_samples_EOD, TW_samples_EOD)), ~ ifelse(. == "", 0, 1)))
 
 # Calculate the Total and proportion of samples carrying a given gene in each population
 gene_pres_abs_clean_TW_NL_EOD_V2 <- gene_pres_abs_clean_TW_NL_EOD |> 
   mutate(Total_NL = rowSums(across(all_of(NL_samples_EOD))), 
-         Total_CDC = rowSums(across(all_of(CDC_samples_EOD))), 
+         Total_TW = rowSums(across(all_of(TW_samples_EOD))), 
          Proportion_NL = Total_NL/length(NL_samples_EOD), 
-         Proportion_CDC = Total_CDC/length(CDC_samples_EOD)) |> 
-  filter(Total_NL +Total_CDC !=0)
+         Proportion_TW = Total_TW/length(TW_samples_EOD)) |> 
+  filter(Total_NL +Total_TW !=0)
 
 # All genes
 # Create a data frame for shading the region (independent of gene_pres_abs_clean_V2)
@@ -426,21 +426,21 @@ shade_data <- shade_data %>%
 
 # Prepare data
 gene_pres_abs_clean_TW_NL_EOD_V3 <- gene_pres_abs_clean_TW_NL_EOD_V2 |> 
-  filter(!(Proportion_NL < 0.05 & Proportion_CDC < 0.05)) |> 
+  filter(!(Proportion_NL < 0.05 & Proportion_TW < 0.05)) |> 
   mutate(Type = ifelse(Proportion_NL >= 0.95, 
-                       ifelse(Proportion_CDC >= 0.95, "Core both", "Core NL"), 
-                       ifelse(Proportion_CDC >= 0.95, "Core CDC", 
-                              ifelse((Proportion_NL >= 0.05 & Proportion_CDC >= 0.05), "Accessory both", 
-                                     ifelse((Proportion_NL >= 0.05 & Proportion_CDC < 0.05), "Accessory NL", "Accessory CDC")))))
+                       ifelse(Proportion_TW >= 0.95, "Core both", "Core NL"), 
+                       ifelse(Proportion_TW >= 0.95, "Core TW", 
+                              ifelse((Proportion_NL >= 0.05 & Proportion_TW >= 0.05), "Accessory both", 
+                                     ifelse((Proportion_NL >= 0.05 & Proportion_TW < 0.05), "Accessory NL", "Accessory TW")))))
 
 # Correlation test 
 ## All genes
-cor_test_TW_NL_EOD <- cor.test(gene_pres_abs_clean_TW_NL_EOD_V3$Proportion_NL, gene_pres_abs_clean_TW_NL_EOD_V3$Proportion_CDC)
+cor_test_TW_NL_EOD <- cor.test(gene_pres_abs_clean_TW_NL_EOD_V3$Proportion_NL, gene_pres_abs_clean_TW_NL_EOD_V3$Proportion_TW)
 cor_coefficient_TW_NL_EOD <- round(cor_test_TW_NL_EOD$estimate, 2)
 p_value_TW_NL_EOD <- signif(cor_test_TW_NL_EOD$p.value, 3)
 # Accessory in both genes
 gene_pres_abs_clean_TW_NL_EOD_V4 <- gene_pres_abs_clean_TW_NL_EOD_V3 |>  filter(Type == "Accessory both")
-cor_test_Accessory_TW_NL_EOD <- cor.test(gene_pres_abs_clean_TW_NL_EOD_V4$Proportion_NL, gene_pres_abs_clean_TW_NL_EOD_V4$Proportion_CDC)
+cor_test_Accessory_TW_NL_EOD <- cor.test(gene_pres_abs_clean_TW_NL_EOD_V4$Proportion_NL, gene_pres_abs_clean_TW_NL_EOD_V4$Proportion_TW)
 cor_coefficient_Accessory_TW_NL_EOD  <- round(cor_test_Accessory_TW_NL_EOD$estimate, 2)
 p_value_Accessory_TW_NL_EOD  <- signif(cor_test_Accessory_TW_NL_EOD$p.value, 3)
 
@@ -449,18 +449,18 @@ p_value_Accessory_TW_NL_EOD  <- signif(cor_test_Accessory_TW_NL_EOD$p.value, 3)
 p_TW_NL_EOD <- ggplot() +
   geom_ribbon(data = shade_data, aes(x = x, ymin = ymin_5, ymax = ymax_5), fill = "grey70", alpha = 0.5)+
   geom_ribbon(data = shade_data, aes(x = x, ymin = ymin_25, ymax = ymax_25), fill = "grey95", alpha = 0.5)+
-  geom_point(data= gene_pres_abs_clean_TW_NL_EOD_V3, aes(x = Proportion_NL, y = Proportion_CDC, color = Type)) +
+  geom_point(data= gene_pres_abs_clean_TW_NL_EOD_V3, aes(x = Proportion_NL, y = Proportion_TW, color = Type)) +
   geom_vline(xintercept = c(0.05, 0.95), linetype = "dashed", color = "grey") +
   geom_hline(yintercept = c(0.05, 0.95), linetype = "dashed", color = "grey") +
   geom_abline(slope = 1, intercept = 0, color = "black") +  
   theme_classic() +
   xlab(paste0("Gene frequencies in Netherlands (n=", length(NL_samples_EOD), ")")) +
-  ylab(paste0("Gene frequencies in TW (n=", length(CDC_samples_EOD), ")")) +
+  ylab(paste0("Gene frequencies in Taiwan (n=", length(TW_samples_EOD), ")")) +
   annotate("text", x = 0.1, y = 0.9, hjust = 0, label = paste("Pearson's correlation:\nAll: r =", cor_coefficient_TW_NL_EOD, ", p ", ifelse(p_value_TW_NL_EOD==0, "< 0.001", paste("=",p_value_TW_NL_EOD)), "\nAccessory both: r =", cor_coefficient_Accessory_TW_NL_EOD, ", p ", ifelse(p_value_Accessory_TW_NL_EOD==0, "< 0.001", paste("=",p_value_Accessory_TW_NL_EOD))), size = 4, color = "black") +
   scale_color_manual(values=c("#364B9A", "#4A7BB7","#98CAE1", "#A50026", "#F67E4B", "#FEDA8B"))+
   scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
   scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
-  ggtitle(paste0("Infant Invasive Disease (n=", (length(NL_samples_EOD)+length(CDC_samples_EOD)), ")"))
+  ggtitle(paste0("Infant Invasive Disease (n=", (length(NL_samples_EOD)+length(TW_samples_EOD)), ")"))
 
 p_TW_NL_EOD
 
@@ -552,14 +552,14 @@ ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pangenome_analysis/1.COG_freq_cor
 ```{r}
 # Reformat gene presence/absence data
 gene_pres_abs_clean_USA_TW_LOD <- gene_pres_abs |>  
-  dplyr::select(contains(c("Gene", TW_samples, CDC_samples_LOD))) |>
-  mutate(across(all_of(c(TW_samples, CDC_samples_LOD)), ~ ifelse(. == "", 0, 1)))
+  dplyr::select(contains(c("Gene", TW_samples_LOD, CDC_samples_LOD))) |>
+  mutate(across(all_of(c(TW_samples_LOD, CDC_samples_LOD)), ~ ifelse(. == "", 0, 1)))
 
 # Calculate the Total and proportion of samples carrying a given gene in each population
 gene_pres_abs_clean_USA_TW_LOD_V2 <- gene_pres_abs_clean_USA_TW_LOD |> 
-  mutate(Total_TW = rowSums(across(all_of(TW_samples))), 
+  mutate(Total_TW = rowSums(across(all_of(TW_samples_LOD))), 
          Total_CDC = rowSums(across(all_of(CDC_samples_LOD))), 
-         Proportion_TW = Total_TW/length(TW_samples), 
+         Proportion_TW = Total_TW/length(TW_samples_LOD), 
          Proportion_CDC = Total_CDC/length(CDC_samples_LOD)) |> 
   filter(Total_TW +Total_CDC !=0)
 
@@ -606,13 +606,13 @@ p_USA_TW_LOD <- ggplot() +
   geom_hline(yintercept = c(0.05, 0.95), linetype = "dashed", color = "grey") +
   geom_abline(slope = 1, intercept = 0, color = "black") +  
   theme_classic() +
-  xlab(paste0("Gene frequencies in Netherlands (n=", length(TW_samples), ")")) +
+  xlab(paste0("Gene frequencies in Taiwan (n=", length(TW_samples_LOD), ")")) +
   ylab(paste0("Gene frequencies in USA (n=", length(CDC_samples_LOD), ")")) +
   annotate("text", x = 0.1, y = 0.9, hjust = 0, label = paste("Pearson's correlation:\nAll: r =", cor_coefficient_USA_TW_LOD, ", p ", ifelse(p_value_USA_TW_LOD==0, "< 0.001", paste("=",p_value_USA_TW_LOD)), "\nAccessory both: r =", cor_coefficient_Accessory_USA_TW_LOD, ", p ", ifelse(p_value_Accessory_USA_TW_LOD==0, "< 0.001", paste("=",p_value_Accessory_USA_TW_LOD))), size = 4, color = "black") +
   scale_color_manual(values=c("#364B9A", "#4A7BB7","#98CAE1", "#A50026", "#F67E4B", "#FEDA8B"))+
   scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
   scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
-  ggtitle(paste0("Infant Invasive Disease (n=", (length(TW_samples)+length(CDC_samples_LOD)), ")"))
+  ggtitle(paste0("Infant Invasive Disease (n=", (length(TW_samples_LOD)+length(CDC_samples_LOD)), ")"))
 
 p_USA_TW_LOD
 
@@ -623,16 +623,16 @@ ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/Analysis/Pangenome_analysis/1.COG_freq_cor
 ```{r}
 # Reformat gene presence/absence data
 gene_pres_abs_clean_TW_NL_LOD <- gene_pres_abs |>  
-  dplyr::select(contains(c("Gene", NL_samples_LOD, CDC_samples_LOD))) |>
-  mutate(across(all_of(c(NL_samples_LOD, CDC_samples_LOD)), ~ ifelse(. == "", 0, 1)))
+  dplyr::select(contains(c("Gene", NL_samples_LOD, TW_samples_LOD))) |>
+  mutate(across(all_of(c(NL_samples_LOD, TW_samples_LOD)), ~ ifelse(. == "", 0, 1)))
 
 # Calculate the Total and proportion of samples carrying a given gene in each population
 gene_pres_abs_clean_TW_NL_LOD_V2 <- gene_pres_abs_clean_TW_NL_LOD |> 
   mutate(Total_NL = rowSums(across(all_of(NL_samples_LOD))), 
-         Total_CDC = rowSums(across(all_of(CDC_samples_LOD))), 
+         Total_TW = rowSums(across(all_of(TW_samples_LOD))), 
          Proportion_NL = Total_NL/length(NL_samples_LOD), 
-         Proportion_CDC = Total_CDC/length(CDC_samples_LOD)) |> 
-  filter(Total_NL +Total_CDC !=0)
+         Proportion_TW = Total_TW/length(TW_samples_LOD)) |> 
+  filter(Total_NL +Total_TW !=0)
 
 # All genes
 # Create a data frame for shading the region (independent of gene_pres_abs_clean_V2)
@@ -649,21 +649,21 @@ shade_data <- shade_data %>%
 
 # Prepare data
 gene_pres_abs_clean_TW_NL_LOD_V3 <- gene_pres_abs_clean_TW_NL_LOD_V2 |> 
-  filter(!(Proportion_NL < 0.05 & Proportion_CDC < 0.05)) |> 
+  filter(!(Proportion_NL < 0.05 & Proportion_TW < 0.05)) |> 
   mutate(Type = ifelse(Proportion_NL >= 0.95, 
-                       ifelse(Proportion_CDC >= 0.95, "Core both", "Core NL"), 
-                       ifelse(Proportion_CDC >= 0.95, "Core CDC", 
-                              ifelse((Proportion_NL >= 0.05 & Proportion_CDC >= 0.05), "Accessory both", 
-                                     ifelse((Proportion_NL >= 0.05 & Proportion_CDC < 0.05), "Accessory NL", "Accessory CDC")))))
+                       ifelse(Proportion_TW >= 0.95, "Core both", "Core NL"), 
+                       ifelse(Proportion_TW >= 0.95, "Core TW", 
+                              ifelse((Proportion_NL >= 0.05 & Proportion_TW >= 0.05), "Accessory both", 
+                                     ifelse((Proportion_NL >= 0.05 & Proportion_TW < 0.05), "Accessory NL", "Accessory TW")))))
 
 # Correlation test 
 ## All genes
-cor_test_TW_NL_LOD <- cor.test(gene_pres_abs_clean_TW_NL_LOD_V3$Proportion_NL, gene_pres_abs_clean_TW_NL_LOD_V3$Proportion_CDC)
+cor_test_TW_NL_LOD <- cor.test(gene_pres_abs_clean_TW_NL_LOD_V3$Proportion_NL, gene_pres_abs_clean_TW_NL_LOD_V3$Proportion_TW)
 cor_coefficient_TW_NL_LOD <- round(cor_test_TW_NL_LOD$estimate, 2)
 p_value_TW_NL_LOD <- signif(cor_test_TW_NL_LOD$p.value, 3)
 # Accessory in both genes
 gene_pres_abs_clean_TW_NL_LOD_V4 <- gene_pres_abs_clean_TW_NL_LOD_V3 |>  filter(Type == "Accessory both")
-cor_test_Accessory_TW_NL_LOD <- cor.test(gene_pres_abs_clean_TW_NL_LOD_V4$Proportion_NL, gene_pres_abs_clean_TW_NL_LOD_V4$Proportion_CDC)
+cor_test_Accessory_TW_NL_LOD <- cor.test(gene_pres_abs_clean_TW_NL_LOD_V4$Proportion_NL, gene_pres_abs_clean_TW_NL_LOD_V4$Proportion_TW)
 cor_coefficient_Accessory_TW_NL_LOD  <- round(cor_test_Accessory_TW_NL_LOD$estimate, 2)
 p_value_Accessory_TW_NL_LOD  <- signif(cor_test_Accessory_TW_NL_LOD$p.value, 3)
 
@@ -672,18 +672,18 @@ p_value_Accessory_TW_NL_LOD  <- signif(cor_test_Accessory_TW_NL_LOD$p.value, 3)
 p_TW_NL_LOD <- ggplot() +
   geom_ribbon(data = shade_data, aes(x = x, ymin = ymin_5, ymax = ymax_5), fill = "grey70", alpha = 0.5)+
   geom_ribbon(data = shade_data, aes(x = x, ymin = ymin_25, ymax = ymax_25), fill = "grey95", alpha = 0.5)+
-  geom_point(data= gene_pres_abs_clean_TW_NL_LOD_V3, aes(x = Proportion_NL, y = Proportion_CDC, color = Type)) +
+  geom_point(data= gene_pres_abs_clean_TW_NL_LOD_V3, aes(x = Proportion_NL, y = Proportion_TW, color = Type)) +
   geom_vline(xintercept = c(0.05, 0.95), linetype = "dashed", color = "grey") +
   geom_hline(yintercept = c(0.05, 0.95), linetype = "dashed", color = "grey") +
   geom_abline(slope = 1, intercept = 0, color = "black") +  
   theme_classic() +
   xlab(paste0("Gene frequencies in Netherlands (n=", length(NL_samples_LOD), ")")) +
-  ylab(paste0("Gene frequencies in TW (n=", length(CDC_samples_LOD), ")")) +
+  ylab(paste0("Gene frequencies in Taiwan (n=", length(TW_samples_LOD), ")")) +
   annotate("text", x = 0.1, y = 0.9, hjust = 0, label = paste("Pearson's correlation:\nAll: r =", cor_coefficient_TW_NL_LOD, ", p ", ifelse(p_value_TW_NL_LOD==0, "< 0.001", paste("=",p_value_TW_NL_LOD)), "\nAccessory both: r =", cor_coefficient_Accessory_TW_NL_LOD, ", p ", ifelse(p_value_Accessory_TW_NL_LOD==0, "< 0.001", paste("=",p_value_Accessory_TW_NL_LOD))), size = 4, color = "black") +
   scale_color_manual(values=c("#364B9A", "#4A7BB7","#98CAE1", "#A50026", "#F67E4B", "#FEDA8B"))+
   scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
   scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
-  ggtitle(paste0("Infant Invasive Disease (n=", (length(NL_samples_LOD)+length(CDC_samples_LOD)), ")"))
+  ggtitle(paste0("Infant Invasive Disease (n=", (length(NL_samples_LOD)+length(TW_samples_LOD)), ")"))
 
 p_TW_NL_LOD
 
