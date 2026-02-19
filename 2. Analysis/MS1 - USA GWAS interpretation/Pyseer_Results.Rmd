@@ -1,0 +1,946 @@
+---
+title: "Main Analysis"
+output: html_document
+date: "2025-07-17"
+---
+
+# 0 Set up environment
+```{r}
+# Clean environment
+rm( list = ls() )
+
+# load libraries
+library(qqman)
+library(circlize)
+library(VennDiagram)
+library(stringr)
+library(tidyverse)
+library(ggrepel)
+library(ggplot2)
+
+
+# Prepare Plotting functions 
+manhattan_plot <- function(data, data_full, type, ann=T) {
+  # Compute significance threshold
+  threshold <- -log10(0.05 / nrow(data_full))
+  if (type=="DBGWAS"){
+    threshold <- -log10(0.05 / 87899)
+  }
+  
+  # Subset for significant hits (above threshold and not NA in label)
+  ann_sub <- data[ -log10(data$lrt.pvalue) > threshold & !is.na(data[["gene"]]), ]
+  
+  # Calculate expanded y limits
+   y_max <- max(-log10(data$lrt.pvalue), na.rm = TRUE)
+   y_lim <- c(0, max(y_max,threshold) * 1.10)
+  
+  plot <- ggplot(data, aes(x=POS, y=-log10(lrt.pvalue))) +
+    geom_point(aes(color=OR_pos), alpha=0.8, size=1.3) +
+    scale_color_manual(values= c("skyblue", "orange")) +
+    scale_y_continuous(expand = c(0, 0), limits = y_lim) +
+    theme_bw()+
+  theme(
+    legend.title = element_blank(),
+    legend.text = element_text(size = 12),  
+    legend.position = c(0.02, 0.6),     # inside plot
+    legend.direction = "horizontal",     # horizontal legend
+    legend.justification = c(0, 1),      # anchor top-left
+    legend.box.margin = margin(2, 2, 2, 2),
+    panel.border = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    plot.title = element_text(face = "bold", hjust = 0.5)
+  ) +
+    labs(
+      x = "Genomic Position (Start)",
+      y = expression(-log[10](italic(p))),
+      title = paste0(type, " Manhattan Plot")
+    ) +
+    geom_hline(yintercept = threshold, color="red", lty="dashed") 
+  
+  if(ann==F){
+   plot
+  }else{
+    plot +
+    geom_label_repel(
+      data = ann_sub,
+      aes(label = .data[["gene"]]),
+      size = 3,
+      min.segment.length = 1,
+      show.legend = FALSE,
+      na.rm = TRUE, 
+      max.overlaps = Inf,
+      force = 10, 
+      force_pull = 10,
+  box.padding = 1,    # more space around each label
+  point.padding = 0.3)
+  }
+}
+
+QQ_plot <- function(data, type){
+  df <- data.frame(expected= (-log10(ppoints(length(data |> pull(lrt.pvalue))))), 
+                             observed=(-log10(sort(data |> pull(lrt.pvalue))))) 
+  df |>
+    ggplot(aes(x = expected, y = observed)) +
+  geom_point() +
+  geom_abline(slope = 1, color="red", lty="dashed")  +      
+  labs(
+    x = "-log10(Expected P-value)",
+    y = "-log10(Observed P-value)",
+    title = paste0(type," QQ-plot")
+  ) +
+  theme_minimal()+
+  xlim(0, 10) +
+  ylim(0, 10)+
+    theme(plot.title = element_text(face = "bold", hjust = 0.5)) 
+}
+
+# Load table
+Missingness_Prop <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/Missingness_Prop.txt", header=F, sep=" ")
+colnames(Missingness_Prop) <- c("POS", "Missingness_Proportion")
+accessory_regions <- Missingness_Prop |> filter(Missingness_Proportion>=0.05) |> pull(POS)
+```
+
+# 1. Main Analysis
+# 1.1. SNP-GWAS (Fastree DP LMM, Panaroo, Binary)
+```{r}
+# Load GWAS results
+SNPGWAS_data <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/Population_Structure_Methods/FastTree_DP_LMM/SNPGWAS.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)|> 
+  mutate(POS=as.integer(str_split(as.character(variant), "_", simplify = T)[,2]), 
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))
+
+# Load Annotations
+SNPGWAS_ann <- read.csv("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/Population_Structure_Methods/FastTree_DP_LMM/SNP_annotations.csv", header=F)
+colnames(SNPGWAS_ann) <- c("POS", "REF", "ALT", "FUNCLASS", "IMPACT", "gene", "nt_change", "aa_change")
+SNPGWAS_ann_df <- left_join(SNPGWAS_data,
+  SNPGWAS_ann |>
+  mutate(variant = paste("AP018935.1", POS, REF, ALT, sep="_")))
+
+# Manhattan Plot
+SNPGWAS_manplot <- manhattan_plot(SNPGWAS_ann_df, SNPGWAS_ann_df, "SNP-GWAS")
+SNPGWAS_manplot
+
+# Sig hits 
+SNPGWAS_sig <- SNPGWAS_ann_df |> 
+  filter(lrt.pvalue < 0.05 /nrow(SNPGWAS_ann_df)) |>
+  mutate(OR = exp(beta),
+    OR_lower = exp(beta - 1.96 * beta.std.err),
+    OR_upper = exp(beta + 1.96 * beta.std.err),
+    OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+    P_value = formatC(lrt.pvalue, format = "e", digits = 2), 
+    variant2= paste0(REF, POS,ALT),
+    type = ifelse(IMPACT == "MODIFIER", "Non-coding", 
+                  ifelse(IMPACT == "LOW", "Synonymous", "Non-Synonymous")),
+    aa_change2= str_remove(aa_change, "p."),
+    annotation = paste0("Mutation: ", type, " (", aa_change2,"); gene: ", gene)) |> 
+  select(variant2 , af, OR_CI, P_value, annotation)|>
+  rename(variant=variant2)
+SNPGWAS_sig
+
+# QQ plot 
+SNPGWAS_qqplot <- QQ_plot(SNPGWAS_data, "SNP-GWAS") 
+SNPGWAS_qqplot
+```
+
+# 1.2. DB-GWAS (Fastree DP LMM, Panaroo, Binary)
+```{r}
+# Load GWAS results
+DBGWAS_data <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/Population_Structure_Methods/FastTree_DP_LMM/DBGWAS.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+
+# Load Annotations
+DBGWAS_ann <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/Population_Structure_Methods/FastTree_DP_LMM/DBGWAS_annotation.txt", sep = "\t", header=F) 
+colnames(DBGWAS_ann) <- colnames(DBGWAS_data)
+DBGWAS_ann <- DBGWAS_ann |> 
+  filter(af >=0.05, af <0.95)|>
+  mutate(ref_unaligned = ifelse(str_extract(notes, "^[^:]+")=="AP018935.1", "ref genome", "unaligned contig"), 
+         coord_range = str_extract(notes, "(?<=:)[0-9]+-[0-9]+"), 
+         start= str_split(coord_range, "-", simplify = T)[,1], 
+         end= str_split(coord_range, "-", simplify = T)[,2],
+         POS = as.integer(str_extract(coord_range, "^[0-9]+")),
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"),
+         ref_unaligned2 = ifelse(ref_unaligned=="ref genome", ifelse(POS %in% accessory_regions, paste0(ref_unaligned, "; accessory region"), paste0(ref_unaligned, "; core region")), ref_unaligned))  |>
+  separate(
+    notes, 
+    into = c("contig_position", "upstream", "gene", "downstream"), 
+    sep = ";", 
+    remove = FALSE, 
+    fill = "right"
+  )
+
+# Manhattan Plot
+DBGWAS_manplot <- manhattan_plot(DBGWAS_ann |> filter(ref_unaligned=="ref genome") , DBGWAS_ann, "DBGWAS")
+DBGWAS_manplot
+
+# Sig hits
+DBGWAS_sig <- DBGWAS_ann |> 
+  filter(lrt.pvalue < 0.05 / 87899) |>
+  mutate(ref_unaligned = factor(ref_unaligned, levels= c("ref genome", "unaligned contig")))|>
+  arrange(ref_unaligned, as.numeric(start))|>
+  mutate(
+    OR = exp(beta),
+    OR_lower = exp(beta - 1.96 * beta.std.err),
+    OR_upper = exp(beta + 1.96 * beta.std.err),
+    OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+    P_value = formatC(lrt.pvalue, format = "e", digits = 2)
+  ) |>
+  mutate(variant2= paste0("Unitig ",row_number()), 
+         annotation= paste0("coord:", coord_range, " (", ref_unaligned2,  "); gene: ", gene))|> 
+  select(variant2, af, OR_CI, P_value, annotation) |>
+  rename(variant=variant2)
+DBGWAS_sig
+
+# QQ plot 
+DBGWAS_qqplot <- QQ_plot(DBGWAS_ann, "DBGWAS")
+DBGWAS_qqplot
+```
+# 1.3. Pan-GWAS (Fastree DP LMM, Panaroo, Binary)
+```{r}
+# Load GWAS results
+PanGWAS_data <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/Population_Structure_Methods/FastTree_DP_LMM/PanGWAS.txt", sep = "\t", header=T) |>
+  filter(af >=0.05, af <0.95)
+
+# Get significant hits
+PanGWAS_sig <- PanGWAS_data |>
+  filter(lrt.pvalue < 0.05 / nrow(PanGWAS_data)) |>
+  mutate(
+    OR = exp(beta),
+    OR_lower = exp(beta - 1.96 * beta.std.err),
+    OR_upper = exp(beta + 1.96 * beta.std.err),
+    OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+    P_value = formatC(lrt.pvalue, format = "e", digits = 2), 
+    annotation= c("Undecaprenyl-phosphate 4-deoxy-4-formamido-L-arabinose transferase, glycosyltransferase family 2", "Glycosyltransferase (glyG)")
+  ) |>
+  select(variant, af, OR_CI, P_value, annotation)
+PanGWAS_sig
+
+# QQ plot 
+PanGWAS_qqplot <- QQ_plot(PanGWAS_data, "PanGWAS")
+PanGWAS_qqplot
+```
+
+# FIGURE - panel of MANHATTAN and QQPlots for SNPGWAS, DBGWAS, PANGWAS 
+```{r}
+library(ggplot2)
+library(patchwork)
+library(gridExtra)
+library(ggplotify)  # for as.ggplot()
+
+# Turn PanGWAS_sig (data.frame) into a table-plot
+PanGWAS_table <- tableGrob(PanGWAS_sig)
+PanGWAS_table_plot <- as.ggplot(PanGWAS_table)
+
+# Build rows: (left, right)
+row1 <- SNPGWAS_manplot   + DBGWAS_manplot
+row2 <- SNPGWAS_qqplot + PanGWAS_qqplot + DBGWAS_qqplot
+
+# Stack rows
+final_panel <- row1 / row2 
+  plot_layout(heights = c(3, 2))  # adjust column width ratio if needed
+
+final_panel
+
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/2. Analysis/MS1 - USA GWAS interpretation/Mahanttan_QQ_plots_panel.png", final_panel, width = 15, height = 10, dpi = 300)
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/2. Analysis/MS1 - USA GWAS interpretation/Mahanttan_QQ_plots_panel.tiff", final_panel, width = 15, height = 10, dpi = 300)
+```
+
+
+# TABLE - PYSEER RESULTS for SNPGWAS, DBGWAS, PANGWAS 
+```{r}
+rbind(SNPGWAS_sig, PanGWAS_sig, DBGWAS_sig)
+
+```
+
+
+
+## Change EOD vs LOD/VLOD threshold
+# 0. EOD vs LOD/VLOD threshold = 7 days (i.e. 1 weeks) - Main Analysis
+```{r}
+# SNP-GWAS
+SNPGWAS_lt7 <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/Population_Structure_Methods/FastTree_DP_LMM/SNPGWAS.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)|> 
+  mutate(POS=as.integer(str_split(as.character(variant), "_", simplify = T)[,2]), 
+         REF=(str_split(as.character(variant), "_", simplify = T)[,3]),
+         ALT=(str_split(as.character(variant), "_", simplify = T)[,4]),
+         variant = paste0(REF, POS, ALT), 
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))
+SNPGWAS_lt7_sig <- SNPGWAS_lt7 |>  filter(lrt.pvalue < 0.05 /nrow(SNPGWAS_lt7)) 
+SNPGWAS_lt7_sig
+
+# DB-GWAS
+DBGWAS_lt7 <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/Population_Structure_Methods/FastTree_DP_LMM/DBGWAS.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)
+# Load Annotations
+
+DBGWAS_ann <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/Population_Structure_Methods/FastTree_DP_LMM/DBGWAS_annotation.txt", sep = "\t", header=F) 
+colnames(DBGWAS_ann) <- colnames(DBGWAS_lt7)
+DBGWAS_ann <- DBGWAS_ann |> 
+  filter(af >=0.05, af <0.95)|>
+  mutate(ref_unaligned = ifelse(str_extract(notes, "^[^:]+")=="AP018935.1", "ref genome", "unaligned contig"),
+         coord_range = str_extract(notes, "(?<=:)[0-9]+-[0-9]+"), 
+         start= str_split(coord_range, "-", simplify = T)[,1], 
+         end= str_split(coord_range, "-", simplify = T)[,2],
+         POS = as.integer(str_extract(coord_range, "^[0-9]+")),
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))  |>
+  separate(
+    notes, 
+    into = c("contig_position", "upstream", "gene", "downstream"), 
+    sep = ";", 
+    remove = FALSE, 
+    fill = "right"
+  )
+
+# Sig hits
+DBGWAS_lt7_sig <- DBGWAS_ann |> 
+  filter(lrt.pvalue < 0.05 / 87899) |>
+  mutate(ref_unaligned = factor(ref_unaligned, levels= c("ref genome", "unaligned contig")))|>
+  arrange(ref_unaligned, as.numeric(start))|>
+  mutate(
+    OR = exp(beta),
+    OR_lower = exp(beta - 1.96 * beta.std.err),
+    OR_upper = exp(beta + 1.96 * beta.std.err),
+    OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+    P_value = formatC(lrt.pvalue, format = "e", digits = 2)
+  ) |>
+  mutate(variant2= paste0("Unitig ",row_number()), 
+         annotation= paste0("coord:", coord_range, "(", ref_unaligned, "); gene: ", gene))|> 
+  select(variant, variant2, af, filter.pvalue, lrt.pvalue,   beta, beta.std.err, variant_h2, notes)
+DBGWAS_lt7_sig
+
+# PanGWAS
+PanGWAS_lt7 <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/Population_Structure_Methods/FastTree_DP_LMM/PanGWAS.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+PanGWAS_lt7_sig <- PanGWAS_lt7 |> filter(lrt.pvalue < 0.05 / nrow(PanGWAS_lt7))
+PanGWAS_lt7_sig
+
+# Summarize results
+final_df_lt7 <- rbind(SNPGWAS_lt7_sig |> 
+  mutate(variant = str_remove(variant, "AP018935.1_"))|> 
+  mutate(OR= round(exp(beta), 2),
+         CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
+         CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
+         lt7= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue), 
+         variant2= "")|>
+  dplyr::select(variant, variant2, lt7),
+PanGWAS_lt7_sig |> 
+  mutate(OR= round(exp(beta), 2),
+         CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
+         CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
+         lt7= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue), 
+         variant2= "")|>
+  dplyr::select(variant, variant2, lt7),
+DBGWAS_lt7_sig |> 
+  mutate(OR= round(exp(beta), 2),
+         CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
+         CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
+         lt7= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
+  dplyr::select(variant, variant2, lt7))
+
+final_df_lt7
+```
+
+
+# 1. EOD vs LOD/VLOD threshold = 14 days (i.e. 2 weeks)
+```{r}
+# SNP-GWAS
+SNPGWAS_lt14 <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/EOD_LOD_Threshold/SNPGWAS_FastTree_DP_LMM_lt14.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)|> 
+  mutate(POS=as.integer(str_split(as.character(variant), "_", simplify = T)[,2]), 
+         REF=(str_split(as.character(variant), "_", simplify = T)[,3]),
+         ALT=(str_split(as.character(variant), "_", simplify = T)[,4]),
+         variant = paste0(REF, POS, ALT), 
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))
+SNPGWAS_lt14_sig <- SNPGWAS_lt14 |>  filter(lrt.pvalue < 0.05 /nrow(SNPGWAS_lt14)) 
+SNPGWAS_lt14_sig
+
+# DB-GWAS
+DBGWAS_lt14 <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/EOD_LOD_Threshold/DBGWAS_FastTree_DP_LMM_lt14.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)
+DBGWAS_lt14_sig <- DBGWAS_lt14 |>  filter(lrt.pvalue < 0.05 /87899) 
+DBGWAS_lt14_sig
+
+# PanGWAS
+PanGWAS_lt14 <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/EOD_LOD_Threshold/PanGWAS_FastTree_DP_LMM_lt14.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+PanGWAS_lt14_sig <- PanGWAS_lt14 |> filter(lrt.pvalue < 0.05 / nrow(PanGWAS_lt14))
+PanGWAS_lt14_sig
+
+# Summarize results
+final_df_lt14 <- rbind(SNPGWAS_lt14_sig |> 
+  mutate(variant = str_remove(variant, "AP018935.1_"))|> 
+  mutate(OR= round(exp(beta), 2),
+         CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
+         CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
+         lt14= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
+  dplyr::select(variant, lt14),
+PanGWAS_lt14_sig |> 
+  mutate(OR= round(exp(beta), 2),
+         CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
+         CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
+         lt14= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
+  dplyr::select(variant, lt14),
+DBGWAS_lt14_sig |> 
+  mutate(OR= round(exp(beta), 2),
+         CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
+         CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
+         lt14= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
+  dplyr::select(variant, lt14))
+
+final_df_lt14
+```
+
+# 2. EOD vs LOD/VLOD threshold = 30 days (i.e. 1 month)
+```{r}
+# SNP-GWAS
+SNPGWAS_lt30 <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/EOD_LOD_Threshold/SNPGWAS_FastTree_DP_LMM_lt30.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)|> 
+  mutate(POS=as.integer(str_split(as.character(variant), "_", simplify = T)[,2]), 
+         REF=(str_split(as.character(variant), "_", simplify = T)[,3]),
+         ALT=(str_split(as.character(variant), "_", simplify = T)[,4]),
+         variant = paste0(REF, POS, ALT), 
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))
+SNPGWAS_lt30_sig <- SNPGWAS_lt30 |>  filter(lrt.pvalue < 0.05 /nrow(SNPGWAS_lt30)) 
+SNPGWAS_lt30_sig
+
+# DB-GWAS
+DBGWAS_lt30 <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/EOD_LOD_Threshold/DBGWAS_FastTree_DP_LMM_lt30.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)
+DBGWAS_lt30_sig <- DBGWAS_lt30 |>  filter(lrt.pvalue < 0.05 /87899) 
+DBGWAS_lt30_sig
+
+# PanGWAS
+PanGWAS_lt30 <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/EOD_LOD_Threshold/PanGWAS_FastTree_DP_LMM_lt30.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+PanGWAS_lt30_sig <- PanGWAS_lt30 |> filter(lrt.pvalue < 0.05 / nrow(PanGWAS_lt30))
+PanGWAS_lt30_sig
+
+# Summarize results
+final_df_lt30 <- rbind(SNPGWAS_lt30_sig |> 
+  mutate(variant = str_remove(variant, "AP018935.1_"))|> 
+  mutate(OR= round(exp(beta), 2),
+         CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
+         CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
+         lt30= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
+  dplyr::select(variant, lt30),
+PanGWAS_lt30_sig |> 
+  mutate(OR= round(exp(beta), 2),
+         CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
+         CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
+         lt30= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
+  dplyr::select(variant, lt30),
+DBGWAS_lt30_sig |> 
+  mutate(OR= round(exp(beta), 2),
+         CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
+         CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
+         lt30= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
+  dplyr::select(variant, lt30))
+final_df_lt30
+```
+
+# 3. EOD vs LOD/VLOD threshold = 60 days (i.e. 2 month)
+```{r}
+# SNP-GWAS
+SNPGWAS_lt60 <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/EOD_LOD_Threshold/SNPGWAS_FastTree_DP_LMM_lt60.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)|> 
+  mutate(POS=as.integer(str_split(as.character(variant), "_", simplify = T)[,2]), 
+         REF=(str_split(as.character(variant), "_", simplify = T)[,3]),
+         ALT=(str_split(as.character(variant), "_", simplify = T)[,4]),
+         variant = paste0(REF, POS, ALT), 
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))
+SNPGWAS_lt60_sig <- SNPGWAS_lt60 |>  filter(lrt.pvalue < 0.05 /nrow(SNPGWAS_lt60)) 
+SNPGWAS_lt60_sig
+
+# DB-GWAS
+DBGWAS_lt60 <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/EOD_LOD_Threshold/DBGWAS_FastTree_DP_LMM_lt60.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)
+DBGWAS_lt60_sig <- DBGWAS_lt60 |>  filter(lrt.pvalue < 0.05 /87899) 
+DBGWAS_lt60_sig
+
+# PanGWAS
+PanGWAS_lt60 <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/EOD_LOD_Threshold/PanGWAS_FastTree_DP_LMM_lt60.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+PanGWAS_lt60_sig <- PanGWAS_lt60 |> filter(lrt.pvalue < 0.05 / nrow(PanGWAS_lt60))
+PanGWAS_lt60_sig
+
+# Summarize results
+final_df_lt60 <- rbind(SNPGWAS_lt60_sig |> 
+  mutate(variant = str_remove(variant, "AP018935.1_"))|> 
+  mutate(OR= round(exp(beta), 2),
+         CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
+         CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
+         lt60= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
+  dplyr::select(variant, lt60),
+PanGWAS_lt60_sig |> 
+  mutate(OR= round(exp(beta), 2),
+         CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
+         CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
+         lt60= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
+  dplyr::select(variant, lt60),
+DBGWAS_lt60_sig |> 
+  mutate(OR= round(exp(beta), 2),
+         CI_lo = round(exp(beta- 1.96*beta.std.err), 2),
+         CI_hi = round(exp(beta+ 1.96*beta.std.err), 2),
+         lt60= paste0(OR, " (",CI_lo, "-",CI_hi,"), p=",lrt.pvalue))|>
+  dplyr::select(variant, lt60))
+final_df_lt60
+```
+
+# Join all results in final table
+```{r}
+final_df <- left_join(left_join(left_join(final_df_lt7, final_df_lt14), final_df_lt30), final_df_lt60) |> 
+  mutate(variant = ifelse(variant2 == "", variant, variant2)) |> 
+  select(- variant2)
+final_df 
+```
+
+
+
+# NDL PYSEER RESULTS 
+```{r}
+# SNP-GWAS 
+# Load GWAS results
+SNPGWAS_NLD <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/NDL/SNPGWAS.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)|> 
+  mutate(POS=as.integer(str_split(as.character(variant), "_", simplify = T)[,2]), 
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"),
+    OR_lower = exp(beta - 1.96 * beta.std.err),
+    OR_upper = exp(beta + 1.96 * beta.std.err),
+    OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+    P_value = formatC(lrt.pvalue, format = "e", digits = 2), 
+         REF=(str_split(as.character(variant), "_", simplify = T)[,3]), 
+         ALT=(str_split(as.character(variant), "_", simplify = T)[,4]), 
+         hit=paste0(REF,  POS,  ALT))
+
+# Load Annotations
+SNPGWAS_NLD_ann <- left_join(SNPGWAS_NLD,
+  SNPGWAS_ann |>
+  mutate(variant = paste("AP018935.1", POS, REF, ALT, sep="_")))
+
+# Table of significant hits 
+SNPGWAS_NLD_ann |> 
+  filter(lrt.pvalue< 0.05/nrow(SNPGWAS_NLD_ann)) |> 
+  select(POS, REF, ALT, af, OR_CI, P_value, FUNCLASS, gene, aa_change)
+
+# QQ plot 
+SNPGWAS_NLD_qqplot <- QQ_plot(SNPGWAS_NLD_ann, "SNP-GWAS")
+
+
+# DB-GWAS 
+# Load GWAS results
+DBGWAS_NLD <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/NDL/DBGWAS.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+
+# Load Annotations
+DBGWAS_NLD_ann <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/NDL/DBGWAS_annotation.txt", sep = "\t", header=F) 
+colnames(DBGWAS_NLD_ann) <- colnames(DBGWAS_NLD)
+DBGWAS_NLD_ann <- DBGWAS_NLD_ann |> 
+  filter(af >=0.05, af <0.95)|>
+  mutate(core_accessory = ifelse(str_extract(notes, "^[^:]+")=="AP018935.1", "ref", "accessory"),
+         coord_range = str_extract(notes, "(?<=:)[0-9]+-[0-9]+"), 
+         start= str_split(coord_range, "-", simplify = T)[,1], 
+         end= str_split(coord_range, "-", simplify = T)[,2],
+         POS = as.integer(str_extract(coord_range, "^[0-9]+")),
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"),
+    OR_lower = exp(beta - 1.96 * beta.std.err),
+    OR_upper = exp(beta + 1.96 * beta.std.err),
+    OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+    P_value = formatC(lrt.pvalue, format = "e", digits = 2))  |>
+  separate(
+    notes, 
+    into = c("contig_position", "upstream", "gene", "downstream"), 
+    sep = ";", 
+    remove = FALSE, 
+    fill = "right")
+
+
+# Significant Hits table
+DBGWAS_NLD_ann |> 
+  filter(lrt.pvalue< 0.05/87899) |> 
+  select(coord_range, af, OR_CI, P_value, gene)
+
+# QQ plot 
+DBGWAS_NLD_qqplot <- QQ_plot(DBGWAS_NLD_ann, "DBGWAS")
+
+
+#  Pan-GWAS
+# Load GWAS results
+PanGWAS_NLD <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/NDL/PanGWAS.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+
+# Get significant hits
+PanGWAS_NLD_sig <- PanGWAS_NLD |>
+  filter(lrt.pvalue< 0.05/nrow(PanGWAS_NLD)) |> 
+  mutate(
+    OR = exp(beta),
+    OR_lower = exp(beta - 1.96 * beta.std.err),
+    OR_upper = exp(beta + 1.96 * beta.std.err),
+    OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+    P_value = formatC(lrt.pvalue, format = "e", digits = 2)
+  ) |>
+  select(variant, af, OR_CI, P_value)
+PanGWAS_NLD_sig
+
+# QQ plot 
+PanGWAS_NLD_qqplot <- QQ_plot(PanGWAS_NLD, "PanGWAS")
+
+
+
+# Make QQ plot panel 
+qqplot_panel_NDL <- SNPGWAS_NLD_qqplot + PanGWAS_NLD_qqplot + DBGWAS_NLD_qqplot
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/2. Analysis/MS1 - USA GWAS interpretation/NL_QQplots_panel.png", qqplot_panel_NDL, width = 9, height = 3, dpi = 300)
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/2. Analysis/MS1 - USA GWAS interpretation/NL_QQplots_panel.tiff", qqplot_panel_NDL, width = 9, height = 3, dpi = 300)
+```
+
+
+
+
+
+
+
+
+
+# CDC PYSEER RESULTS (using CDC+NDL outputs)
+```{r}
+# DB-GWAS 
+# Load GWAS results
+DBGWAS_CDC_global <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/CDC_NDL_unitig_COG_definitions/DBGWAS.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+
+# Load Annotations
+DBGWAS_CDC_global_ann <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/CDC_NDL_unitig_COG_definitions/DBGWAS_annotation.txt", sep = "\t", header=F) 
+colnames(DBGWAS_CDC_global_ann) <- colnames(DBGWAS_CDC_global)
+DBGWAS_CDC_global_ann <- DBGWAS_CDC_global_ann |> 
+  filter(af >=0.05, af <0.95)|>
+  mutate(core_accessory = ifelse(str_extract(notes, "^[^:]+")=="AP018935.1", "ref", "accessory"),
+         coord_range = str_extract(notes, "(?<=:)[0-9]+-[0-9]+"), 
+         start= str_split(coord_range, "-", simplify = T)[,1], 
+         end= str_split(coord_range, "-", simplify = T)[,2],
+         POS = as.integer(str_extract(coord_range, "^[0-9]+")),
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"),
+    OR_lower = exp(beta - 1.96 * beta.std.err),
+    OR_upper = exp(beta + 1.96 * beta.std.err),
+    OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+    P_value = formatC(lrt.pvalue, format = "e", digits = 2))  |>
+  separate(
+    notes, 
+    into = c("contig_position", "upstream", "gene", "downstream"), 
+    sep = ";", 
+    remove = FALSE, 
+    fill = "right")
+
+
+# Significant Hits table
+# which ones correspond to original hits ? 
+DBGWAS_sig_names <- DBGWAS_ann |> 
+  filter(lrt.pvalue < 0.05 / 87899) |>
+  mutate(ref_unaligned = factor(ref_unaligned, levels= c("ref genome", "unaligned contig")))|>
+  arrange(ref_unaligned, as.numeric(start)) |>
+  mutate(unitig= paste0("Unitig ",row_number()))|> 
+  select(coord_range, unitig) 
+DBGWAS_sig_names
+
+DBGWAS_CDC_global_sig <- left_join(DBGWAS_CDC_global_ann |> 
+  filter(coord_range %in% DBGWAS_sig_names$coord_range) |> 
+  select(variant, coord_range, af, OR_CI, P_value, gene), DBGWAS_sig_names)
+DBGWAS_CDC_global_sig
+
+
+DBGWAS_CDC_global_sig2 <- DBGWAS_CDC_global_ann |> 
+  filter(lrt.pvalue < 0.05 / 87899)
+DBGWAS_CDC_global_sig2 <- left_join(DBGWAS_CDC_global_sig2, DBGWAS_sig_names) |> 
+  filter(is.na(unitig)) |>
+  select(variant, coord_range, af, OR_CI, P_value, gene)
+
+CDC_sig_unitigs_Global_def <-rbind(DBGWAS_CDC_global_sig |>  select(variant, unitig) , 
+  data.frame(variant = c("TAATAGTGGAGAAATTTGTGATAATTTATCTCA", "TTTCGTTTAACAAAAAAAATACTTTGCGAGGTCTCCATGCAGA"), 
+             unitig = c("Unitig 8", "Unitig 16")))|> 
+  arrange(parse_number(unitig))
+write.table(CDC_sig_unitigs_Global_def, "~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/CDC_NDL_unitig_COG_definitions/CDC_sig_unitigs_Global_def.txt", row.names = F, quote = F)
+
+CDC_sig_unitigs_Global_def |> select(variant)
+## missing unitigs 8 and 16
+#  Pan-GWAS
+# Load GWAS results
+PanGWAS_CDC_global <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/CDC_NDL_unitig_COG_definitions/PanGWAS.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+
+# Get significant hits
+PanGWAS_CDC_global_sig <- PanGWAS_CDC_global |>
+  filter(lrt.pvalue< 0.05/nrow(PanGWAS_CDC_global)) |> 
+  mutate(
+    OR = exp(beta),
+    OR_lower = exp(beta - 1.96 * beta.std.err),
+    OR_upper = exp(beta + 1.96 * beta.std.err),
+    OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+    P_value = formatC(lrt.pvalue, format = "e", digits = 2)
+  ) |>
+  select(variant, af, OR_CI, P_value)
+PanGWAS_CDC_global_sig
+```
+
+# NDL PYSEER RESULTS (using CDC+NDL outputs)
+```{r}
+# SNPGWAS
+SNPGWAS_NLD_sig <- SNPGWAS_NLD |> 
+  filter(hit %in% SNPGWAS_sig$variant) |> 
+  select(hit, af, OR_CI, filter.pvalue, P_value )
+
+# DB-GWAS 
+DBGWAS_NDL_global <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/NDL/CDC_NDL_unitig_COG_definitions/DBGWAS.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+DBGWAS_NDL_global_sig <- left_join(DBGWAS_NDL_global |> 
+  filter(variant %in% CDC_sig_unitigs_Global_def$variant) |>
+  mutate(OR = exp(beta), 
+         OR_lower = exp(beta - 1.96 * beta.std.err),
+         OR_upper = exp(beta + 1.96 * beta.std.err),
+         OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+         P_value = formatC(lrt.pvalue, format = "e", digits = 2)) , 
+  CDC_sig_unitigs_Global_def |> rename(hit= unitig))|> 
+  select(hit, af, OR_CI, filter.pvalue, P_value )|> 
+  arrange(parse_number(hit))
+
+#  Pan-GWAS
+PanGWAS_NDL_global <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/NDL/CDC_NDL_unitig_COG_definitions/PanGWAS.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+PanGWAS_NLD_global_sig <- PanGWAS_NDL_global |>
+  filter(variant %in% PanGWAS_CDC_global_sig$variant) |> 
+  mutate( OR = exp(beta),
+    OR_lower = exp(beta - 1.96 * beta.std.err),
+    OR_upper = exp(beta + 1.96 * beta.std.err),
+    OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+    P_value = formatC(lrt.pvalue, format = "e", digits = 2), 
+    variant= ifelse(variant == "group_2327", "arnC", "group1981")) |>
+  select(variant, af, OR_CI, filter.pvalue, P_value)|> 
+  rename(hit= variant)
+
+# Combine
+CDC_sig_hits_among_NDL_samples <- rbind(SNPGWAS_NLD_sig, PanGWAS_NLD_global_sig, DBGWAS_NDL_global_sig)
+write.table(CDC_sig_hits_among_NDL_samples, "~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/NDL/CDC_sig_hits_among_NDL_samples.Rtab")
+```
+
+
+# CDC vs NDL PYSEER p-value (using CDC+NDL outputs)
+```{r}
+# prepare CDC data 
+CDC_pyseer_df <- rbind(SNPGWAS_data  |> 
+                         select(variant, filter.pvalue, lrt.pvalue, OR)|> 
+                         rename(filter.pvalue_CDC=filter.pvalue, lrt.pvalue_CDC= lrt.pvalue, OR_CDC=OR),
+                       DBGWAS_CDC_global |>
+                         mutate(OR=exp(beta))|> 
+                         select(variant, filter.pvalue, lrt.pvalue, OR)|> 
+                         rename(filter.pvalue_CDC=filter.pvalue, lrt.pvalue_CDC= lrt.pvalue, OR_CDC=OR),
+                       PanGWAS_CDC_global |> 
+                         mutate(OR=exp(beta)) |> 
+                         select(variant, filter.pvalue, lrt.pvalue, OR)|> 
+                         rename(filter.pvalue_CDC=filter.pvalue, lrt.pvalue_CDC= lrt.pvalue, OR_CDC=OR))
+
+# prepare NDL data 
+NDL_pyseer_df <- rbind(SNPGWAS_NLD |> 
+                         select(variant, filter.pvalue, lrt.pvalue, OR) |> 
+                         rename(filter.pvalue_NLD=filter.pvalue, lrt.pvalue_NLD= lrt.pvalue, OR_NLD=OR),
+                       DBGWAS_NDL_global |>
+                         mutate(OR=exp(beta)) |> 
+                         select(variant, filter.pvalue, lrt.pvalue, OR)|> 
+                         rename(filter.pvalue_NLD=filter.pvalue, lrt.pvalue_NLD= lrt.pvalue, OR_NLD=OR),
+                       PanGWAS_NDL_global|>
+                         mutate(OR=exp(beta)) |> 
+                         select(variant, filter.pvalue, lrt.pvalue, OR)|> 
+                         rename(filter.pvalue_NLD=filter.pvalue, lrt.pvalue_NLD= lrt.pvalue, OR_NLD=OR))
+
+
+# Combine
+NLD_CDC_pyseer_df <- left_join(CDC_pyseer_df, NDL_pyseer_df)
+
+
+# Plot p-values before population structure adjustment
+r_val_filter.pvalue <-cor.test(-log10(NLD_CDC_pyseer_df$filter.pvalue_NLD), -log10(NLD_CDC_pyseer_df$filter.pvalue_CDC))
+p_corr_before <- NLD_CDC_pyseer_df |>
+  ggplot() +
+  geom_point(aes(x = -log10(filter.pvalue_CDC),
+                 y = -log10(filter.pvalue_NLD))) +
+  theme_classic()+
+  annotate(
+    "text",
+    x = 30, y = 20,
+    label = paste0("r = ", round(r_val_filter.pvalue$estimate, 2), " p-val < 0.001"),
+    hjust = 1.1, vjust = 1.5, size=10
+  )+
+  ggtitle("Before Pop. Structure Correction")+ 
+  theme(
+    plot.title   = element_text(face = "bold", hjust = 0.5, size =30),
+    axis.title   = element_text(size = 30),   # axis titles
+    axis.text    = element_text(size = 20),   # axis tick labels
+    legend.title = element_text(size = 30),   # legend title
+    legend.text  = element_text(size = 20)    # legend labels
+  )+
+  xlab("USA dataset\n-log10(p-value)")+
+  ylab("Netherlands dataset\n-log10(p-value)")
+
+# Plot p-values after population structure adjustment
+r_val_lrt.pvalue <-cor.test(-log10(NLD_CDC_pyseer_df$lrt.pvalue_NLD), -log10(NLD_CDC_pyseer_df$lrt.pvalue_CDC))
+p_corr_after <-NLD_CDC_pyseer_df |>
+  ggplot()+
+  geom_point(aes(x=-log10(lrt.pvalue_CDC), y=-log10(lrt.pvalue_NLD))) +
+  theme_classic()+
+  annotate(
+    "text",
+    x = 6, y = 5,
+    label = paste0("r = ", round(r_val_lrt.pvalue$estimate, 2), " p-val < 0.001"),
+    hjust = 1.1, vjust = 1.5, size=10
+  )+
+  ggtitle("After Pop. Structure Correction")+ 
+  theme(
+    plot.title   = element_text(face = "bold", hjust = 0.5, size =30),
+    axis.title   = element_text(size = 30),   # axis titles
+    axis.text    = element_text(size = 20),   # axis tick labels
+    legend.title = element_text(size = 15),   # legend title
+    legend.text  = element_text(size = 20)    # legend labels
+  )+
+  xlab("USA dataset\n-log10(p-value)")+
+  ylab("Netherlands dataset\n-log10(p-value)")
+
+# # Plot ORs
+# r_val_OR <-cor.test((NLD_CDC_pyseer_df$OR_CDC), (NLD_CDC_pyseer_df$OR_NLD))
+# 
+# NLD_CDC_pyseer_df |>
+#   ggplot()+
+#   geom_point(aes(x=OR_CDC, y=OR_NLD))+
+#   theme_classic()+
+#   annotate(
+#     "text",
+#     x = 0.7, y = 1.4,
+#     label = paste0("r = ", round(r_val_OR$estimate, 2), " p-val < 0.001"),
+#     hjust = 1.1, vjust = 1.5
+#   )
+
+# Combine
+p_corr_before_after <- p_corr_before + p_corr_after
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/2. Analysis/MS1 - USA GWAS interpretation/GWAS_pval_corr_USA_vs_NDL.png", p_corr_before_after, width = 20, height = 10, dpi = 300)
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/2. Analysis/MS1 - USA GWAS interpretation/GWAS_pval_corr_USA_vs_NDL.tiff", p_corr_before_after, width = 20, height =10, dpi = 300)
+```
+
+# Make supplementary figure for MS1:
+```{r}
+library(dplyr)
+library(openxlsx)
+
+wb <- createWorkbook()
+
+# SNPGWAS EOD_LOD
+SNPGWAS_ann_df_sig <- SNPGWAS_ann_df |>
+  filter(lrt.pvalue < 0.05 / nrow(SNPGWAS_ann_df)) |>
+  select(variant, af, filter.pvalue, lrt.pvalue, beta, beta.std.err,
+         variant_h2)
+
+addWorksheet(wb, "SNPGWAS (EOD vs LOD)")
+writeData(wb, "SNPGWAS (EOD vs LOD)", SNPGWAS_ann_df_sig)
+
+PanGWAS_data_sig <- PanGWAS_data |>
+  filter(lrt.pvalue < 0.05 / nrow(PanGWAS_data)) |>
+  select(variant, af, filter.pvalue, lrt.pvalue, beta, beta.std.err,
+         variant_h2)
+
+addWorksheet(wb, "PanGWAS (EOD vs LOD)")
+writeData(wb, "PanGWAS (EOD vs LOD)", PanGWAS_data_sig)
+
+DBGWAS_ann_sig <- DBGWAS_ann |>
+  filter(lrt.pvalue < 0.05 / 87899) |>
+  select(variant, af, filter.pvalue, lrt.pvalue, beta, beta.std.err,
+         variant_h2, notes)
+
+addWorksheet(wb, "DBGWAS (EOD vs LOD)")
+writeData(wb, "DBGWAS (EOD vs LOD)", DBGWAS_ann_sig)
+
+# 14 days
+snpgwas_14_days <- SNPGWAS_lt14 |>
+  filter(lrt.pvalue < 0.05 / nrow(SNPGWAS_lt14)) |>
+  select(variant, af, filter.pvalue, lrt.pvalue, beta, beta.std.err,
+         variant_h2)
+
+addWorksheet(wb, "SNPGWAS (14 days)")
+writeData(wb, "SNPGWAS (14 days)", snpgwas_14_days)
+
+PanGWAS_14_days <- PanGWAS_lt14 |>
+  filter(lrt.pvalue < 0.05 / nrow(PanGWAS_lt14)) |>
+  select(variant, af, filter.pvalue, lrt.pvalue, beta, beta.std.err,variant_h2)
+
+addWorksheet(wb, "PanGWAS (14 days)")
+writeData(wb, "PanGWAS (14 days)", PanGWAS_14_days)
+
+DBGWAS_14_days <- DBGWAS_lt14 |>
+  filter(lrt.pvalue < 0.05 / 87899) |>
+  select(variant, af, filter.pvalue, lrt.pvalue, beta, beta.std.err,
+         variant_h2, notes)
+
+addWorksheet(wb, "DBGWAS (14 days)")
+writeData(wb, "DBGWAS (14 days)", DBGWAS_14_days)
+
+
+# 30 days
+snpgwas_30_days <- SNPGWAS_lt30 |>
+  filter(lrt.pvalue < 0.05 / nrow(SNPGWAS_lt30)) |>
+  select(variant, af, filter.pvalue, lrt.pvalue, beta, beta.std.err,
+         variant_h2)
+
+addWorksheet(wb, "SNPGWAS (30 days)")
+writeData(wb, "SNPGWAS (30 days)", snpgwas_30_days)
+
+
+PanGWAS_30_days <- PanGWAS_lt30 |>
+  filter(lrt.pvalue < 0.05 / nrow(PanGWAS_lt30)) |>
+  select(variant, af, filter.pvalue, lrt.pvalue, beta, beta.std.err,
+         variant_h2)
+
+addWorksheet(wb, "PanGWAS (30 days)")
+writeData(wb, "PanGWAS (30 days)", PanGWAS_30_days)
+
+DBGWAS_30_days <- DBGWAS_lt30 |>
+  filter(lrt.pvalue < 0.05 / 87899) |>
+  select(variant, af, filter.pvalue, lrt.pvalue, beta, beta.std.err,
+         variant_h2, notes)
+
+addWorksheet(wb, "DBGWAS (30 days)")
+writeData(wb, "DBGWAS (30 days)", DBGWAS_30_days)
+
+# 60 days
+snpgwas_60_days <- SNPGWAS_lt60 |>
+  filter(lrt.pvalue < 0.05 / nrow(SNPGWAS_lt60)) |>
+  select(variant, af, filter.pvalue, lrt.pvalue, beta, beta.std.err,
+         variant_h2, notes)
+
+addWorksheet(wb, "SNPGWAS (60 days)")
+writeData(wb, "SNPGWAS (60 days)", snpgwas_60_days)
+
+PanGWAS_60_days <- PanGWAS_lt60 |>
+  filter(lrt.pvalue < 0.05 / nrow(PanGWAS_lt60)) |>
+  select(variant, af, filter.pvalue, lrt.pvalue, beta, beta.std.err,
+         variant_h2, notes)
+
+addWorksheet(wb, "PanGWAS (60 days)")
+writeData(wb, "PanGWAS (60 days)", PanGWAS_60_days)
+
+DBGWAS_60_days <- DBGWAS_lt60 |>
+  filter(lrt.pvalue < 0.05 / 87899) |>
+  select(variant, af, filter.pvalue, lrt.pvalue, beta, beta.std.err,
+         variant_h2, notes)
+
+addWorksheet(wb, "DBGWAS (60 days)")
+writeData(wb, "DBGWAS (60 days)", DBGWAS_60_days)
+
+# Finally save workbook ------------------------------------------------
+saveWorkbook(wb, "~/GitHub/GBS-GWAS-CDC-EOD-LOD/2. Analysis/MS1 - USA GWAS interpretation/Supp_Pyseer_significant_outputs.xlsx", overwrite = TRUE)
+
+```
+
+

@@ -1,0 +1,301 @@
+---
+title: "Linkage Investigation"
+output: html_document
+date: "2025-10-06"
+---
+
+# 0 Set up environment
+```{r}
+# Clean environment
+rm( list = ls() )
+
+# load libraries
+library(stringr)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(phytools)
+library(ape)
+library(treeio)
+library(ggtree)
+library(ggnewscale)
+library(RColorBrewer)
+library(cartography)
+library(khroma)
+```
+
+# PLot phylogeny 
+```{r}
+# Import tree
+tr  <-midpoint.root(read.tree("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Phylogenies/CDC/Fastree_DP.tre"))
+
+# Load metadata
+serotypes <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Strain Typing/CDC/Serotypes.txt", header=T)
+CCs <- read.csv("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Strain Typing/CDC/combined_results_with_cc.txt")
+SCs <- read.csv("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Strain Typing/CDC/GBS_GWAS_db_core_clusters.csv") |> rename(Sample=Taxon, SC=Cluster)
+
+# Load phenotypes
+phenotypes <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/0.Raw_data/phenotypes_CDC.txt", header=T)
+phenotypes <- phenotypes |>
+  rename(Sample =samples ) |> 
+  mutate(Age_cat = ifelse(continuous<=7, "EOD", 
+                          ifelse(continuous<=89, "LOD", "VLOD")))
+# Prep metadata for tree
+typing_data <- left_join(left_join(left_join(serotypes, CCs), SCs), phenotypes)
+fewer5_SC <- which(table(typing_data$SC)<=5)
+metadata_tree_v0 <- typing_data |>
+  mutate(SC2= ifelse(SC %in% fewer5_SC, "other", SC))|>
+  mutate(SC2= factor(SC2, level=c(1:12, "other")))|>
+  mutate(Serotype2 = str_remove(str_remove(GBS.SBG,"\\*"),"\\?"))|>
+  mutate(Serotype2 = ifelse(grepl("III-", Serotype2), "III", Serotype2))|>
+  mutate(Serotype2 = factor(Serotype2, levels=c("Ia", "Ib","II", "III", "IV", "V","VI", "VIII")))|> 
+  rename("label" = "Sample")|> 
+  filter(label %in% tr$tip.label)
+```
+
+# 1. Main Analysis
+# 1.1. SNP-GWAS (Fastree DP LMM, Panaroo, Binary)
+```{r}
+# Load GWAS results
+SNPGWAS_data_Fasttree_LMM <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/Population_Structure_Methods/FastTree_DP_LMM/SNPGWAS.txt", sep = "\t", header=T)|> 
+  filter(af>=0.05, af <0.95)|> 
+  mutate(POS=as.integer(str_split(as.character(variant), "_", simplify = T)[,2]), 
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))
+SNPGWAS_sig <-SNPGWAS_data_Fasttree_LMM |> 
+  filter(lrt.pvalue < 0.05 /nrow(SNPGWAS_data_Fasttree_LMM))
+
+# Load SNP distribution across samples
+sig_SNPs <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/Sig_SNP.txt")
+sig_SNPs_df <- sig_SNPs  |> 
+  select(- X.CHROM, -ID, -QUAL, -FILTER, -INFO, -FORMAT)|>
+  mutate(across(4:1543, ~ ifelse(grepl("1/1", .), 1, 0)))|>
+  mutate(Sum = rowSums(across(4:1543), na.rm = TRUE),
+         Proportion = round(Sum / 1540, 3))|>
+  mutate(across(4:1543, ~ ifelse(grepl("1", .), "present", "absent")))|>
+  mutate(MUT= paste0(REF, POS, ALT), .before = 1)|> 
+  select(-POS, -REF, -ALT)
+df_t <- as.data.frame(t(sig_SNPs_df[,-1]))
+colnames(df_t) <- sig_SNPs_df[[1]]
+
+```
+# 1.2. DB-GWAS (Fastree DP LMM, Panaroo, Binary)
+```{r}
+# Load GWAS results
+DBGWAS_data <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/Population_Structure_Methods/FastTree_DP_LMM/DBGWAS.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+
+# Load Annotations
+DBGWAS_ann <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/Population_Structure_Methods/FastTree_DP_LMM/DBGWAS_annotation.txt", sep = "\t", header=F) 
+colnames(DBGWAS_ann) <- colnames(DBGWAS_data)
+DBGWAS_ann <- DBGWAS_ann |> 
+  filter(af >=0.05, af <0.95)|>
+  mutate(ref_accessory = ifelse(str_extract(notes, "^[^:]+")=="AP018935.1", "ref genome", "unaligned contig"),
+         coord_range = str_extract(notes, "(?<=:)[0-9]+-[0-9]+"), 
+         start= str_split(coord_range, "-", simplify = T)[,1], 
+         end= str_split(coord_range, "-", simplify = T)[,2],
+         POS = as.integer(str_extract(coord_range, "^[0-9]+")),
+         OR = exp(beta), 
+         OR_pos =ifelse(OR<1, "OR<1", "OR>1"))  |>
+  separate(
+    notes, 
+    into = c("contig_position", "upstream", "gene", "downstream"), 
+    sep = ";", 
+    remove = FALSE, 
+    fill = "right"
+  )
+
+# Sig hits
+DBGWAS_sig <- DBGWAS_ann |> 
+  filter(lrt.pvalue < 0.05 / 87899) |>
+  mutate(ref_accessory = factor(ref_accessory, levels= c("ref genome", "unaligned contig")))|>
+  arrange(ref_accessory, as.numeric(start))|>
+  mutate(
+    OR = exp(beta),
+    OR_lower = exp(beta - 1.96 * beta.std.err),
+    OR_upper = exp(beta + 1.96 * beta.std.err),
+    OR_CI = sprintf("%.2f (%.2f; %.2f)", OR, OR_lower, OR_upper),
+    P_value = formatC(lrt.pvalue, format = "e", digits = 2)
+  ) |>
+  mutate(variant2= paste0("Unitig ",row_number()), 
+         annotation= paste0("coord:", coord_range, "(", ref_accessory, "); gene: ", gene))|> 
+  select(variant, variant2, af, OR_CI, P_value, annotation) 
+DBGWAS_sig
+
+# Load Unitig distribution across samples
+Sig_Unitig <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/Sig_Unitig.txt", sep=" ", header=F)|>
+  select(-V2)
+Sig_Unitig[] <- lapply(Sig_Unitig, function(x) gsub(":1", "", x))
+order_unitigs <- DBGWAS_sig$variant
+Sig_Unitig <- Sig_Unitig |>
+  filter(V1 %in% order_unitigs) |>
+  mutate(V1 = factor(V1, levels = order_unitigs)) |>
+  arrange(V1)
+
+Unitig_sig_t <- metadata_tree_v0 %>% select(label)
+for(i in 1:nrow(Sig_Unitig)){
+  present_samples <- as.vector(unlist(Sig_Unitig[i, -1]))
+  new_var <- ifelse(Unitig_sig_t$label %in% present_samples, 1, 0)
+  Unitig_sig_t[[paste0("Unitig_", i)]] <- new_var
+}
+row.names(Unitig_sig_t) <- Unitig_sig_t$label
+Unitig_sig_t <- Unitig_sig_t[,-1]
+round(colMeans(Unitig_sig_t %>% select(starts_with("Unitig_"))),3)
+Unitig_sig_t <- Unitig_sig_t |>
+  dplyr::mutate(across(everything(), ~ ifelse(. == 0, "absent", "present")))
+```
+# 1.3. Pan-GWAS (Fastree DP LMM, Panaroo, Binary)
+```{r}
+# Load GWAS results
+PanGWAS_FastTree <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/Population_Structure_Methods/FastTree_DP_LMM/PanGWAS.txt", sep = "\t", header=T) |> 
+  filter(af >=0.05, af <0.95)
+ PanGWAS_FastTree_sig <- PanGWAS_FastTree |> filter(lrt.pvalue < 0.05 / nrow(PanGWAS_FastTree))
+ 
+# Load Gene distribution across samples
+gene_presence_absence <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/COG_presence_absence.Rtab", header=T)
+gene_sig <- gene_presence_absence |> 
+  filter(Gene %in% PanGWAS_FastTree_sig$variant)
+gene_sig_Sum_prop <- gene_sig|>
+  mutate(Sum = rowSums(across(2:ncol(gene_sig)), na.rm = TRUE),
+         Proportion = round(Sum / (ncol(gene_sig)-1), 3))|>
+  select(Gene, Sum, Proportion)
+gene_sig_Sum_prop
+gene_sig <- gene_sig |>
+  mutate(across(2:1541, ~ ifelse(grepl("1", .), "present", "absent")))
+gene_sig_t <- as.data.frame(t(gene_sig[,-1]))
+colnames(gene_sig_t) <- gene_sig[[1]]
+
+```
+
+# What proportion of samples carrying one significant hit also carries another ? 
+```{r}
+df_complete <- left_join(left_join(left_join(metadata_tree_v0 , 
+                          df_t |> mutate(label=rownames(df_t))) , 
+                          Unitig_sig_t |> mutate(label=rownames(Unitig_sig_t))), 
+                          gene_sig_t |> mutate(label=rownames(gene_sig_t))) 
+
+
+df_complete_V2 <- df_complete |> select(-label, -GBS.SBG, -ST, -clonal_complex, -SC, -binary, -continuous, -Age_cat, -SC2, -Serotype2)
+
+# Suppose `line` is your data.frame or matrix
+sim_matrix <- matrix(NA, ncol(df_complete_V2), ncol(df_complete_V2),
+                     dimnames = list(colnames(df_complete_V2), colnames(df_complete_V2)))
+
+for (i in 1:ncol(df_complete_V2)) {
+  for (j in 1:ncol(df_complete_V2)) {
+    sim_matrix[i, j] <- mean(df_complete_V2[, i] == df_complete_V2[, j])
+  }
+}
+
+# Heatmap
+library(reshape2)
+sim_long <- melt(sim_matrix)
+colnames(sim_long) <- c("Var1", "Var2", "value")
+sym_palette <- c(viridis::plasma(100), rev(viridis::plasma(100)))
+sim_long_tri <- sim_long[as.numeric(sim_long$Var2) <= as.numeric(sim_long$Var1), ]
+library(ggplot2)
+p_direction <- ggplot(sim_long_tri, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient2(
+    low = "blue",       # Color for 0
+    mid = "white",     # Color for 0.5
+    high = "red",      # Color for 1
+    midpoint = 0.5,    # Where the "mid" color should be
+    limits = c(0, 1)
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(
+    x = "", y = "", 
+    title = "Direction of Co-occurrence\nof GWAS-significant variants",
+    fill = "Proportion of samples\nwith identical genotypes"
+  )
+
+
+# Suppose `line` is your data.frame or matrix
+chisq_matrix_stat <- matrix(NA, ncol(df_complete_V2), ncol(df_complete_V2),
+                     dimnames = list(colnames(df_complete_V2), colnames(df_complete_V2)))
+chisq_matrix_p <- chisq_matrix_stat
+
+n_pairs <- ncol(df_complete_V2)*((ncol(df_complete_V2))-1)/2
+sig_threshold <- 
+
+for (i in 1:ncol(df_complete_V2)) {
+  for (j in 1:ncol(df_complete_V2)) {
+    chisq_test <- chisq.test(df_complete_V2[, i], df_complete_V2[, j])
+    chisq_matrix_stat[i, j] <- chisq_test$statistic
+    chisq_matrix_p[i, j] <- chisq_test$p.value
+  }
+}
+
+
+# Heatmap
+chisq_matrix_stat_long <- melt(chisq_matrix_stat)
+colnames(chisq_matrix_stat_long) <- c("Var1", "Var2", "value")
+chisq_matrix_stat_long_tri <- chisq_matrix_stat_long[as.numeric(chisq_matrix_stat_long$Var2) <= as.numeric(chisq_matrix_stat_long$Var1), ]
+p_strength <- ggplot(chisq_matrix_stat_long_tri, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient2(
+    low = "blue",       
+    mid = "white",     
+    high = "red",      
+    midpoint = 0.05) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(
+    x = "Genetic Variant / GWAS Signal 1", 
+    y = "Genetic Variant / GWAS Signal 2", 
+    title = "Strength of Co-occurrence\nof GWAS-significant variants",
+    fill = "Chi-square test statistic\nfor co-occurrence of\nvariant alleles")
+
+
+# Stack rows
+p_direction_strength <- p_direction + p_strength 
+p_direction_strength
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/2. Analysis/MS1 - USA GWAS interpretation/CDC_linkage_heatmaps.png", p_direction_strength, width = 15, height = 5, dpi = 300)
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/2. Analysis/MS1 - USA GWAS interpretation/CDC_linkage_heatmaps.tiff", p_direction_strength, width = 15, height = 5, dpi = 300)
+```
+
+```{r}
+# Check stats
+# Linkage BLock 1
+table(df_complete$T1206469C, df_complete$T1216249C)
+table(df_complete$T1206469C, df_complete$Unitig_11)
+table(df_complete$T1216249C, df_complete$Unitig_14)
+table(df_complete$T1216249C, df_complete$Unitig_15)
+table(df_complete$T1216249C, df_complete$Unitig_17)
+
+table(paste(df_complete$T1206469C,df_complete$T1216249C, df_complete$Unitig_11, df_complete$Unitig_14, df_complete$Unitig_15, df_complete$Unitig_17))
+
+table(paste(df_complete$T1206469C,df_complete$T1216249C, df_complete$Unitig_11, df_complete$Unitig_14, df_complete$Unitig_15, df_complete$Unitig_17, df_complete$Unitig_12, df_complete$Unitig_13))
+
+
+# Linkage BLock 2
+table(df_complete$C1249780T, df_complete$C1250385A)
+table(df_complete$C1249780T, df_complete$A1250938G)
+table(paste(df_complete$C1249780T,df_complete$C1250385A, df_complete$A1250938G))
+
+# Linkage BLock 3
+table(df_complete$Unitig_3, df_complete$Unitig_4)
+table(df_complete$Unitig_3, df_complete$Unitig_5)
+table(df_complete$Unitig_3, df_complete$Unitig_6)
+table(df_complete$Unitig_3, df_complete$Unitig_7)
+table(df_complete$Unitig_3, df_complete$Unitig_8)
+table(df_complete$Unitig_3, df_complete$Unitig_9)
+table(df_complete$Unitig_3, df_complete$Unitig_20)
+table(df_complete$Unitig_3, df_complete$arnC)
+
+table(paste(df_complete$Unitig_3,df_complete$Unitig_4, df_complete$Unitig_5,df_complete$Unitig_6, df_complete$Unitig_7,df_complete$Unitig_8, df_complete$Unitig_9,df_complete$Unitig_20, df_complete$arnC))
+
+
+# Linkage BLock 4
+table(df_complete$Unitig_1, df_complete$Unitig_2)
+table(df_complete$Unitig_1, df_complete$Unitig_18)
+table(df_complete$Unitig_1, df_complete$Unitig_19)
+table(df_complete$Unitig_1, df_complete$Unitig_10)
+table(paste(df_complete$Unitig_1,df_complete$Unitig_2, df_complete$Unitig_18,df_complete$Unitig_19, df_complete$Unitig_10))
+
+
+```
+
+

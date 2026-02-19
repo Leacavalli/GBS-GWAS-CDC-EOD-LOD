@@ -1,0 +1,13 @@
+allele_frequency_from: 0.01,0.05,0.1,0.25
+allele_frequency_to: 0.05,0.1,0.25,0.5
+homoplasy_steps_from: 0
+homoplasy_steps_to: 1000
+number_causal_variants: 1
+sampling_repetitions: 20
+
+sample_size: 250,500,1000,1500
+case_control_ratio: 0.5
+effect_size: 1.5,2,5,10
+heritability: 0.5
+prevalence: 0.5
+simulation_repetitions: 100

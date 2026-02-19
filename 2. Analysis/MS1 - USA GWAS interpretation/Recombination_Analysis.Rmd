@@ -1,0 +1,345 @@
+---
+title: "Recombination_Analysis"
+output: html_document
+date: "2025-10-17"
+---
+
+```{r}
+# Clean environment
+rm( list = ls() )
+
+# load libraries
+library(stringr)
+library(tidyverse)
+library(ggplot2)
+library(ape)
+library(phytools)
+library(ggtree)
+library(khroma)
+library(cartography)
+library(ggnewscale)
+
+# Load Branch statistics
+recomb_predictions_CDC <- read.gff("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Gubbins/CDC/Fulltree/recombination_predictions.gff", na.strings = c(".", "?"), GFF3 = TRUE)
+recomb_predictions_NDL <- read.gff("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Gubbins/NDL/recombination_predictions.gff", na.strings = c(".", "?"), GFF3 = TRUE)
+  
+# Get accessory regions from Missingness proportion 
+Missingness_Prop_CDC <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/Missingness_Prop.txt")
+CDC_Accesory_region_POS <- Missingness_Prop_CDC |> filter(V2>=0.05) |> pull(V1)
+CDC_Core_region_POS <- Missingness_Prop_CDC |> filter(V2<0.05) |> pull(V1)
+
+Missingness_Prop_NDL <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/NDL/Missingness_Prop.txt")
+NDL_Accesory_region_POS <- Missingness_Prop_NDL |> filter(V2>=0.05) |> pull(V1)
+NDL_Core_region_POS <- Missingness_Prop_NDL |> filter(V2<0.05) |> pull(V1)
+
+# Get cps locus
+cps_POS <- 1193391:1209001
+
+# merge consecutive positions into ranges
+get_ranges <- function(pos) {
+  if (length(pos) == 0) return(data.frame(start=integer(), end=integer()))
+  pos <- sort(pos)
+  split <- c(0, cumsum(diff(pos) != 1))
+  do.call(rbind, lapply(split(pos, split), function(x) data.frame(start=min(x), end=max(x))))
+}
+
+# Preparing shading data
+cps_df <- get_ranges(cps_POS)
+cps_df$region_type <- "cps locus"
+
+CDC_accessory_df <- get_ranges(CDC_Accesory_region_POS)
+CDC_accessory_df$region_type <- "Accessory region"
+CDC_shaded_regions <- bind_rows(CDC_accessory_df, cps_df) %>%
+  mutate(alpha = ifelse(region_type == "Accessory region", 0.2, 1))
+
+NDL_accessory_df <- get_ranges(NDL_Accesory_region_POS)
+NDL_accessory_df$region_type <- "Accessory region"
+NDL_shaded_regions <- bind_rows(NDL_accessory_df, cps_df) %>%
+  mutate(alpha = ifelse(region_type == "Accessory region", 0.2, 1))
+
+# Define positions for sig hits
+green_pos <- data.frame(what = c("T1206469C", "T1216249C", "C1249780T", "C1250385A", "A1250938G", "Unitig_1", "Unitig_2", "Unitig_3", "Unitig_7", "Unitig_8", "Unitig_9", "Unitig_10", "Unitig_11", "Unitig_12"), 
+                        start= c(1206469-20, 1216249-20, 1249780-20, 1250385-20, 1250938-20, 1206439, 1216431, 1238722, 1198989, 1198992, 1201107, 1201748, 1201754, 1203290), 
+           end= c(1206469+20, 1216249+20, 1249780+20, 1250385+20, 1250938+20, 1206470, 1216469, 1238768, 1199021, 1199027, 1201138, 1201783, 1201796, 1203334), 
+           region_type= "Sig. hits", 
+           alpha=1)
+CDC_shaded_regions2 <- rbind(CDC_shaded_regions, green_pos |> select(-what)) |>
+  mutate(alpha= ifelse(region_type == "cps locus", 0.4, alpha))
+NDL_shaded_regions2 <- rbind(NDL_shaded_regions, green_pos |> select(-what)) |>
+  mutate(alpha= ifelse(region_type == "cps locus", 0.4, alpha))
+
+# prep sig hit labels
+green_pos <- green_pos  %>%
+  arrange(start)%>%
+  dplyr::mutate(x_mid = (start + end) / 2)%>%
+  dplyr::mutate(y_lab = c(0, 600, 1800, 2200, 2600, 3400, 600, 1800, 600, 1800, 2200, 600, 1800, 2600))
+```
+
+
+# Plot distribution of Recombination block and regions, highlighting accessory regions and the cps locus
+## CDC
+```{r}
+# Plot Recombination blocks
+p_recomb_block_CDC <- recomb_predictions_CDC %>%
+  mutate(mid = (start + end) / 2) %>%
+  ggplot() +
+  geom_histogram(aes(x = mid), bins = 1000, 
+                 fill = "grey80", color = "black") +
+  geom_rect(
+    data = CDC_shaded_regions,
+    aes(xmin = start, xmax = end, ymin = -Inf, ymax = Inf, fill = region_type, alpha = alpha),
+    color = NA,
+    inherit.aes = FALSE
+  ) +
+  scale_fill_manual(
+    name = "Region", 
+    values = c("Accessory region" = "red", "cps locus" = "blue")
+  ) +
+  scale_alpha_identity() +  # use the alpha values directly
+  theme_classic()
+p_recomb_block_CDC
+
+# Plot The number of Recombination blocks spanning each genomic position
+deconvoluted_df_CDC <- recomb_predictions_CDC %>%
+  rowwise() %>%
+  mutate(position = list(seq(start, end))) %>%   # List of positions for each row
+  unnest(position) %>%
+  ungroup()
+
+
+# ADD significant hits
+p_recomb_sig_pos_CDC <- deconvoluted_df_CDC %>%
+  ggplot() +
+  geom_histogram(aes(x = position), bins = 100000, 
+                 fill = "grey50", color = "grey50") +
+  geom_rect(
+    data = CDC_shaded_regions2,
+    aes(xmin = start, xmax = end, ymin = -Inf, ymax = Inf, fill = region_type, alpha = alpha),
+    color = NA,
+    inherit.aes = FALSE
+  ) +
+  scale_fill_manual(
+    name = "Region", 
+    values = c("Accessory region" = "red", "cps locus" = "blue", "Sig. hits" = "green3")
+  ) +
+  scale_alpha_identity() +  # use the alpha values directly
+  theme_classic()+
+  xlab("Genomic Position")+
+  ylab("Number of Spanning Recombination Blocks")
+p_recomb_sig_pos_CDC
+
+
+# ADD labels
+p_recomb_sig_pos_label_CDC <- deconvoluted_df_CDC %>%
+  ggplot() +
+  geom_histogram(aes(x = position), bins = 500,
+                 fill = "grey50", color = "grey50") +
+  geom_rect(
+    data = CDC_shaded_regions2,
+    aes(xmin = start, xmax = end, ymin = -Inf, ymax = Inf,
+        fill = region_type, alpha = alpha),
+    color = NA,
+    inherit.aes = FALSE
+  ) +
+  # labels for green_pos
+  geom_text(
+    data = green_pos,
+    aes(x = end, y =y_lab, label = what),   # adjust y as needed
+    angle = 45, vjust = 0.5, hjust = 0,
+    size = 3,
+    inherit.aes = FALSE, color= "green3"
+  ) +
+  scale_fill_manual(
+    name = "Region",
+    values = c("Accessory region" = "red",
+               "cps locus" = "blue",
+               "Sig. hits" = "green3")
+  ) +
+  scale_alpha_identity() +
+  theme_classic() +
+  xlab("Genomic Position") +
+  ylab("Number of Spanning Recombination Blocks")
+
+p_zoom_CDC <- p_recomb_sig_pos_label_CDC+ 
+  xlim(1193390, 1252000) +
+  theme(legend.position="bottom")
+  
+
+p_full_CDC <- p_recomb_sig_pos_CDC +
+  theme(axis.title.x = element_blank(),
+        axis.text.x  = element_blank(),
+        axis.ticks.x = element_blank(), 
+        legend.position = "none")
+
+# Arrange one above the other (patchwork)
+library(patchwork)
+empty <- patchwork::plot_spacer()
+p_zoom_null_CDC <- (p_zoom_CDC / empty) + plot_layout(heights = c(1, 1))
+
+p_save_CDC <- p_full_CDC + p_zoom_null_CDC 
+# save
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/2. Analysis/MS1 - USA GWAS interpretation/CDC_recombination_tract.png", plot = p_save_CDC, width = 18, height = 6, dpi = 300, units = "in", bg = "white")
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/2. Analysis/MS1 - USA GWAS interpretation/CDC_recombination_tract.tiff", plot = p_save_CDC, width = 18, height = 6, dpi = 300, units = "in", bg = "white")
+```
+
+## NDL
+```{r}
+# Plot Recombination blocks
+p_recomb_block_NDL <- recomb_predictions_NDL %>%
+  mutate(mid = (start + end) / 2) %>%
+  ggplot() +
+  geom_histogram(aes(x = mid), bins = 1000, 
+                 fill = "grey80", color = "black") +
+  geom_rect(
+    data = NDL_shaded_regions2,
+    aes(xmin = start, xmax = end, ymin = -Inf, ymax = Inf, fill = region_type, alpha = alpha),
+    color = NA,
+    inherit.aes = FALSE
+  ) +
+  scale_fill_manual(
+    name = "Region", 
+    values = c("Accessory region" = "red", "cps locus" = "blue")
+  ) +
+  scale_alpha_identity() +  # use the alpha values directly
+  theme_classic()
+p_recomb_block_NDL
+
+# Plot The number of Recombination blocks spanning each genomic position
+deconvoluted_df_NDL <- recomb_predictions_NDL %>%
+  rowwise() %>%
+  mutate(position = list(seq(start, end))) %>%   # List of positions for each row
+  unnest(position) %>%
+  ungroup()
+
+
+# ADD significant hits
+p_recomb_sig_pos_NDL <- deconvoluted_df_NDL %>%
+  ggplot() +
+  geom_histogram(aes(x = position), bins = 100000, 
+                 fill = "grey50", color = "grey50") +
+  geom_rect(
+    data = NDL_shaded_regions2,
+    aes(xmin = start, xmax = end, ymin = -Inf, ymax = Inf, fill = region_type, alpha = alpha),
+    color = NA,
+    inherit.aes = FALSE
+  ) +
+  scale_fill_manual(
+    name = "Region", 
+    values = c("Accessory region" = "red", "cps locus" = "blue", "Sig. hits" = "green3")
+  ) +
+  scale_alpha_identity() +  # use the alpha values directly
+  theme_classic()+
+  xlab("Genomic Position")+
+  ylab("Number of Spanning Recombination Blocks")
+p_recomb_sig_pos_NDL
+
+
+# ADD labels
+p_recomb_sig_pos_label_NDL <- deconvoluted_df_NDL %>%
+  ggplot() +
+  geom_histogram(aes(x = position), bins = 500,
+                 fill = "grey50", color = "grey50") +
+  geom_rect(
+    data = NDL_shaded_regions2,
+    aes(xmin = start, xmax = end, ymin = -Inf, ymax = Inf,
+        fill = region_type, alpha = alpha),
+    color = NA,
+    inherit.aes = FALSE
+  ) +
+  # labels for green_pos
+  geom_text(
+    data = green_pos,
+    aes(x = end, y =y_lab, label = what),   # adjust y as needed
+    angle = 45, vjust = 0.5, hjust = 0,
+    size = 3,
+    inherit.aes = FALSE, color= "green3"
+  ) +
+  scale_fill_manual(
+    name = "Region",
+    values = c("Accessory region" = "red",
+               "cps locus" = "blue",
+               "Sig. hits" = "green3")
+  ) +
+  scale_alpha_identity() +
+  theme_classic() +
+  xlab("Genomic Position") +
+  ylab("Number of Spanning Recombination Blocks")
+
+p_zoom_NDL <- p_recomb_sig_pos_label_NDL+ 
+  xlim(1193390, 1252000) +
+  theme(legend.position="bottom")
+  
+
+p_full_NDL <- p_recomb_sig_pos_NDL +
+  theme(axis.title.x = element_blank(),
+        axis.text.x  = element_blank(),
+        axis.ticks.x = element_blank(), 
+        legend.position = "none")
+
+# Arrange one above the other (patchwork)
+library(patchwork)
+empty <- patchwork::plot_spacer()
+p_zoom_null_NDL <- (p_zoom_NDL / empty) + plot_layout(heights = c(1, 1))
+
+p_save_NDL <- p_full_NDL + p_zoom_null_NDL 
+# save
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/2. Analysis/MS1 - USA GWAS interpretation/NDL_recombination_tract.png", plot = p_save_NDL, width = 18, height = 6, dpi = 300, units = "in", bg = "white")
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/2. Analysis/MS1 - USA GWAS interpretation/NDL_recombination_tract.tiff", plot = p_save_NDL, width = 18, height = 6, dpi = 300, units = "in", bg = "white")
+```
+
+# Get rates of recombination across genome, comparing accessory, core and cps locus
+## CDC
+```{r}
+# Rate in accessory regions
+Accesory_deconvoluted_df_CDC <- deconvoluted_df_CDC |>  filter(position %in% CDC_Accesory_region_POS) 
+r_acc_CDC <- nrow(Accesory_deconvoluted_df_CDC)/length(CDC_Accesory_region_POS)
+r_acc_CDC
+# on average, around 34.0 recombination blocks span each genomic position in accessory regions. 
+
+# Rate in Core regions
+Core_deconvoluted_df_CDC <- deconvoluted_df_CDC |>  filter(position %in% CDC_Core_region_POS) 
+r_core_CDC <- nrow(Core_deconvoluted_df_CDC)/length(CDC_Core_region_POS)
+r_core_CDC
+# on average, around 8.4 recombination blocks span each genomic position in core regions. 
+
+# Rate in cps locus
+cps_deconvoluted_df_CDC <- deconvoluted_df_CDC |>  filter(position %in% cps_POS) 
+r_cps_CDC <- nrow(cps_deconvoluted_df_CDC)/length(cps_POS)
+r_cps_CDC
+# on average, around 36.1 recombination blocks span each genomic position in the cps locus 
+
+# Rate around the cps locus
+cps_around_deconvoluted_df_CDC <- deconvoluted_df_CDC |>  filter(position %in% 1193391:1250000) 
+r_cps_around_CDC <- nrow(cps_around_deconvoluted_df_CDC)/length(1193391:1250000)
+r_cps_around_CDC
+# on average, around 36.5 recombination blocks span each genomic position around the cps locus 
+```
+
+
+
+## NDL
+```{r}
+# Rate in accessory regions
+Accesory_deconvoluted_df_NDL <- deconvoluted_df_NDL |>  filter(position %in% NDL_Accesory_region_POS) 
+r_acc_NDL <- nrow(Accesory_deconvoluted_df_NDL)/length(NDL_Accesory_region_POS)
+r_acc_NDL
+# on average, around 40.6 recombination blocks span each genomic position in accessory regions. 
+
+# Rate in Core regions
+Core_deconvoluted_df_NDL <- deconvoluted_df_NDL |>  filter(position %in% NDL_Core_region_POS) 
+r_core_NDL <- nrow(Core_deconvoluted_df_NDL)/length(NDL_Core_region_POS)
+r_core_NDL
+# on average, around 8.1 recombination blocks span each genomic position in core regions. 
+
+# Rate in cps locus
+cps_deconvoluted_df_NDL <- deconvoluted_df_NDL |>  filter(position %in% cps_POS) 
+r_cps_NDL <- nrow(cps_deconvoluted_df_NDL)/length(cps_POS)
+r_cps_NDL
+# on average, around 33.9 recombination blocks span each genomic position in the cps locus 
+
+# Rate around the cps locus
+cps_around_deconvoluted_df_NDL <- deconvoluted_df_NDL |>  filter(position %in% 1193391:1250000) 
+r_cps_around_NDL <- nrow(cps_around_deconvoluted_df_NDL)/length(1193391:1250000)
+r_cps_around_NDL
+# on average, around 33.7 recombination blocks span each genomic position around the cps locus. 
+```

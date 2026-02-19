@@ -1,0 +1,957 @@
+---
+title: "Strain Distributions"
+output: html_document
+date: "2026-02-16"
+---
+
+# 0 Set up environment
+```{r}
+# Clean environment
+rm( list = ls() )
+
+# load libraries
+library(qqman)
+library(circlize)
+library(VennDiagram)
+library(stringr)
+library(tidyverse)
+library(ggrepel)
+library(ggplot2)
+library(phytools)
+library(ape)
+library(treeio)
+library(ggtree)
+library(ggnewscale)
+library(RColorBrewer)
+library(cartography)
+library(khroma)
+library(xlsx)
+
+# Load CDC and NL accessions
+library(xlsx)
+NL_metadata <- read.xlsx2("~/GitHub/GBS-GWAS-CDC-EOD-LOD/0.Raw_data/Netherlands_Sanger_metadata.xlsx", 1) 
+NL_accessions <- NL_metadata |> pull(ENA.lane.accession)
+CDC_metadata <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/0.Raw_data/phenotypes_CDC.txt", header=T) 
+CDC_accessions <- CDC_metadata |> pull(samples)
+
+# Import tree
+Fasttree <- read.tree("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Phylogenies/CDC_NLD/FastTree_phylo.tre")
+Fasttree_mid <- midpoint.root(Fasttree)
+
+# Load metadata
+serotypes <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Strain Typing/CDC_NDL/Serotypes.txt", header=T) |> mutate(GBS.SBG = ifelse(GBS.SBG=="", NA, GBS.SBG)) 
+CCs <- read.csv("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Strain Typing/CDC_NDL/combined_results_with_cc.txt") |> dplyr::select(Sample, clonal_complex)
+SCs <- read.csv("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Strain Typing/CDC_NDL/GBS_GWAS_db_core_clusters.csv") |> rename(Sample=Taxon, SC=Cluster)
+STs <- read.delim("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Strain Typing/CDC_NDL/ST_results.txt") |>
+  mutate(ST2 = str_remove(str_remove(ST,"\\*"),"\\?"))
+
+# Load phenotypes
+phenotypes <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/0.Raw_data/phenotypes_CDC_NDL.txt", header=T) |>
+  rename(Sample =samples ) |> 
+  mutate(Age_cat = ifelse(Sample %in% NL_accessions, ifelse(binary==1, "EOD", "LOD/VLOD"), ifelse(binary==1, "LOD/VLOD", "EOD")))
+
+
+# Prep metadata for tree
+typing_data <- left_join(left_join(left_join(left_join(serotypes, CCs ), SCs), phenotypes), (STs |> dplyr::select(Sample, ST, ST2)))
+fewer5_SC <- which(table(typing_data$SC)<=10)
+metadata_tree <- typing_data |>
+  mutate(SC2= ifelse(SC %in% fewer5_SC, "other", SC))|>
+  mutate(SC2= factor(SC2, level=c(1:14, "other")))|>
+  mutate(Serotype2 = str_remove(str_remove(GBS.SBG,"\\*"),"\\?"))|>
+  mutate(Serotype2 = ifelse(grepl("III-", Serotype2), "III", Serotype2))|>
+  mutate(Serotype2 = factor(Serotype2, levels=c("Ia", "Ib","II", "III", "IV", "V","VI","VII","VIII", "IX")))|> 
+  rename("label" = "Sample")|> 
+  filter(label %in% Fasttree_mid$tip.label)|>
+  mutate(country = ifelse(label %in% NL_accessions, "NLD", 
+                          ifelse(label %in% CDC_accessions, "USA", "other")))
+
+# Fix missing CCs
+ref_ST_cc_df <- rbind(unique(metadata_tree|> filter(!grepl("\\*", ST), !grepl("\\?", ST)) |> dplyr::select(ST, clonal_complex)), 
+                       data.frame(ST= c(1750, 2107, 137, 1809, 235, 482, 1946, 2106, 234),
+                                  clonal_complex=c("cc17", "cc17", "cc17", "cc23", "cc1", "cc17", "cc17", "cc19", "cc23")))
+
+# Load CDC and NL accessions
+NL_metadata <- read.xlsx("~/GitHub/GBS-GWAS-CDC-EOD-LOD/0.Raw_data/Netherlands_Sanger_metadata.xlsx", 1)
+NL_accessions <- NL_metadata |> pull(ENA.lane.accession) 
+
+# Join tree with metadata
+metadata_tree_v0 <- unique(left_join(metadata_tree |> dplyr::select(-clonal_complex), ref_ST_cc_df |> rename(ST2=ST)) |> 
+  mutate(clonal_complex = case_when(
+    label == "SRR29440471" ~ "cc19",
+    label == "SRR29458952" ~ "cc17",
+    label == "SRR29459527" ~ "cc1",
+    label == "SRR29476238" ~ "cc459",
+    label == "SRR29480489" ~ "cc17",
+    label == "SRR29489178" ~ "cc17",
+    label == "SRR29489593" ~ "cc1",
+    label == "SRR29489703" ~ "cc19",
+    label == "SRR29506764" ~ "cc19",
+    label == "SRR29506975" ~ "cc19",
+    label == "SRR29508494" ~ "cc1",
+    label == "SRR31502751" ~ "cc452",
+    label == "SRR5063593" ~ "cc19",
+    label == "ERR1659749" ~ "cc19",
+    label == "SRR23753882" ~ "cc17",
+    label == "SRR23754097" ~ "cc17",
+    TRUE ~ clonal_complex # keep existing value for all others
+  )) |> 
+  mutate(clonal_complex = ifelse(ST2 %in% c(4,16,103, 130, 255, 929, 932, 1553, 1559,1580, 1606), "No CC", clonal_complex)))
+
+# Prepare colors for phylo
+Serotype_colors <- c(color("muted")(9),"#D55E00" , "grey")
+names(Serotype_colors) <- levels(metadata_tree_v0$Serotype2)
+CC_colors <- c("#8dcabd", "#e3b1b8", "#caecbc", "#d1bbdf", "#9db8da", "#e0bf9d", "#8ad6e4", "#e6d2c7", "#b9d7eb", "#aac5a4" ,"#ddaa98", "#a2bebd")
+names(CC_colors) <- c("cc1",   "cc12" , "cc17" , "cc19",  "cc22",  "cc23"  ,"cc26"  ,"cc283", "cc327", "cc452", "cc459" ,"No CC")
+```
+
+
+# CDC dsitributions 
+# Clonal Complex vs AGe Cat
+```{r}
+# chi-square tests of Clonal Complex vs Age_cat, stratified by country
+metadata_tree_CDC <- metadata_tree_v0 |> filter(country == "USA")
+chisq.test_CC_CDC <- chisq.test(metadata_tree_CDC$Age_cat, metadata_tree_CDC$clonal_complex)
+
+p_labels_CC_CDC <- data.frame(pval= signif(chisq.test_CC_CDC$p.value , 3), 
+                       X2= round(chisq.test_CC_CDC$statistic, 1))
+
+
+# Summarise counts and percentages per country x Age_cat x Serotype2
+df_pct_CC_CDC <- metadata_tree_CDC |>
+  group_by(Age_cat, clonal_complex) |>
+  summarise(count = n(), .groups = "drop") |>
+  group_by(Age_cat) |>
+  mutate(
+    perc = count / sum(count) * 100,
+    perc_label = ifelse(perc >= 1, paste0(round(perc), "%"), "")
+  ) |>
+  ungroup()
+
+# Totals per bar (same as before but from df_pct)
+bar_totals_CC_CDC <- df_pct_CC_CDC |>
+  group_by(Age_cat) |>
+  summarise(N = sum(count), .groups = "drop")
+
+
+p_CC_CDC <- df_pct_CC_CDC |>
+  ggplot(aes(x = Age_cat, y = perc, fill = clonal_complex)) +
+  # stacked percentage bars (perc already in data)
+  geom_col() +
+  
+  # percentage labels inside segments, only if >= 10%
+  geom_text(
+    aes(label = perc_label),
+    position = position_stack(vjust = 0.5),
+    color = "white",
+    size = 5
+  ) +
+  
+  # total N at top of each bar
+  geom_text(
+    data = bar_totals_CC_CDC,
+    aes(x = Age_cat, y = 102, label = paste0("n=", N)),
+    inherit.aes = FALSE, size=5
+  ) +
+  scale_y_continuous(
+    name = "Percentage",
+    limits = c(0, 115),
+    breaks = seq(0, 100, 20),
+    labels = function(x) paste0(x, "%")
+  ) +
+  xlab("Age Category") +
+  theme_bw() +
+  scale_fill_manual(name = "Clonal Complex", values = CC_colors)+
+  # add per-country p-values
+  geom_text(
+    aes(x = 1.3, y = 115, label = paste0("χ²= ", p_labels_CC_CDC$X2)),
+    inherit.aes = FALSE,
+    hjust = 0,          # left-justify
+    size = 4
+  ) +
+  # add per-country p-values
+  geom_text(
+    aes(x = 1.25, y = 110, label = paste0("p = ", p_labels_CC_CDC$pval)),
+    inherit.aes = FALSE,
+    hjust = 0,          # left-justify
+    size = 4
+  ) +
+  # segment above bars connecting them
+  geom_segment(
+    aes(x = 1, xend = 2, y = 107, yend = 107),
+    inherit.aes = FALSE,
+    linewidth = 0.7
+  )+
+  # segment above bars connecting them
+  geom_segment(
+    aes(x = 1, xend = 1, y = 105, yend = 107),
+    inherit.aes = FALSE,
+    linewidth = 0.7
+  )+
+  # segment above bars connecting them
+  geom_segment(
+    aes(x = 2, xend = 2, y = 105, yend = 107),
+    inherit.aes = FALSE,
+    linewidth = 0.7
+  )+
+  ggtitle("Serotype Distribution\nEOD vs LOD/VLOD")+ theme(
+    plot.title   = element_text(face = "bold", hjust = 0.5, size =15),
+    axis.title   = element_text(size = 15),   # axis titles
+    axis.text    = element_text(size = 13),   # axis tick labels
+    legend.title = element_text(size = 15),   # legend title
+    legend.text  = element_text(size = 13)    # legend labels
+  )
+
+# Serotype vs AGe Cat
+# chi-square tests 
+chisq.test_Serotype_CDC <- chisq.test(metadata_tree_CDC$Age_cat, metadata_tree_CDC$Serotype2)
+p_labels_Serotype_CDC <- data.frame(pval= signif(chisq.test_Serotype_CDC$p.value , 3), 
+                       X2= round(chisq.test_Serotype_CDC$statistic, 1))
+
+
+# Summarise counts and percentages per country x Age_cat x Serotype2
+df_pct_Serotype_CDC <- metadata_tree_CDC |>
+  group_by(Age_cat, Serotype2) |>
+  summarise(count = n(), .groups = "drop") |>
+  group_by(Age_cat) |>
+  mutate(
+    perc = count / sum(count) * 100,
+    perc_label = ifelse(perc >= 1, paste0(round(perc), "%"), "")
+  ) |>
+  ungroup()
+
+# Totals per bar (same as before but from df_pct)
+bar_totals_Serotype_CDC <- df_pct_Serotype_CDC |>
+  group_by(Age_cat) |>
+  summarise(N = sum(count), .groups = "drop")
+
+
+p_Serotype_CDC <- df_pct_Serotype_CDC |>
+  ggplot(aes(x = Age_cat, y = perc, fill = Serotype2)) +
+  # stacked percentage bars (perc already in data)
+  geom_col() +
+  
+  # percentage labels inside segments, only if >= 10%
+  geom_text(
+    aes(label = perc_label),
+    position = position_stack(vjust = 0.5),
+    color = "white",
+    size = 5
+  ) +
+  
+  # total N at top of each bar
+  geom_text(
+    data = bar_totals_Serotype_CDC,
+    aes(x = Age_cat, y = 102, label = paste0("n=", N)),
+    inherit.aes = FALSE, size=5
+  ) +
+  scale_y_continuous(
+    name = "Percentage",
+    limits = c(0, 115),
+    breaks = seq(0, 100, 20),
+    labels = function(x) paste0(x, "%")
+  ) +
+  xlab("Age Category") +
+  theme_bw() +
+  scale_fill_manual(name = "Serotype", values = Serotype_colors)+
+  # add per-country p-values
+  geom_text(
+    aes(x = 1.3, y = 115, label = paste0("χ²= ", p_labels_Serotype_CDC$X2)),
+    inherit.aes = FALSE,
+    hjust = 0,          # left-justify
+    size = 4
+  ) +
+  # add per-country p-values
+  geom_text(
+    aes(x = 1.25, y = 110, label = paste0("p = ", p_labels_Serotype_CDC$pval)),
+    inherit.aes = FALSE,
+    hjust = 0,          # left-justify
+    size = 4
+  ) +
+  # segment above bars connecting them
+  geom_segment(
+    aes(x = 1, xend = 2, y = 107, yend = 107),
+    inherit.aes = FALSE,
+    linewidth = 0.7
+  )+
+  # segment above bars connecting them
+  geom_segment(
+    aes(x = 1, xend = 1, y = 105, yend = 107),
+    inherit.aes = FALSE,
+    linewidth = 0.7
+  )+
+  # segment above bars connecting them
+  geom_segment(
+    aes(x = 2, xend = 2, y = 105, yend = 107),
+    inherit.aes = FALSE,
+    linewidth = 0.7
+  )+
+  ggtitle("Serotype Distribution\nEOD vs LOD/VLOD")+ theme(
+    plot.title   = element_text(face = "bold", hjust = 0.5, size =15),
+    axis.title   = element_text(size = 15),   # axis titles
+    axis.text    = element_text(size = 13),   # axis tick labels
+    legend.title = element_text(size = 15),   # legend title
+    legend.text  = element_text(size = 13)    # legend labels
+  )
+
+# Combine 
+p_CDC <- p_CC_CDC + p_Serotype_CDC
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/2. Analysis/MS1 - USA GWAS interpretation/CDC_CC_Sero_Barplots.png", p_CDC, width = 12, height = 5, dpi = 300)
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/2. Analysis/MS1 - USA GWAS interpretation/CDC_CC_Sero_Barplots.tiff", p_CDC, width = 12, height = 5, dpi = 300)
+```
+
+# Clonal Complex vs AGe Cat in each country
+```{r}
+# chi-square tests of Clonal Complex vs Age_cat, stratified by country
+metadata_tree_CDC <- metadata_tree_v0 |> filter(country == "USA")
+metadata_tree_NLD <- metadata_tree_v0 |> filter(country == "NLD")
+
+chisq.test_CC_CDC <- chisq.test(metadata_tree_CDC$Age_cat, metadata_tree_CDC$clonal_complex)
+chisq.test_CC_NLD <- chisq.test(metadata_tree_NLD$Age_cat, metadata_tree_NLD$clonal_complex)
+
+p_labels_CC <- data.frame(country= c("USA", "NLD"), 
+                       pval= c(signif(chisq.test_CC_CDC$p.value , 3), signif(chisq.test_CC_NLD$p.value , 3)), 
+                       X2= c(round(chisq.test_CC_CDC$statistic, 1), round(chisq.test_CC_NLD$statistic, 1)))
+
+
+# Summarise counts and percentages per country x Age_cat x Serotype2
+df_pct_CC <- metadata_tree_v0 |>
+  filter(country != "other") |>
+  group_by(country, Age_cat, clonal_complex) |>
+  summarise(count = n(), .groups = "drop") |>
+  group_by(country, Age_cat) |>
+  mutate(
+    perc = count / sum(count) * 100,
+    perc_label = ifelse(perc >= 1, paste0(round(perc), "%"), "")
+  ) |>
+  ungroup()
+
+# Totals per bar (same as before but from df_pct)
+bar_totals_CC <- df_pct_CC |>
+  group_by(country, Age_cat) |>
+  summarise(N = sum(count), .groups = "drop")
+
+
+p_CC <- df_pct_CC |>
+  ggplot(aes(x = Age_cat, y = perc, fill = clonal_complex)) +
+  # stacked percentage bars (perc already in data)
+  geom_col() +
+  
+  # percentage labels inside segments, only if >= 10%
+  geom_text(
+    aes(label = perc_label),
+    position = position_stack(vjust = 0.5),
+    color = "white",
+    size = 5
+  ) +
+  
+  # total N at top of each bar
+  geom_text(
+    data = bar_totals_CC,
+    aes(x = Age_cat, y = 102, label = paste0("n=", N)),
+    inherit.aes = FALSE, size=5
+  ) +
+  
+  facet_grid(. ~ country) +
+  scale_y_continuous(
+    name = "Percentage",
+    limits = c(0, 115),
+    breaks = seq(0, 100, 20),
+    labels = function(x) paste0(x, "%")
+  ) +
+  xlab("Age Category") +
+  theme_bw() +
+  scale_fill_manual(name = "Clonal Complex", values = CC_colors)+
+  # add per-country p-values
+  geom_text(
+    data = p_labels_CC,
+    aes(x = 1.3, y = 115, label = paste0("χ²= ", X2)),
+    inherit.aes = FALSE,
+    hjust = 0,          # left-justify
+    size = 4
+  ) +
+  # add per-country p-values
+  geom_text(
+    data = p_labels_CC,
+    aes(x = 1.25, y = 110, label = paste0("p = ", pval)),
+    inherit.aes = FALSE,
+    hjust = 0,          # left-justify
+    size = 4
+  ) +
+  # segment above bars connecting them
+  geom_segment(
+    aes(x = 1, xend = 2, y = 107, yend = 107),
+    inherit.aes = FALSE,
+    linewidth = 0.7
+  )+
+  # segment above bars connecting them
+  geom_segment(
+    aes(x = 1, xend = 1, y = 105, yend = 107),
+    inherit.aes = FALSE,
+    linewidth = 0.7
+  )+
+  # segment above bars connecting them
+  geom_segment(
+    aes(x = 2, xend = 2, y = 105, yend = 107),
+    inherit.aes = FALSE,
+    linewidth = 0.7
+  )+
+  ggtitle("Clonal Complex Distribution\nEOD vs LOD/VLOD\n in the USA and Netherlands")+ theme(
+    plot.title   = element_text(face = "bold", hjust = 0.5, size =15),
+    axis.title   = element_text(size = 15),   # axis titles
+    axis.text    = element_text(size = 13),   # axis tick labels
+    legend.title = element_text(size = 15),   # legend title
+    legend.text  = element_text(size = 13)    # legend labels
+  )
+
+
+
+# Serotypes vs AGe Cat in each country
+# chi-square tests of Serotype2 vs Age_cat, stratified by country
+metadata_tree_CDC <- metadata_tree_v0 |> filter(country == "USA")
+metadata_tree_NLD <- metadata_tree_v0 |> filter(country == "NLD")
+
+chisq.test_CDC <- chisq.test(metadata_tree_CDC$Age_cat, metadata_tree_CDC$Serotype2)
+chisq.test_NLD <- chisq.test(metadata_tree_NLD$Age_cat, metadata_tree_NLD$Serotype2)
+
+p_labels <- data.frame(country= c("USA", "NLD"), 
+                       pval= c(signif(chisq.test_CDC$p.value , 3), signif(chisq.test_NLD$p.value , 3)), 
+                       X2= c(round(chisq.test_CDC$statistic, 1), round(chisq.test_NLD$statistic, 1)))
+
+
+# Summarise counts and percentages per country x Age_cat x Serotype2
+df_pct <- metadata_tree_v0 |>
+  filter(country != "other") |>
+  group_by(country, Age_cat, Serotype2) |>
+  summarise(count = n(), .groups = "drop") |>
+  group_by(country, Age_cat) |>
+  mutate(
+    perc = count / sum(count) * 100,
+    perc_label = ifelse(perc >= 1, paste0(round(perc), "%"), "")
+  ) |>
+  ungroup()
+
+# Totals per bar (same as before but from df_pct)
+bar_totals <- df_pct |>
+  group_by(country, Age_cat) |>
+  summarise(N = sum(count), .groups = "drop")
+
+
+p_serotype <- df_pct |>
+  ggplot(aes(x = Age_cat, y = perc, fill = Serotype2)) +
+  # stacked percentage bars (perc already in data)
+  geom_col() +
+  
+  # percentage labels inside segments, only if >= 10%
+  geom_text(
+    aes(label = perc_label),
+    position = position_stack(vjust = 0.5),
+    color = "white",
+    size = 5
+  ) +
+  
+  # total N at top of each bar
+  geom_text(
+    data = bar_totals,
+    aes(x = Age_cat, y = 102, label = paste0("n=", N)),
+    inherit.aes = FALSE, size=5
+  ) +
+  
+  facet_grid(. ~ country) +
+  scale_y_continuous(
+    name = "Percentage",
+    limits = c(0, 115),
+    breaks = seq(0, 100, 20),
+    labels = function(x) paste0(x, "%")
+  ) +
+  xlab("Age Category") +
+  theme_bw() +
+  scale_fill_manual(name = "Serotype", values = Serotype_colors)+
+  # add per-country p-values
+  geom_text(
+    data = p_labels,
+    aes(x = 1.3, y = 115, label = paste0("χ²= ", X2)),
+    inherit.aes = FALSE,
+    hjust = 0,          # left-justify
+    size = 4
+  ) +
+  # add per-country p-values
+  geom_text(
+    data = p_labels,
+    aes(x = 1.25, y = 110, label = paste0("p = ", pval)),
+    inherit.aes = FALSE,
+    hjust = 0,          # left-justify
+    size = 4
+  ) +
+  # segment above bars connecting them
+  geom_segment(
+    aes(x = 1, xend = 2, y = 107, yend = 107),
+    inherit.aes = FALSE,
+    linewidth = 0.7
+  )+
+  # segment above bars connecting them
+  geom_segment(
+    aes(x = 1, xend = 1, y = 105, yend = 107),
+    inherit.aes = FALSE,
+    linewidth = 0.7
+  )+
+  # segment above bars connecting them
+  geom_segment(
+    aes(x = 2, xend = 2, y = 105, yend = 107),
+    inherit.aes = FALSE,
+    linewidth = 0.7
+  )+
+  ggtitle("Serotype Distribution\nEOD vs LOD/VLOD\n in the USA and Netherlands")+ 
+  theme(
+    plot.title   = element_text(face = "bold", hjust = 0.5, size =15),
+    axis.title   = element_text(size = 15),   # axis titles
+    axis.text    = element_text(size = 13),   # axis tick labels
+    legend.title = element_text(size = 15),   # legend title
+    legend.text  = element_text(size = 13)    # legend labels
+  )
+
+# Combine 
+p_CC_serotype <- p_CC + p_serotype
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/2. Analysis/MS1 - USA GWAS interpretation/CDC_vs_NDL_EOD_vs_LOD_CC_Sero_Barplots.png", p_CC_serotype, width = 15, height = 5, dpi = 300)
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/2. Analysis/MS1 - USA GWAS interpretation/CDC_vs_NDL_EOD_vs_LOD_CC_Barplots.tiff", p_CC_serotype, width = 15, height = 5, dpi = 300)
+```
+
+```{r}
+# Clonal Complex in each country
+chisq.test_CC_country <- chisq.test(metadata_tree_v0$country, metadata_tree_v0$clonal_complex)
+
+p_labels_CC_country <- data.frame(country= c("USA", "NLD"), 
+                       pval= c(signif(chisq.test_CC_country$p.value , 3), signif(chisq.test_CC_country$p.value , 3)), 
+                       X2= c(round(chisq.test_CC_country$statistic, 1), round(chisq.test_CC_country$statistic, 1)))
+
+
+# Summarise counts and percentages per country x Age_cat x Serotype2
+df_pct_CC_country <- metadata_tree_v0 |>
+  filter(country != "other") |>
+  group_by(country, clonal_complex) |>
+  summarise(count = n(), .groups = "drop") |>
+  group_by(country) |>
+  mutate(
+    perc = count / sum(count) * 100,
+    perc_label = ifelse(perc >= 1, paste0(round(perc), "%"), "")
+  ) |>
+  ungroup()
+
+# Totals per bar (same as before but from df_pct)
+bar_totals_CC_country <- df_pct_CC_country |>
+  group_by(country) |>
+  summarise(N = sum(count), .groups = "drop")
+
+
+p_CC_country <- df_pct_CC_country |>
+  ggplot(aes(x = country, y = perc, fill = clonal_complex)) +
+  # stacked percentage bars (perc already in data)
+  geom_col() +
+  
+  # percentage labels inside segments, only if >= 10%
+  geom_text(
+    aes(label = perc_label),
+    position = position_stack(vjust = 0.5),
+    color = "white",
+    size = 5
+  ) +
+  
+  # total N at top of each bar
+  geom_text(
+    data = bar_totals_CC_country,
+    aes(x = country, y = 102, label = paste0("n=", N)),
+    inherit.aes = FALSE, size=5
+  ) +
+  scale_y_continuous(
+    name = "Percentage",
+    limits = c(0, 115),
+    breaks = seq(0, 100, 20),
+    labels = function(x) paste0(x, "%")
+  ) +
+  xlab("Country") +
+  theme_bw() +
+  scale_fill_manual(name = "Clonal Complex", values = CC_colors)+
+  # add per-country p-values
+  geom_text(
+    data = p_labels_CC_country,
+    aes(x = 1.3, y = 115, label = paste0("χ²= ", X2)),
+    inherit.aes = FALSE,
+    hjust = 0,          # left-justify
+    size = 4
+  ) +
+  # add per-country p-values
+  geom_text(
+    data = p_labels_CC_country,
+    aes(x = 1.25, y = 110, label = paste0("p = ", pval)),
+    inherit.aes = FALSE,
+    hjust = 0,          # left-justify
+    size = 4
+  ) +
+  # segment above bars connecting them
+  geom_segment(
+    aes(x = 1, xend = 2, y = 107, yend = 107),
+    inherit.aes = FALSE,
+    linewidth = 0.7
+  )+
+  # segment above bars connecting them
+  geom_segment(
+    aes(x = 1, xend = 1, y = 105, yend = 107),
+    inherit.aes = FALSE,
+    linewidth = 0.7
+  )+
+  # segment above bars connecting them
+  geom_segment(
+    aes(x = 2, xend = 2, y = 105, yend = 107),
+    inherit.aes = FALSE,
+    linewidth = 0.7
+  )+
+    ggtitle("Overall Clonal Complex Distribution\n in the USA vs Netherlands")+ 
+  theme(
+    plot.title   = element_text(face = "bold", hjust = 0.5, size =15),
+    axis.title   = element_text(size = 15),   # axis titles
+    axis.text    = element_text(size = 13),   # axis tick labels
+    legend.title = element_text(size = 15),   # legend title
+    legend.text  = element_text(size = 13)    # legend labels
+  )
+
+# chi-square tests of Serotype2 vs Age_cat, stratified by country
+chisq.test_cps_country <- chisq.test(metadata_tree_v0$country, metadata_tree_v0$Serotype2)
+
+p_labels_cps_country <- data.frame(country= c("USA", "NLD"), 
+                       pval= c(signif(chisq.test_cps_country$p.value , 3), signif(chisq.test_cps_country$p.value , 3)), 
+                       X2= c(round(chisq.test_cps_country$statistic, 1), round(chisq.test_cps_country$statistic, 1)))
+
+
+# Summarise counts and percentages per country x Age_cat x Serotype2
+df_pct_cps_country <- metadata_tree_v0 |>
+  filter(country != "other") |>
+  group_by(country, Serotype2) |>
+  summarise(count = n(), .groups = "drop") |>
+  group_by(country) |>
+  mutate(
+    perc = count / sum(count) * 100,
+    perc_label = ifelse(perc >= 1, paste0(round(perc), "%"), "")
+  ) |>
+  ungroup()
+
+# Totals per bar (same as before but from df_pct)
+bar_totals_cps_country <- df_pct_cps_country |>
+  group_by(country) |>
+  summarise(N = sum(count), .groups = "drop")
+
+
+p_cps_country <- df_pct_cps_country |>
+  ggplot(aes(x = country, y = perc, fill = Serotype2)) +
+  # stacked percentage bars (perc already in data)
+  geom_col() +
+  
+  # percentage labels inside segments, only if >= 10%
+  geom_text(
+    aes(label = perc_label),
+    position = position_stack(vjust = 0.5),
+    color = "white",
+    size = 5
+  ) +
+  
+  # total N at top of each bar
+  geom_text(
+    data = bar_totals_cps_country,
+    aes(x = country, y = 102, label = paste0("n=", N)),
+    inherit.aes = FALSE, size=5
+  ) +
+  
+  scale_y_continuous(
+    name = "Percentage",
+    limits = c(0, 115),
+    breaks = seq(0, 100, 20),
+    labels = function(x) paste0(x, "%")
+  ) +
+  xlab("Country") +
+  theme_bw() +
+  scale_fill_manual(name = "Serotype", values = Serotype_colors)+
+  # add per-country p-values
+  geom_text(
+    data = p_labels_cps_country,
+    aes(x = 1.3, y = 115, label = paste0("χ²= ", X2)),
+    inherit.aes = FALSE,
+    hjust = 0,          # left-justify
+    size = 4
+  ) +
+  # add per-country p-values
+  geom_text(
+    data = p_labels_cps_country,
+    aes(x = 1.25, y = 110, label = paste0("p = ", pval)),
+    inherit.aes = FALSE,
+    hjust = 0,          # left-justify
+    size = 4
+  ) +
+  # segment above bars connecting them
+  geom_segment(
+    aes(x = 1, xend = 2, y = 107, yend = 107),
+    inherit.aes = FALSE,
+    linewidth = 0.7
+  )+
+  # segment above bars connecting them
+  geom_segment(
+    aes(x = 1, xend = 1, y = 105, yend = 107),
+    inherit.aes = FALSE,
+    linewidth = 0.7
+  )+
+  # segment above bars connecting them
+  geom_segment(
+    aes(x = 2, xend = 2, y = 105, yend = 107),
+    inherit.aes = FALSE,
+    linewidth = 0.7
+  )+
+  ggtitle("Overall Serotype Distribution\n in the USA vs Netherlands")+ 
+  theme(
+    plot.title   = element_text(face = "bold", hjust = 0.5, size =15),
+    axis.title   = element_text(size = 15),   # axis titles
+    axis.text    = element_text(size = 13),   # axis tick labels
+    legend.title = element_text(size = 15),   # legend title
+    legend.text  = element_text(size = 13)    # legend labels
+  )
+
+
+# Combine 
+p_CC_serotype_country <- p_CC_country + p_cps_country
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/2. Analysis/MS1 - USA GWAS interpretation/CDC_vs_NDL_CC_Sero_Barplots.png", p_CC_serotype_country, width = 12, height = 5, dpi = 300)
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/2. Analysis/MS1 - USA GWAS interpretation/CDC_vs_NDL_CC_Sero_Barplots.tiff", p_CC_serotype_country, width = 12, height = 5, dpi = 300)
+```
+
+```{r}
+# Prepare data
+metadata_CDC <- metadata_tree_v0 |> 
+  filter(label  %in% CDC_accessions)|> 
+  select(label, Age_cat, Serotype2, clonal_complex) |> 
+  rename(Age_cat_7d = Age_cat)|>
+  mutate(Age_cat_7d= ifelse(Age_cat_7d =="EOD", "Below\nThreshold", "Above\nThreshold"))
+phenotypes_EOD_lt14 <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/EOD_LOD_Threshold/phenotypes_EOD_lt14.txt", header = T) |>
+  mutate(binary= ifelse(binary ==0, "Below\nThreshold", "Above\nThreshold")) |> 
+  rename(label  = samples, 
+         Age_cat_14d = binary)
+phenotypes_EOD_lt30 <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/EOD_LOD_Threshold/phenotypes_EOD_lt30.txt", header = T)|>
+  mutate(binary= ifelse(binary ==0, "Below\nThreshold", "Above\nThreshold")) |> 
+  rename(label  = samples, 
+         Age_cat_30d = binary)
+phenotypes_EOD_lt60 <- read.table("~/GitHub/GBS-GWAS-CDC-EOD-LOD/1.Bioinformatics/Ouputs/Pyseer Results/CDC/EOD_LOD_Threshold/phenotypes_EOD_lt60.txt", header = T)|>
+  mutate(binary= ifelse(binary ==0, "Below\nThreshold", "Above\nThreshold")) |> 
+  rename(label  = samples, 
+         Age_cat_60d = binary)
+metadata_CDC_threshold <- left_join(left_join(left_join(metadata_CDC, phenotypes_EOD_lt14), phenotypes_EOD_lt30), phenotypes_EOD_lt60)
+metadata_CDC_threshold_long <-  rbind(metadata_CDC |> rename(Age_cat = Age_cat_7d) |> mutate(threshold= "7 days"), 
+                                      left_join(metadata_CDC |> select(-Age_cat_7d), phenotypes_EOD_lt14 |> rename(Age_cat = Age_cat_14d)  |> mutate(threshold= "14 days")), 
+                                      left_join(metadata_CDC |> select(-Age_cat_7d), phenotypes_EOD_lt30 |> rename(Age_cat = Age_cat_30d) |> mutate(threshold= "30 days")), 
+                                      left_join(metadata_CDC |> select(-Age_cat_7d), phenotypes_EOD_lt60 |> rename(Age_cat = Age_cat_60d) |> mutate(threshold= "60 days")))
+  
+# Clonal Complex vs Age Cat in each country
+chisq.test_CC_CDC_7d <- chisq.test(metadata_CDC_threshold$Age_cat_7d, metadata_CDC_threshold$clonal_complex)
+chisq.test_CC_CDC_14d <- chisq.test(metadata_CDC_threshold$Age_cat_14d, metadata_CDC_threshold$clonal_complex)
+chisq.test_CC_CDC_30d <- chisq.test(metadata_CDC_threshold$Age_cat_30d, metadata_CDC_threshold$clonal_complex)
+chisq.test_CC_CDC_60d <- chisq.test(metadata_CDC_threshold$Age_cat_60d, metadata_CDC_threshold$clonal_complex)
+
+p_labels_CC_CDC_threshold <- data.frame(threshold= c("7 days", "14 days", "30 days", "60 days"), 
+                       pval= c(signif(chisq.test_CC_CDC_7d$p.value , 3), signif(chisq.test_CC_CDC_14d$p.value , 3), signif(chisq.test_CC_CDC_30d$p.value , 3), signif(chisq.test_CC_CDC_60d$p.value , 3)), 
+                       X2= c(round(chisq.test_CC_CDC_7d$statistic, 1), round(chisq.test_CC_CDC_14d$statistic, 1), round(chisq.test_CC_CDC_30d$statistic, 1), round(chisq.test_CC_CDC_60d$statistic, 1)))|>
+  mutate(threshold = factor(threshold, levels=c("7 days", "14 days", "30 days", "60 days")))
+
+
+# Summarise counts and percentages per country x Age_cat x Serotype2
+df_pct_CC_CDC_threshold <- metadata_CDC_threshold_long |>
+  group_by(threshold, Age_cat, clonal_complex) |>
+  summarise(count = n(), .groups = "drop") |>
+  group_by(threshold, Age_cat) |>
+  mutate(
+    perc = count / sum(count) * 100,
+    perc_label = ifelse(perc >= 1, paste0(round(perc), "%"), "")
+  ) |>
+  ungroup()|>
+  mutate(threshold = factor(threshold, levels=c("7 days", "14 days", "30 days", "60 days")))
+
+# Totals per bar (same as before but from df_pct)
+bar_totals_CC_CDC_threshold <- df_pct_CC_CDC_threshold |>
+  group_by(threshold, Age_cat) |>
+  summarise(N = sum(count), .groups = "drop")
+
+
+p_CC_CDC_threshold <- df_pct_CC_CDC_threshold|>
+  ggplot(aes(x = Age_cat, y = perc, fill = clonal_complex)) +
+  # stacked percentage bars (perc already in data)
+  geom_col() +
+  
+  # percentage labels inside segments, only if >= 10%
+  geom_text(
+    aes(label = perc_label),
+    position = position_stack(vjust = 0.5),
+    color = "white",
+    size = 5
+  ) +
+  
+  # total N at top of each bar
+  geom_text(
+    data = bar_totals_CC_CDC_threshold,
+    aes(x = Age_cat, y = 102, label = paste0("n=", N)),
+    inherit.aes = FALSE, size=5
+  ) +
+  facet_grid(. ~ threshold) +
+  scale_y_continuous(
+    name = "Percentage",
+    limits = c(0, 115),
+    breaks = seq(0, 100, 20),
+    labels = function(x) paste0(x, "%")
+  ) +
+  xlab("Age Category") +
+  theme_bw() +
+  scale_fill_manual(name = "Clonal Complex", values = CC_colors)+
+  # add per-country p-values
+  geom_text(
+    data = p_labels_CC_CDC_threshold,
+    aes(x = 1.3, y = 115, label = paste0("χ²= ", X2)),
+    inherit.aes = FALSE,
+    hjust = 0,          # left-justify
+    size = 4
+  ) +
+  # add per-country p-values
+  geom_text(
+    data = p_labels_CC_CDC_threshold,
+    aes(x = 1.25, y = 110, label = paste0("p = ", pval)),
+    inherit.aes = FALSE,
+    hjust = 0,          # left-justify
+    size = 4
+  ) +
+  # segment above bars connecting them
+  geom_segment(
+    aes(x = 1, xend = 2, y = 107, yend = 107),
+    inherit.aes = FALSE,
+    linewidth = 0.7
+  )+
+  # segment above bars connecting them
+  geom_segment(
+    aes(x = 1, xend = 1, y = 105, yend = 107),
+    inherit.aes = FALSE,
+    linewidth = 0.7
+  )+
+  # segment above bars connecting them
+  geom_segment(
+    aes(x = 2, xend = 2, y = 105, yend = 107),
+    inherit.aes = FALSE,
+    linewidth = 0.7
+  )+
+  ggtitle("Clonal Complex Distribution across Age of Onset Binarization Thresholds")+ 
+  theme(
+    plot.title   = element_text(face = "bold", hjust = 0.5, size =15),
+    axis.title   = element_text(size = 15),   # axis titles
+    axis.text    = element_text(size = 13),   # axis tick labels
+    legend.title = element_text(size = 15),   # legend title
+    legend.text  = element_text(size = 13)    # legend labels
+  )
+
+
+
+# Serotype vs Age Cat in each country
+chisq.test_Serotype_CDC_7d <- chisq.test(metadata_CDC_threshold$Age_cat_7d, metadata_CDC_threshold$Serotype2)
+chisq.test_Serotype_CDC_14d <- chisq.test(metadata_CDC_threshold$Age_cat_14d, metadata_CDC_threshold$Serotype2)
+chisq.test_Serotype_CDC_30d <- chisq.test(metadata_CDC_threshold$Age_cat_30d, metadata_CDC_threshold$Serotype2)
+chisq.test_Serotype_CDC_60d <- chisq.test(metadata_CDC_threshold$Age_cat_60d, metadata_CDC_threshold$Serotype2)
+
+p_labels_Serotype_CDC_threshold <- data.frame(threshold= c("7 days", "14 days", "30 days", "60 days"), 
+                       pval= c(signif(chisq.test_Serotype_CDC_7d$p.value , 3), signif(chisq.test_Serotype_CDC_14d$p.value , 3), signif(chisq.test_Serotype_CDC_30d$p.value , 3), signif(chisq.test_Serotype_CDC_60d$p.value , 3)), 
+                       X2= c(round(chisq.test_Serotype_CDC_7d$statistic, 1), round(chisq.test_Serotype_CDC_14d$statistic, 1), round(chisq.test_Serotype_CDC_30d$statistic, 1), round(chisq.test_Serotype_CDC_60d$statistic, 1)))|>
+  mutate(threshold = factor(threshold, levels=c("7 days", "14 days", "30 days", "60 days")))
+
+
+# Summarise counts and percentages per country x Age_cat x Serotype2
+df_pct_Serotype_CDC_threshold <- metadata_CDC_threshold_long |>
+  group_by(threshold, Age_cat, Serotype2) |>
+  summarise(count = n(), .groups = "drop") |>
+  group_by(threshold, Age_cat) |>
+  mutate(
+    perc = count / sum(count) * 100,
+    perc_label = ifelse(perc >= 1, paste0(round(perc), "%"), "")
+  ) |>
+  ungroup()|>
+  mutate(threshold = factor(threshold, levels=c("7 days", "14 days", "30 days", "60 days")))
+
+# Totals per bar (same as before but from df_pct)
+bar_totals_Serotype_CDC_threshold <- df_pct_Serotype_CDC_threshold |>
+  group_by(threshold, Age_cat) |>
+  summarise(N = sum(count), .groups = "drop")
+
+
+p_Serotype_CDC_threshold <- df_pct_Serotype_CDC_threshold|>
+  ggplot(aes(x = Age_cat, y = perc, fill = Serotype2)) +
+  # stacked percentage bars (perc already in data)
+  geom_col() +
+  
+  # percentage labels inside segments, only if >= 10%
+  geom_text(
+    aes(label = perc_label),
+    position = position_stack(vjust = 0.5),
+    color = "white",
+    size = 5
+  ) +
+  
+  # total N at top of each bar
+  geom_text(
+    data = bar_totals_Serotype_CDC_threshold,
+    aes(x = Age_cat, y = 102, label = paste0("n=", N)),
+    inherit.aes = FALSE, size=5
+  ) +
+  facet_grid(. ~ threshold) +
+  scale_y_continuous(
+    name = "Percentage",
+    limits = c(0, 115),
+    breaks = seq(0, 100, 20),
+    labels = function(x) paste0(x, "%")
+  ) +
+  xlab("Age Category") +
+  theme_bw() +
+  scale_fill_manual(name = "Serotype", values = Serotype_colors)+
+  # add per-country p-values
+  geom_text(
+    data = p_labels_Serotype_CDC_threshold,
+    aes(x = 1.3, y = 115, label = paste0("χ²= ", X2)),
+    inherit.aes = FALSE,
+    hjust = 0,          # left-justify
+    size = 4
+  ) +
+  # add per-country p-values
+  geom_text(
+    data = p_labels_Serotype_CDC_threshold,
+    aes(x = 1.25, y = 110, label = paste0("p = ", pval)),
+    inherit.aes = FALSE,
+    hjust = 0,          # left-justify
+    size = 4
+  ) +
+  # segment above bars connecting them
+  geom_segment(
+    aes(x = 1, xend = 2, y = 107, yend = 107),
+    inherit.aes = FALSE,
+    linewidth = 0.7
+  )+
+  # segment above bars connecting them
+  geom_segment(
+    aes(x = 1, xend = 1, y = 105, yend = 107),
+    inherit.aes = FALSE,
+    linewidth = 0.7
+  )+
+  # segment above bars connecting them
+  geom_segment(
+    aes(x = 2, xend = 2, y = 105, yend = 107),
+    inherit.aes = FALSE,
+    linewidth = 0.7
+  )+
+  ggtitle("Serotype Distribution across Age of Onset Binarization Thresholds")+ 
+  theme(
+    plot.title   = element_text(face = "bold", hjust = 0.5, size =15),
+    axis.title   = element_text(size = 15),   # axis titles
+    axis.text    = element_text(size = 13),   # axis tick labels
+    legend.title = element_text(size = 15),   # legend title
+    legend.text  = element_text(size = 13)    # legend labels
+  )
+
+# Combine 
+p_CC_serotype_CDC_threshold <- p_CC_CDC_threshold / p_Serotype_CDC_threshold
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/2. Analysis/MS1 - USA GWAS interpretation/CDC_EOD_vs_LOD_thresholds_CC_Sero_Barplots.png", p_CC_serotype_CDC_threshold, width = 15, height = 10, dpi = 300)
+ggsave("~/GitHub/GBS-GWAS-CDC-EOD-LOD/2. Analysis/MS1 - USA GWAS interpretation/CDC_EOD_vs_LOD_thresholds_CC_Sero_Barplots.tiff", p_CC_serotype_CDC_threshold, width = 15, height = 10, dpi = 300)
+```
+
